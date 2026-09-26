@@ -25,7 +25,8 @@ import {
   ShieldCheck,
   Zap,
   BarChart3,
-  Search
+  Search,
+  Settings
 } from 'lucide-react';
 import { LineEntry, UserProfile, ChecklistMap } from '../types';
 import { CustomDateSelector } from './CustomDateSelector';
@@ -269,6 +270,17 @@ export const Reports: React.FC<ReportsProps> = ({
               <Printer className="w-4 h-4 text-[#176f78]" />
               <span>Print Sheet</span>
             </button>
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('control-center')}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#d9d2c2] text-[#176f78] hover:bg-[#f1eee6] transition-colors text-xs font-bold cursor-pointer shadow-2xs"
+                title="Go to Settings Control Center"
+              >
+                <Settings className="w-4 h-4 text-[#176f78]" />
+                <span className="hidden sm:inline">Settings Hub</span>
+              </button>
+            )}
           </div>
         </div>
 

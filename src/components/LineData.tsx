@@ -71,8 +71,121 @@ import { calculate8hShiftWorkingMinutesBalancing } from '../utils/workingMinutes
 import { generateTelemetryCSV, downloadTelemetryCSV } from '../utils/telemetryCsv';
 import { LineEfficiencySparkline } from './LineEfficiencySparkline';
 
-export type LineSortCriterion = 'lineNo' | 'efficiency' | 'wip';
+export type LineSortCriterion = 'lineNo' | 'efficiency' | 'bottleneck' | 'wip' | 'critical';
 export type SortDirection = 'asc' | 'desc';
+
+/**
+ * Calculates bottleneck severity score and status details for a sewing line.
+ * Higher score indicates worse station choking requiring urgent floor intervention.
+ */
+export const getBottleneckSeverity = (line: LineEntry): {
+  score: number;
+  status: 'critical' | 'high' | 'ok' | 'none';
+  cycleTime: number;
+  targetCT: number;
+  overrunPct: number;
+  station: string;
+  action: string;
+} => {
+  const bn = line.bottleneck;
+  if (!bn) {
+    return {
+      score: 0,
+      status: 'none',
+      cycleTime: 0,
+      targetCT: 0,
+      overrunPct: 0,
+      station: 'No Bottleneck Reported',
+      action: ''
+    };
+  }
+
+  const ct = Number(bn.cycleTime) || 0;
+  const targetCT = Number(bn.targetCT) || 0;
+  const overrunPct = targetCT > 0 ? Math.round(((ct - targetCT) / targetCT) * 100) : (ct > 0 ? 50 : 0);
+
+  let score = 0;
+  let status: 'critical' | 'high' | 'ok' | 'none' = 'ok';
+
+  if (bn.status === 'critical' || overrunPct >= 20 || (ct > 0 && targetCT > 0 && ct >= targetCT * 1.2)) {
+    status = 'critical';
+    score += 500;
+  } else if (bn.status === 'high' || overrunPct > 0 || (ct > 0 && targetCT > 0 && ct > targetCT)) {
+    status = 'high';
+    score += 250;
+  } else if (bn.status === 'ok') {
+    status = 'ok';
+    score += 50;
+  }
+
+  // Weight by actual cycle time overrun
+  score += Math.max(0, overrunPct * 2);
+
+  return {
+    score,
+    status,
+    cycleTime: ct,
+    targetCT,
+    overrunPct,
+    station: bn.station || 'Critical Station',
+    action: bn.action || ''
+  };
+};
+
+/**
+ * Compound urgency score for shop-floor IE interventions.
+ */
+export const getFloorInterventionUrgency = (line: LineEntry): {
+  score: number;
+  reasons: string[];
+  level: 'urgent' | 'warning' | 'stable';
+} => {
+  let score = 0;
+  const reasons: string[] = [];
+
+  // 1. Bottleneck severity
+  const bn = getBottleneckSeverity(line);
+  if (bn.status === 'critical') {
+    score += 400;
+    reasons.push(`Critical Bottleneck at ${bn.station} (${bn.cycleTime}s vs ${bn.targetCT}s takt)`);
+  } else if (bn.status === 'high') {
+    score += 200;
+    reasons.push(`High Cycle Time at ${bn.station} (+${bn.overrunPct}%)`);
+  }
+
+  // 2. Efficiency deficit (<60% is urgent)
+  const eff = line.efficiency ?? 0;
+  const targetEff = line.targetEff ?? 85;
+  if (eff < 55) {
+    score += 350;
+    reasons.push(`Severely Low Efficiency (${eff}% vs ${targetEff}% target)`);
+  } else if (eff < 70) {
+    score += 180;
+    reasons.push(`Under Target Efficiency (${eff}%)`);
+  }
+
+  // 3. WIP Accumulation (>350 is severe buffer choke)
+  const wip = line.wip ?? 0;
+  if (wip > 350) {
+    score += 150;
+    reasons.push(`Excessive WIP Buffer (${wip} pcs)`);
+  } else if (wip > 240) {
+    score += 80;
+    reasons.push(`High Buffer WIP (${wip} pcs)`);
+  }
+
+  // 4. Manpower Absenteeism
+  const present = (line.mp?.Operator?.present || 0) + (line.mp?.Helper?.present || 0) + (line.mp?.['Iron Man']?.present || 0);
+  const absent = (line.mp?.Operator?.absent || 0) + (line.mp?.Helper?.absent || 0) + (line.mp?.['Iron Man']?.absent || 0);
+  const total = present + absent;
+  if (total > 0 && (absent / total) >= 0.15) {
+    score += 120;
+    reasons.push(`High Absenteeism (${absent} absent / ${Math.round((absent / total) * 100)}%)`);
+  }
+
+  const level = score >= 400 ? 'urgent' : score >= 200 ? 'warning' : 'stable';
+  return { score, reasons, level };
+};
 
 interface LineDataProps {
   lines: LineEntry[];
@@ -88,6 +201,8 @@ interface LineDataProps {
   onSelectDate?: (date: string) => void;
   profile?: UserProfile;
   roleTiers?: RoleTier[];
+  initialSortBy?: LineSortCriterion;
+  initialSortDirection?: SortDirection;
 }
 
 export const LineData: React.FC<LineDataProps> = ({
@@ -103,13 +218,27 @@ export const LineData: React.FC<LineDataProps> = ({
   activeDate,
   onSelectDate,
   profile,
-  roleTiers
+  roleTiers,
+  initialSortBy,
+  initialSortDirection
 }) => {
   const isMasterAdmin = isMasterAdminOrAdmin(profile);
   const [filterDate, setFilterDate] = useState<string>(activeDate || 'all');
   const [selectedFloorFilter, setSelectedFloorFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<LineSortCriterion>('lineNo');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortBy, setSortBy] = useState<LineSortCriterion>(initialSortBy || 'lineNo');
+  const [sortDirection, setSortDirection] = useState<SortDirection>(initialSortDirection || 'asc');
+
+  useEffect(() => {
+    if (initialSortBy) {
+      setSortBy(initialSortBy);
+    }
+  }, [initialSortBy]);
+
+  useEffect(() => {
+    if (initialSortDirection) {
+      setSortDirection(initialSortDirection);
+    }
+  }, [initialSortDirection]);
 
   // Debonair LTD (Unit-02) RBAC Access Check for currently selected line
   const lineAccess = useMemo(() => {
@@ -392,16 +521,56 @@ export const LineData: React.FC<LineDataProps> = ({
     return result;
   }, [lines, filterDate, activeDate, selectedFloorFilter]);
 
-  // Sorted Lines computation
+  // Sorted Lines computation supporting Bottleneck Status, Efficiency %, Intervention Priority, WIP, and Line Number
   const sortedLines = React.useMemo(() => {
     return [...filteredLines].sort((a, b) => {
+      // 1. Bottleneck Status Sorting: Critical floor interventions prioritized
+      if (sortBy === 'bottleneck') {
+        const bnA = getBottleneckSeverity(a);
+        const bnB = getBottleneckSeverity(b);
+        if (bnA.score !== bnB.score) {
+          // desc: Critical bottlenecks first (highest severity score)
+          // asc: Balanced lines first (lowest severity score)
+          return sortDirection === 'desc' ? bnB.score - bnA.score : bnA.score - bnB.score;
+        }
+        // Secondary: sort by efficiency ascending (lowest efficiency needs help first)
+        const effA = a.efficiency ?? 0;
+        const effB = b.efficiency ?? 0;
+        if (effA !== effB) {
+          return effA - effB;
+        }
+      }
+
+      // 2. Efficiency Percentage Sorting: Prioritize low efficiency lines for intervention
       if (sortBy === 'efficiency') {
         const effA = a.efficiency ?? 0;
         const effB = b.efficiency ?? 0;
         if (effA !== effB) {
+          // asc: Lowest efficiency first (Critical floor intervention priority)
+          // desc: Highest efficiency first (Top benchmark performers)
           return sortDirection === 'desc' ? effB - effA : effA - effB;
         }
-      } else if (sortBy === 'wip') {
+        // Secondary: sort by bottleneck severity desc
+        const bnA = getBottleneckSeverity(a);
+        const bnB = getBottleneckSeverity(b);
+        if (bnA.score !== bnB.score) {
+          return bnB.score - bnA.score;
+        }
+      }
+
+      // 3. Compound Floor Intervention Urgency
+      if (sortBy === 'critical') {
+        const urgA = getFloorInterventionUrgency(a);
+        const urgB = getFloorInterventionUrgency(b);
+        if (urgA.score !== urgB.score) {
+          return sortDirection === 'desc' ? urgB.score - urgA.score : urgA.score - urgB.score;
+        }
+        // Secondary: lowest efficiency first
+        return (a.efficiency ?? 0) - (b.efficiency ?? 0);
+      }
+
+      // 4. WIP Buffer Accumulation
+      if (sortBy === 'wip') {
         const wipA = a.wip ?? 0;
         const wipB = b.wip ?? 0;
         if (wipA !== wipB) {
@@ -420,6 +589,42 @@ export const LineData: React.FC<LineDataProps> = ({
         : a.lineNo.localeCompare(b.lineNo, undefined, { numeric: true });
     });
   }, [filteredLines, sortBy, sortDirection]);
+
+  // Floor intervention and bottleneck summary across currently filtered lines
+  const interventionSummary = React.useMemo(() => {
+    let criticalBottlenecks = 0;
+    let highBottlenecks = 0;
+    let lowEfficiency = 0; // < 60%
+    let subTargetEfficiency = 0; // < targetEff
+    let mostCriticalLine: LineEntry | null = null;
+    let highestUrgencyScore = -1;
+
+    filteredLines.forEach(line => {
+      const bn = getBottleneckSeverity(line);
+      if (bn.status === 'critical') criticalBottlenecks++;
+      else if (bn.status === 'high') highBottlenecks++;
+
+      const eff = line.efficiency ?? 0;
+      const target = line.targetEff ?? 85;
+      if (eff < 60) lowEfficiency++;
+      if (eff < target) subTargetEfficiency++;
+
+      const urgency = getFloorInterventionUrgency(line);
+      if (urgency.score > highestUrgencyScore) {
+        highestUrgencyScore = urgency.score;
+        mostCriticalLine = line;
+      }
+    });
+
+    return {
+      criticalBottlenecks,
+      highBottlenecks,
+      lowEfficiency,
+      subTargetEfficiency,
+      mostCriticalLine: mostCriticalLine as LineEntry | null,
+      highestUrgencyScore
+    };
+  }, [filteredLines]);
 
   const currentLine = filteredLines.find(l => l.lineNo === selectedLineNo) || lines.find(l => l.lineNo === selectedLineNo) || lines[0];
 
@@ -1296,6 +1501,9 @@ export const LineData: React.FC<LineDataProps> = ({
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 sm:pb-0 max-w-full snap-x snap-mandatory touch-scroll no-scrollbar">
               {sortedLines.map(line => {
                 const isSelected = line.lineNo === selectedLineNo;
+                const bn = getBottleneckSeverity(line);
+                const urgency = getFloorInterventionUrgency(line);
+
                 return (
                   <button
                     key={line.id}
@@ -1303,33 +1511,80 @@ export const LineData: React.FC<LineDataProps> = ({
                     className={`px-3 py-1.5 min-h-[40px] rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 snap-start touch-manipulation active:scale-95 ${
                       isSelected
                         ? 'bg-[#176f78] text-white shadow-xs'
+                        : urgency.level === 'urgent' && (sortBy === 'bottleneck' || sortBy === 'critical' || (sortBy === 'efficiency' && sortDirection === 'asc'))
+                        ? 'bg-rose-50/80 text-rose-900 border border-rose-300 hover:bg-rose-100'
                         : 'bg-[#f1eee6] text-[#527078] hover:bg-[#e7e1d5] border border-[#d9d2c2]'
                     }`}
                   >
                     <span>Line {line.lineNo}</span>
+
+                    {/* Bottleneck Status Badge */}
+                    {sortBy === 'bottleneck' && (
+                      <span
+                        className={`text-[9.5px] px-1.5 py-0.2 rounded-md font-mono font-bold flex items-center gap-0.5 ${
+                          isSelected
+                            ? 'bg-white/20 text-white'
+                            : bn.status === 'critical'
+                            ? 'bg-rose-200 text-rose-900 border border-rose-300'
+                            : bn.status === 'high'
+                            ? 'bg-amber-200 text-amber-900 border border-amber-300'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
+                        title={`Bottleneck: ${bn.station} (${bn.cycleTime}s vs ${bn.targetCT}s)`}
+                      >
+                        {bn.status === 'critical' && <AlertTriangle className="w-2.5 h-2.5 text-rose-700 shrink-0" />}
+                        <span>{bn.status === 'critical' ? 'CRIT' : bn.status === 'high' ? `${bn.cycleTime}s` : 'OK'}</span>
+                      </span>
+                    )}
+
+                    {/* Efficiency % Badge */}
                     {sortBy === 'efficiency' && (
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono-numbers ${
-                        isSelected
-                          ? 'bg-white/20 text-white'
-                          : line.efficiency >= 80
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : line.efficiency >= 60
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-rose-100 text-rose-800'
-                      }`}>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded font-mono-numbers font-bold ${
+                          isSelected
+                            ? 'bg-white/20 text-white'
+                            : (line.efficiency ?? 0) < 60
+                            ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                            : (line.efficiency ?? 0) < 80
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
+                      >
                         {line.efficiency}%
                       </span>
                     )}
+
+                    {/* Compound Critical Urgency Badge */}
+                    {sortBy === 'critical' && (
+                      <span
+                        className={`text-[9.5px] px-1.5 py-0.2 rounded font-mono font-bold flex items-center gap-0.5 ${
+                          isSelected
+                            ? 'bg-white/20 text-white'
+                            : urgency.level === 'urgent'
+                            ? 'bg-rose-200 text-rose-900 border border-rose-300'
+                            : urgency.level === 'warning'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
+                      >
+                        {urgency.level === 'urgent' && <Flame className="w-2.5 h-2.5 text-rose-700 shrink-0" />}
+                        <span>{urgency.level.toUpperCase()}</span>
+                      </span>
+                    )}
+
+                    {/* WIP Level Badge */}
                     {sortBy === 'wip' && (
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono-numbers ${
-                        isSelected
-                          ? 'bg-white/20 text-white'
-                          : (line.wip ?? 0) > 350
-                          ? 'bg-rose-100 text-rose-800'
-                          : (line.wip ?? 0) > 220
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-slate-200 text-slate-700'
-                      }`}>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded font-mono-numbers ${
+                          isSelected
+                            ? 'bg-white/20 text-white'
+                            : (line.wip ?? 0) > 350
+                            ? 'bg-rose-100 text-rose-800'
+                            : (line.wip ?? 0) > 220
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-slate-200 text-slate-700'
+                        }`}
+                      >
                         {line.wip ?? 0} wip
                       </span>
                     )}
@@ -1372,16 +1627,107 @@ export const LineData: React.FC<LineDataProps> = ({
           </div>
         </div>
 
-        {/* Sorting Controls Bar */}
+        {/* Sorting Controls Bar with Bottleneck & Efficiency Prioritization */}
         <div className="mt-4 pt-3 border-t border-[#e7e1d5] flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 text-xs font-bold text-[#527078] uppercase tracking-wider">
               <ArrowUpDown className="w-3.5 h-3.5 text-[#176f78]" />
-              <span>Sort By:</span>
+              <span>Sort Lines:</span>
             </div>
 
-            {/* Segmented Buttons */}
-            <div className="inline-flex rounded-xl bg-[#f1eee6] p-0.5 border border-[#d9d2c2]">
+            {/* Segmented Sort Buttons */}
+            <div className="inline-flex rounded-xl bg-[#f1eee6] p-0.5 border border-[#d9d2c2] flex-wrap">
+              {/* Bottleneck Status - Priority Floor Interventions */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (sortBy === 'bottleneck') {
+                    setSortDirection(prev => (prev === 'desc' ? 'asc' : 'desc'));
+                  } else {
+                    setSortBy('bottleneck');
+                    setSortDirection('desc'); // Default to critical bottlenecks first
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  sortBy === 'bottleneck'
+                    ? 'bg-rose-600 text-white shadow-2xs'
+                    : 'text-[#527078] hover:text-[#17343a]'
+                }`}
+                title="Sort lines by station bottleneck status to prioritize critical floor interventions"
+              >
+                <AlertTriangle className={`w-3 h-3 ${sortBy === 'bottleneck' ? 'text-amber-300' : 'text-rose-600'}`} />
+                <span>Bottleneck</span>
+                {interventionSummary.criticalBottlenecks > 0 && (
+                  <span
+                    className={`text-[9px] px-1 py-0.2 rounded-full font-mono font-bold ${
+                      sortBy === 'bottleneck' ? 'bg-white text-rose-700' : 'bg-rose-100 text-rose-800'
+                    }`}
+                  >
+                    {interventionSummary.criticalBottlenecks}
+                  </span>
+                )}
+                {sortBy === 'bottleneck' && (
+                  sortDirection === 'desc' ? (
+                    <span className="text-[10px] opacity-90 font-mono">Crit ⚠️</span>
+                  ) : (
+                    <span className="text-[10px] opacity-90 font-mono">OK ✓</span>
+                  )
+                )}
+              </button>
+
+              {/* Efficiency % - Low (Intervention) or High (Benchmark) */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (sortBy === 'efficiency') {
+                    setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+                  } else {
+                    setSortBy('efficiency');
+                    setSortDirection('asc'); // Default to lowest efficiency first to prioritize critical lines
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  sortBy === 'efficiency'
+                    ? sortDirection === 'asc'
+                      ? 'bg-amber-600 text-white shadow-2xs'
+                      : 'bg-[#176f78] text-white shadow-2xs'
+                    : 'text-[#527078] hover:text-[#17343a]'
+                }`}
+                title="Sort by Efficiency % (Lowest First for floor intervention, or Highest First for top benchmarks)"
+              >
+                <Percent className="w-3 h-3" />
+                <span>Efficiency</span>
+                {sortBy === 'efficiency' && (
+                  sortDirection === 'asc' ? (
+                    <span className="text-[10px] font-mono opacity-90">Low 🚨</span>
+                  ) : (
+                    <span className="text-[10px] font-mono opacity-90">High 🏆</span>
+                  )
+                )}
+              </button>
+
+              {/* Compound Intervention Priority */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (sortBy === 'critical') {
+                    setSortDirection(prev => (prev === 'desc' ? 'asc' : 'desc'));
+                  } else {
+                    setSortBy('critical');
+                    setSortDirection('desc');
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  sortBy === 'critical'
+                    ? 'bg-rose-700 text-white shadow-2xs'
+                    : 'text-[#527078] hover:text-[#17343a]'
+                }`}
+                title="Compound floor intervention priority based on bottlenecks, efficiency deficit, and buffer WIP"
+              >
+                <Flame className={`w-3 h-3 ${sortBy === 'critical' ? 'text-amber-300' : 'text-rose-500'}`} />
+                <span>Intervene</span>
+              </button>
+
               {/* Line Number */}
               <button
                 type="button"
@@ -1406,30 +1752,6 @@ export const LineData: React.FC<LineDataProps> = ({
                 )}
               </button>
 
-              {/* Efficiency */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (sortBy === 'efficiency') {
-                    setSortDirection(prev => (prev === 'desc' ? 'asc' : 'desc'));
-                  } else {
-                    setSortBy('efficiency');
-                    setSortDirection('desc');
-                  }
-                }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                  sortBy === 'efficiency'
-                    ? 'bg-white text-[#176f78] shadow-2xs'
-                    : 'text-[#527078] hover:text-[#17343a]'
-                }`}
-                title="Sort by Efficiency (High / Low)"
-              >
-                <span>Efficiency</span>
-                {sortBy === 'efficiency' && (
-                  sortDirection === 'desc' ? <ArrowDown className="w-3 h-3 text-[#176f78]" /> : <ArrowUp className="w-3 h-3 text-[#176f78]" />
-                )}
-              </button>
-
               {/* WIP Level */}
               <button
                 type="button"
@@ -1448,14 +1770,14 @@ export const LineData: React.FC<LineDataProps> = ({
                 }`}
                 title="Sort by WIP Level (High / Low)"
               >
-                <span>WIP Level</span>
+                <span>WIP</span>
                 {sortBy === 'wip' && (
                   sortDirection === 'desc' ? <ArrowDown className="w-3 h-3 text-[#176f78]" /> : <ArrowUp className="w-3 h-3 text-[#176f78]" />
                 )}
               </button>
             </div>
 
-            {/* Quick Dropdown Selector */}
+            {/* Quick Dropdown Selector for Complete Control */}
             <select
               value={`${sortBy}-${sortDirection}`}
               onChange={(e) => {
@@ -1465,12 +1787,19 @@ export const LineData: React.FC<LineDataProps> = ({
               }}
               className="text-xs font-bold py-1 px-2.5 rounded-xl bg-white border border-[#d9d2c2] text-[#17343a] cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#176f78]"
             >
-              <option value="lineNo-asc">Line Number (1 → 34)</option>
-              <option value="lineNo-desc">Line Number (34 → 1)</option>
-              <option value="efficiency-desc">Efficiency (High → Low)</option>
-              <option value="efficiency-asc">Efficiency (Low → High)</option>
-              <option value="wip-desc">WIP Level (High → Low)</option>
-              <option value="wip-asc">WIP Level (Low → High)</option>
+              <optgroup label="Floor Intervention Priorities">
+                <option value="bottleneck-desc">⚠️ Bottleneck: Critical Bottlenecks First</option>
+                <option value="bottleneck-asc">✓ Bottleneck: Stable &amp; Balanced Lines First</option>
+                <option value="efficiency-asc">🚨 Efficiency: Lowest First (Intervention Priority)</option>
+                <option value="critical-desc">🔥 Floor Triage: Combined Urgent Needs First</option>
+              </optgroup>
+              <optgroup label="Standard Benchmarks &amp; Order">
+                <option value="efficiency-desc">🏆 Efficiency: Highest First (Top Performers)</option>
+                <option value="lineNo-asc">🔢 Line Number: Sequential (Line 01 → 34)</option>
+                <option value="lineNo-desc">🔢 Line Number: Reverse (Line 34 → 01)</option>
+                <option value="wip-desc">📦 WIP Buffer: High Buffer First (&gt;350 pcs)</option>
+                <option value="wip-asc">📦 WIP Buffer: Low Buffer First</option>
+              </optgroup>
             </select>
           </div>
 
@@ -1510,6 +1839,53 @@ export const LineData: React.FC<LineDataProps> = ({
             )}
           </div>
         </div>
+
+        {/* Smart Floor Intervention Callout Banner */}
+        {(sortBy === 'bottleneck' || sortBy === 'critical' || (sortBy === 'efficiency' && sortDirection === 'asc')) && (
+          <div className="mt-3 p-3.5 rounded-2xl bg-gradient-to-r from-rose-50 via-amber-50 to-orange-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-start sm:items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-rose-600 text-white shrink-0 shadow-xs">
+                <AlertTriangle className="w-4 h-4 animate-pulse" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-rose-950 flex flex-wrap items-center gap-2">
+                  <span>Prioritizing Critical Floor Interventions</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-rose-200 text-rose-900 font-mono font-bold uppercase">
+                    {sortBy === 'bottleneck'
+                      ? 'Bottleneck Status Sorting'
+                      : sortBy === 'critical'
+                      ? 'Compound Urgency Ranking'
+                      : 'Lowest Efficiency First'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-rose-800 mt-0.5">
+                  Shop-floor lines are ordered to surface critical bottlenecks, station cycle overruns, and underperforming efficiencies.
+                  {interventionSummary.criticalBottlenecks > 0 && (
+                    <strong className="ml-1 text-rose-950 font-bold">
+                      {interventionSummary.criticalBottlenecks} lines with critical bottlenecks flagged.
+                    </strong>
+                  )}
+                  {interventionSummary.lowEfficiency > 0 && (
+                    <strong className="ml-1 text-amber-900 font-bold">
+                      {interventionSummary.lowEfficiency} lines under 60% efficiency.
+                    </strong>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {interventionSummary.mostCriticalLine && interventionSummary.mostCriticalLine.lineNo !== selectedLineNo && (
+              <button
+                type="button"
+                onClick={() => onSelectLineNo(interventionSummary.mostCriticalLine!.lineNo)}
+                className="px-3.5 py-1.5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold transition-all shadow-xs shrink-0 flex items-center gap-1.5 cursor-pointer touch-manipulation active:scale-95"
+              >
+                <Flame className="w-3.5 h-3.5 text-amber-300" />
+                <span>Jump to Line {interventionSummary.mostCriticalLine.lineNo} (Highest Severity)</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Capture Line Record Banner (Image 1 Header Banner) */}
         <div className="mt-5 p-4 rounded-2xl bg-white border border-[#e7e1d5] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
@@ -3607,22 +3983,55 @@ export const LineData: React.FC<LineDataProps> = ({
                 />
               </div>
 
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="text-[11px] font-bold text-[#527078]">Quick Sort:</span>
+              <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                <span className="text-[11px] font-bold text-[#527078]">Priority Sort:</span>
+                {/* Bottleneck Sort */}
                 <button
                   type="button"
                   onClick={() => {
-                    setSortBy('efficiency');
-                    setSortDirection(prev => (sortBy === 'efficiency' && prev === 'desc' ? 'asc' : 'desc'));
+                    if (sortBy === 'bottleneck') {
+                      setSortDirection(prev => (prev === 'desc' ? 'asc' : 'desc'));
+                    } else {
+                      setSortBy('bottleneck');
+                      setSortDirection('desc');
+                    }
                   }}
-                  className={`px-2.5 py-1 rounded-lg font-bold border transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg font-bold border transition-colors cursor-pointer flex items-center gap-1 ${
+                    sortBy === 'bottleneck'
+                      ? 'bg-rose-600 text-white border-rose-600'
+                      : 'bg-[#f1eee6] text-rose-800 border-[#d9d2c2] hover:bg-[#e7e1d5]'
+                  }`}
+                  title="Sort by Bottleneck Status (Critical First)"
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  <span>Bottleneck {sortBy === 'bottleneck' ? (sortDirection === 'desc' ? '⚠️ Crit' : '✓ OK') : ''}</span>
+                </button>
+
+                {/* Efficiency Sort */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sortBy === 'efficiency') {
+                      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+                    } else {
+                      setSortBy('efficiency');
+                      setSortDirection('asc'); // Lowest first for interventions
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded-lg font-bold border transition-colors cursor-pointer flex items-center gap-1 ${
                     sortBy === 'efficiency'
-                      ? 'bg-[#176f78] text-white border-[#176f78]'
+                      ? sortDirection === 'asc'
+                        ? 'bg-amber-600 text-white border-amber-600'
+                        : 'bg-[#176f78] text-white border-[#176f78]'
                       : 'bg-[#f1eee6] text-[#527078] border-[#d9d2c2] hover:bg-[#e7e1d5]'
                   }`}
+                  title="Sort by Efficiency % (Lowest First for floor intervention)"
                 >
-                  Efficiency {sortBy === 'efficiency' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                  <Percent className="w-3 h-3" />
+                  <span>Efficiency {sortBy === 'efficiency' ? (sortDirection === 'asc' ? '🚨 Low' : '🏆 High') : ''}</span>
                 </button>
+
+                {/* WIP Sort */}
                 <button
                   type="button"
                   onClick={() => {
@@ -3637,6 +4046,8 @@ export const LineData: React.FC<LineDataProps> = ({
                 >
                   WIP Level {sortBy === 'wip' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
                 </button>
+
+                {/* Line No Sort */}
                 <button
                   type="button"
                   onClick={() => {
@@ -3659,14 +4070,64 @@ export const LineData: React.FC<LineDataProps> = ({
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-[#f1eee6] sticky top-0 text-[#17343a] text-[11px] font-bold uppercase tracking-wider border-b border-[#d9d2c2]">
                   <tr>
-                    <th className="p-3">Line #</th>
+                    <th
+                      className="p-3 cursor-pointer hover:text-[#176f78]"
+                      onClick={() => {
+                        setSortBy('lineNo');
+                        setSortDirection(prev => (sortBy === 'lineNo' && prev === 'asc' ? 'desc' : 'asc'));
+                      }}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        Line # {sortBy === 'lineNo' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                      </span>
+                    </th>
                     <th className="p-3">Floor / Unit</th>
                     <th className="p-3">Buyer &amp; Style</th>
                     <th className="p-3 text-right">SMV</th>
                     <th className="p-3 text-right">Planned MP</th>
                     <th className="p-3 text-right">Output / Target</th>
-                    <th className="p-3 text-right">Efficiency</th>
-                    <th className="p-3 text-right">WIP Level</th>
+                    <th
+                      className="p-3 text-right cursor-pointer hover:text-[#176f78]"
+                      onClick={() => {
+                        if (sortBy === 'efficiency') {
+                          setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+                        } else {
+                          setSortBy('efficiency');
+                          setSortDirection('asc');
+                        }
+                      }}
+                    >
+                      <span className="inline-flex items-center gap-1 justify-end">
+                        Efficiency {sortBy === 'efficiency' ? (sortDirection === 'asc' ? '🚨 Low' : '🏆 High') : '↕'}
+                      </span>
+                    </th>
+                    <th
+                      className="p-3 cursor-pointer hover:text-rose-700"
+                      onClick={() => {
+                        if (sortBy === 'bottleneck') {
+                          setSortDirection(prev => (prev === 'desc' ? 'asc' : 'desc'));
+                        } else {
+                          setSortBy('bottleneck');
+                          setSortDirection('desc');
+                        }
+                      }}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-rose-600" />
+                        Bottleneck Status {sortBy === 'bottleneck' ? (sortDirection === 'desc' ? '⚠️ Crit' : '✓ OK') : '↕'}
+                      </span>
+                    </th>
+                    <th
+                      className="p-3 text-right cursor-pointer hover:text-[#176f78]"
+                      onClick={() => {
+                        setSortBy('wip');
+                        setSortDirection(prev => (sortBy === 'wip' && prev === 'desc' ? 'asc' : 'desc'));
+                      }}
+                    >
+                      <span className="inline-flex items-center gap-1 justify-end">
+                        WIP Level {sortBy === 'wip' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                      </span>
+                    </th>
                     <th className="p-3 text-center">Actions</th>
                   </tr>
                 </thead>
@@ -3684,11 +4145,17 @@ export const LineData: React.FC<LineDataProps> = ({
                     })
                     .map(line => {
                       const isCurrent = line.lineNo === selectedLineNo;
+                      const bn = getBottleneckSeverity(line);
+
                       return (
                         <tr
                           key={line.id}
                           className={`hover:bg-[#fbfaf6] transition-colors ${
-                            isCurrent ? 'bg-[#eef7f7]/60 font-semibold' : ''
+                            isCurrent
+                              ? 'bg-[#eef7f7]/60 font-semibold'
+                              : bn.status === 'critical' && sortBy === 'bottleneck'
+                              ? 'bg-rose-50/50'
+                              : ''
                           }`}
                         >
                           <td className="p-3 font-bold text-[#17343a]">
@@ -3722,10 +4189,39 @@ export const LineData: React.FC<LineDataProps> = ({
                                 ? 'bg-emerald-100 text-emerald-800'
                                 : line.efficiency >= 60
                                 ? 'bg-amber-100 text-amber-800'
-                                : 'bg-rose-100 text-rose-800'
+                                : 'bg-rose-100 text-rose-800 border border-rose-200'
                             }`}>
                               {line.efficiency}%
                             </span>
+                          </td>
+                          {/* Bottleneck Status Column */}
+                          <td className="p-3">
+                            {bn.status === 'critical' ? (
+                              <div className="space-y-0.5">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-900 border border-rose-300 inline-flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
+                                  <span>Critical ({bn.cycleTime}s vs {bn.targetCT}s)</span>
+                                </span>
+                                <div className="text-[10px] text-rose-800 truncate max-w-[170px]" title={bn.station}>
+                                  {bn.station}
+                                </div>
+                              </div>
+                            ) : bn.status === 'high' ? (
+                              <div className="space-y-0.5">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                                  <span>High Cycle ({bn.cycleTime}s)</span>
+                                </span>
+                                <div className="text-[10px] text-[#527078] truncate max-w-[170px]" title={bn.station}>
+                                  {bn.station}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Balanced</span>
+                              </span>
+                            )}
                           </td>
                           <td className="p-3 text-right font-mono-numbers">
                             <span className={`font-bold ${

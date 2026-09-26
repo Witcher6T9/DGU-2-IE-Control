@@ -25,7 +25,6 @@ import {
   Layers,
   Wrench,
   Calculator,
-  ArrowUpRight,
   X
 } from 'lucide-react';
 import { LeanMethod, LeanActionItem, UserProfile, LineEntry } from '../types';
@@ -249,42 +248,6 @@ export const LeanToolkit: React.FC<LeanToolkitProps> = ({
             <span className="text-xs text-[#527078] hidden sm:block">
               Click any tool to launch its interactive workspace
             </span>
-          </div>
-
-          {/* Featured Tool: Line Capacity Calculator */}
-          <div
-            id="featured-capacity-calculator-banner"
-            onClick={() => setActiveToolId('capacity-calculator')}
-            className="p-4 sm:p-5 rounded-3xl bg-linear-to-r from-[#0c4a60] via-[#176f78] to-[#12555c] text-white shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
-          >
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-                <Calculator className="w-6 h-6 stroke-[2.2]" />
-              </div>
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded-full bg-amber-400 text-amber-950 text-[10px] font-extrabold uppercase tracking-wide">
-                    NEW IE TOOL
-                  </span>
-                  <span className="text-xs font-bold text-cyan-200 uppercase tracking-wider">
-                    Production Planning
-                  </span>
-                </div>
-                <h2 className="text-lg font-extrabold text-white tracking-tight">
-                  Line Capacity Calculator
-                </h2>
-                <p className="text-xs text-cyan-100 max-w-xl">
-                  Input total machine hours and planned SMV to determine theoretical daily production capacity, pitch takt time, and delivery targets.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-              <span className="px-4 py-2 rounded-xl bg-white text-[#0c4a60] font-extrabold text-xs shadow-xs group-hover:bg-cyan-50 transition-colors flex items-center gap-1.5">
-                <span>Launch Calculator</span>
-                <ArrowUpRight className="w-4 h-4" />
-              </span>
-            </div>
           </div>
 
           {/* 13 Tools List - Exactly matching the screenshot design */}

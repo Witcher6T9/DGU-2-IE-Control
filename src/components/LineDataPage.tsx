@@ -5,19 +5,11 @@
 
 import React, { useState } from 'react';
 import {
-  Layers,
-  Sliders,
-  BarChart2,
-  TrendingDown,
-  LayoutGrid,
-  TrendingUp,
-  Calculator,
-  ChevronRight,
-  Sparkles
+  ChevronLeft
 } from 'lucide-react';
 import { LineEntry, ChecklistMap, UserProfile, RoleTier, LeanActionItem } from '../types';
 import { StationData, HourlyOutput, DowntimeIncident } from '../types/dcs';
-import { LineData } from './LineData';
+import { LineData, LineSortCriterion, SortDirection } from './LineData';
 import { LineBalancingTab } from './LineBalancingTab';
 import { HourlyPacingTab } from './HourlyPacingTab';
 import { LossParetoTab } from './LossParetoTab';
@@ -50,6 +42,8 @@ interface LineDataPageProps {
   profile?: UserProfile;
   roleTiers?: RoleTier[];
   initialSubTab?: LineDataSubTab;
+  initialSortBy?: LineSortCriterion;
+  initialSortDirection?: SortDirection;
   stations?: StationData[];
   hourlyData?: HourlyOutput[];
   downtimeLog?: DowntimeIncident[];
@@ -81,6 +75,8 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
   profile,
   roleTiers,
   initialSubTab = 'lines',
+  initialSortBy,
+  initialSortDirection,
   stations = [],
   hourlyData = [],
   downtimeLog = [],
@@ -95,120 +91,25 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
   onUpdateActions = () => {}
 }) => {
   const [subTab, setSubTab] = useState<LineDataSubTab>(initialSubTab);
-
-  // Debonair LTD (Unit-02) operates exactly 34 active sewing lines (Lines 01 to 34 across 6 factory floors)
-  const totalActiveLines = React.useMemo(() => {
-    const uniqueLineNumbers = new Set(
-      lines
-        .map(l => {
-          const num = parseInt(String(l.lineNo).replace(/\D/g, ''), 10);
-          return isNaN(num) ? String(l.lineNo).trim() : String(num);
-        })
-        .filter(Boolean)
-    );
-    return uniqueLineNumbers.size > 0 ? uniqueLineNumbers.size : 34;
-  }, [lines]);
-
-  const subTabs = [
-    {
-      id: 'lines' as LineDataSubTab,
-      label: 'Lines Telemetry',
-      shortLabel: 'Lines Table',
-      icon: Layers,
-      count: totalActiveLines
-    },
-    {
-      id: 'balancing' as LineDataSubTab,
-      label: 'Line Balancing (Yamazumi)',
-      shortLabel: 'Balancing',
-      icon: Sliders
-    },
-    {
-      id: 'hourly' as LineDataSubTab,
-      label: 'Hourly Pacing (UPH)',
-      shortLabel: 'Hourly Pacing',
-      icon: BarChart2
-    },
-    {
-      id: 'loss-pareto' as LineDataSubTab,
-      label: 'Loss Pareto & Downtimes',
-      shortLabel: 'Loss Pareto',
-      icon: TrendingDown,
-      badge: downtimeLog.length > 0 ? `${downtimeLog.length}` : undefined
-    },
-    {
-      id: 'floor-plan' as LineDataSubTab,
-      label: 'Floor Plan & Setup',
-      shortLabel: 'Floor Plan',
-      icon: LayoutGrid
-    },
-    {
-      id: 'history' as LineDataSubTab,
-      label: 'History & Learning Curves',
-      shortLabel: 'History',
-      icon: TrendingUp
-    },
-    {
-      id: 'capacity' as LineDataSubTab,
-      label: 'Capacity Calculator',
-      shortLabel: 'Capacity',
-      icon: Calculator
-    }
-  ];
+  const [hubSortBy, setHubSortBy] = useState<LineSortCriterion>(initialSortBy || 'lineNo');
+  const [hubSortDirection, setHubSortDirection] = useState<SortDirection>(initialSortDirection || 'asc');
 
   return (
     <div className="space-y-4">
-      {/* Top Segmented Sub-Navigation for Line Data Page */}
-      <div className="bg-[#fbfaf6] border border-[#d9d2c2] rounded-2xl p-2 sm:p-2.5 shadow-2xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#176f78] animate-pulse" />
-              <h1 className="text-base sm:text-lg font-bold text-[#17343a] font-display">
-                Line Data Operations Hub
-              </h1>
-              <span className="text-[10.5px] uppercase font-mono px-2.5 py-0.5 rounded-lg bg-[#176f78]/10 text-[#176f78] font-bold border border-[#176f78]/25 tracking-wide shadow-2xs inline-flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#176f78] inline-block animate-pulse" />
-                {totalActiveLines} Sewing Lines Active
-              </span>
-            </div>
-            <p className="text-xs text-[#527078] mt-0.5 hidden sm:block">
-              Real-time workstation balancing, hourly pacing, downtime loss analysis, and floor configurations.
-            </p>
-          </div>
-
-          {/* Sub-tab pills */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-            {subTabs.map(item => {
-              const Icon = item.icon;
-              const isActive = subTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setSubTab(item.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer touch-manipulation active:scale-95 ${
-                    isActive
-                      ? 'bg-[#176f78] text-white shadow-2xs'
-                      : 'bg-white hover:bg-[#f1eee6] text-slate-600 border border-[#d9d2c2]'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
-                  <span>{item.shortLabel}</span>
-                  {item.badge && (
-                    <span
-                      className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                        isActive ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+      {/* Return to Lines telemetry banner when viewing a deep operational workspace */}
+      {subTab !== 'lines' && (
+        <div className="flex items-center justify-between bg-[#fbfaf6] border border-[#d9d2c2] rounded-xl px-3 py-2 text-xs">
+          <button
+            type="button"
+            onClick={() => setSubTab('lines')}
+            className="flex items-center gap-1.5 font-bold text-[#176f78] hover:underline cursor-pointer"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span>Back to Lines Telemetry</span>
+          </button>
+          <span className="font-semibold text-[#527078] capitalize">{subTab.replace('-', ' ')} Workspace</span>
         </div>
-      </div>
+      )}
 
       {/* Active Sub-Tab View Rendering */}
       <div>
@@ -227,6 +128,8 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
             onSelectDate={onSelectDate}
             profile={profile}
             roleTiers={roleTiers}
+            initialSortBy={hubSortBy}
+            initialSortDirection={hubSortDirection}
           />
         )}
 

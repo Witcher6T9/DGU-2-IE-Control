@@ -82,7 +82,6 @@ const TodoSchedule = lazy(() => import('./components/TodoSchedule').then(m => ({
 const LineData = lazy(() => import('./components/LineData').then(m => ({ default: m.LineData })));
 const LeanToolkit = lazy(() => import('./components/LeanToolkit').then(m => ({ default: m.LeanToolkit })));
 const MonthlySummary = lazy(() => import('./components/MonthlySummary').then(m => ({ default: m.MonthlySummary })));
-const Reports = lazy(() => import('./components/Reports').then(m => ({ default: m.Reports })));
 const IESimulator = lazy(() => import('./components/IESimulator').then(m => ({ default: m.IESimulator })));
 const FloorPlanLineSetup = lazy(() => import('./components/FloorPlanLineSetup').then(m => ({ default: m.FloorPlanLineSetup })));
 const LineProductionHistoryView = lazy(() => import('./components/LineProductionHistoryView').then(m => ({ default: m.LineProductionHistoryView })));
@@ -117,6 +116,7 @@ import {
 import type { LineDataSubTab } from './components/LineDataPage';
 import type { ChecklistSubTab } from './components/ChecklistPage';
 import type { LeanToolsSubTab } from './components/LeanToolsPage';
+import type { SettingsPageSection } from './components/SettingsControlCenterPage';
 
 // Code-split modals loaded strictly on-demand
 const AuthPage = lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
@@ -156,6 +156,7 @@ export default function App() {
   const [lineDataSubTab, setLineDataSubTab] = useState<LineDataSubTab>('lines');
   const [checklistSubTab, setChecklistSubTab] = useState<ChecklistSubTab>('daily-checklist');
   const [leanToolsSubTab, setLeanToolsSubTab] = useState<LeanToolsSubTab>('toolkit');
+  const [settingsSection, setSettingsSection] = useState<SettingsPageSection>('control-center');
 
   // DCS Interactive Data State
   const [stations, setStations] = useState<StationData[]>(INITIAL_STATIONS);
@@ -393,7 +394,9 @@ export default function App() {
 
   const handleOpenFactorySettings = () => {
     setFloorSetupInitialSubView('factory');
-    setCurrentTab('floor-plan');
+    setLineDataSubTab('floor-plan');
+    setSettingsSection('control-center');
+    setCurrentTab('settings');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -1611,8 +1614,8 @@ export default function App() {
     notifySave();
   };
 
-  // Canonical 5-Page Navigation Router
-  // Home • Line Data • Check List • Lean Tools - Settings(Control Center & Preferences)
+  // Canonical Navigation Router
+  // Home • Settings Unified Cockpit (Line Data Operations Hub, Check List Compliance Hub, Lean Tools, World WCM)
   const handleNavigate = (tab: string, lineNo?: string) => {
     if (lineNo) setSelectedLineNo(lineNo);
 
@@ -1623,28 +1626,32 @@ export default function App() {
       return;
     }
 
-    // 2. Line Data and sub-views
-    if (tab === 'linedata' || tab === 'lines') {
+    // 2. Line Data Operations Hub (In Settings)
+    if (tab === 'linedata' || tab === 'lines' || tab === 'line-data') {
       setLineDataSubTab('lines');
-      setCurrentTab('linedata');
+      setSettingsSection('line-data');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (tab === 'balancing') {
       setLineDataSubTab('balancing');
-      setCurrentTab('linedata');
+      setSettingsSection('line-data');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (tab === 'hourly') {
       setLineDataSubTab('hourly');
-      setCurrentTab('linedata');
+      setSettingsSection('line-data');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (tab === 'loss-pareto' || tab === 'downtime') {
       setLineDataSubTab('loss-pareto');
-      setCurrentTab('linedata');
+      setSettingsSection('line-data');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -1661,76 +1668,95 @@ export default function App() {
         setFloorSetupInitialSubView('factory');
       }
       setLineDataSubTab('floor-plan');
-      setCurrentTab('linedata');
+      setSettingsSection('line-data');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (tab === 'history' || tab === 'production-history' || tab === 'line-history') {
       setLineDataSubTab('history');
-      setCurrentTab('linedata');
+      setSettingsSection('line-data');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (tab === 'capacity' || tab === 'capacity-calc') {
       setLineDataSubTab('capacity');
-      setCurrentTab('linedata');
+      setSettingsSection('line-data');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    // 3. Check List and sub-views
+    // 3. Check List & Floor Compliance Hub (In Settings)
     if (tab === 'checklist' || tab === 'daily-checklist') {
       setChecklistSubTab('daily-checklist');
-      setCurrentTab('checklist');
+      setSettingsSection('checklist');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (tab === 'todo-schedule' || tab === 'todos' || tab === 'schedule') {
       setChecklistSubTab('todo-schedule');
-      setCurrentTab('checklist');
+      setSettingsSection('checklist');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (tab === 'actions' || tab === 'action-tracker' || tab === '5-whys') {
       setChecklistSubTab('actions');
-      setCurrentTab('checklist');
+      setSettingsSection('checklist');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (tab === 'audits' || tab === '5s-audit' || tab === 'centerlines') {
       setChecklistSubTab('audits');
-      setCurrentTab('checklist');
+      setSettingsSection('checklist');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (tab === 'monthly' || tab === 'monthly-summary' || tab === 'monthly-audit') {
       setChecklistSubTab('monthly-summary');
-      setCurrentTab('checklist');
+      setSettingsSection('checklist');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    // 4. Lean Tools and sub-views
+    // 4. Lean Tools & Industrial Engineering Cockpit (In Settings)
     if (tab === 'lean-tools' || tab === 'lean-toolkit' || tab === 'lean') {
       setLeanToolsSubTab('toolkit');
-      setCurrentTab('lean-tools');
+      setSettingsSection('lean-tools');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (tab === 'workspace' || tab === 'lean-workspace') {
       setLeanToolsSubTab('workspace');
-      setCurrentTab('lean-tools');
+      setSettingsSection('lean-tools');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (tab === 'simulator' || tab === 'ie-simulator') {
       setLeanToolsSubTab('simulator');
-      setCurrentTab('lean-tools');
+      setSettingsSection('lean-tools');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    // 5. Settings (Control Center & Preferences)
+    // 5. World Class Manufacturing (WCM) (In Settings)
+    if (tab === 'world' || tab === 'wcm' || tab === 'world-class') {
+      setSettingsSection('world');
+      setCurrentTab('settings');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // 6. Settings (Control Center & Preferences)
     if (
       tab === 'settings' ||
       tab === 'control-center' ||
@@ -1739,14 +1765,16 @@ export default function App() {
       tab === 'tiers' ||
       tab === 'operational-tiers'
     ) {
+      setSettingsSection(tab === 'preferences' ? 'preferences' : 'control-center');
       setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    // Legacy reports mapping
-    if (tab === 'reports') {
-      setCurrentTab('reports');
+    // 7. Reports & Production Analytics Hub (In Settings)
+    if (tab === 'reports' || tab === 'report' || tab === 'analytics' || tab === 'shift-reports') {
+      setSettingsSection('reports');
+      setCurrentTab('settings');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -1798,8 +1826,8 @@ export default function App() {
         onOpenFactorySettings={handleOpenFactorySettings}
         onOpenAndroidPackage={() => setIsAndroidPackageModalOpen(true)}
         onOpenSettings={() => {
-          setSettingsInitialTab('all');
-          setIsSettingsOpen(true);
+          setSettingsSection('control-center');
+          setCurrentTab('settings');
         }}
       />
 
@@ -1840,87 +1868,8 @@ export default function App() {
             />
           )}
 
-          {/* Page 2: Line Data */}
-          {currentTab === 'linedata' && (
-            <LineDataPage
-              lines={lines}
-              checklists={checklists}
-              selectedLineNo={selectedLineNo}
-              onSelectLineNo={setSelectedLineNo}
-              onSaveLine={handleSaveLine}
-              onAddNewLine={handleAddNewLine}
-              onDeleteLine={handleDeleteLine}
-              onDeleteFloor={handleDeleteFloor}
-              onReorderLines={handleReorderLines}
-              onNavigate={handleNavigate}
-              activeDate={activeDate}
-              onSelectDate={handleSelectDate}
-              profile={profile}
-              roleTiers={roleTiers}
-              initialSubTab={lineDataSubTab}
-              stations={stations}
-              hourlyData={hourlyData}
-              downtimeLog={downtimeLog}
-              onOpenNewDowntime={() => setIsNewDowntimeModalOpen(true)}
-              onUpdateHourNotes={handleUpdateHourNotes}
-              onUpdateHourOutput={handleUpdateHourOutput}
-              factoryProfile={factoryProfile}
-              onUpdateFactoryProfile={handleUpdateFactoryProfile}
-              savedFactories={savedFactories}
-              onSaveFactoryList={handleSaveFactoryList}
-              onOpenDatabase={handleOpenDatabase}
-            />
-          )}
-
-          {/* Page 3: Check List */}
-          {currentTab === 'checklist' && (
-            <ChecklistPage
-              checklists={checklists}
-              selectedDate={selectedChecklistDate}
-              onSelectDate={setSelectedChecklistDate}
-              onUpdateTaskStatus={handleUpdateChecklistTask}
-              onBatchUpdateChecklist={handleBatchUpdateChecklist}
-              profile={profile}
-              roleTiers={roleTiers}
-              onNavigate={handleNavigate}
-              todos={todos}
-              schedules={schedules}
-              onUpdateTodos={setTodos}
-              onUpdateSchedules={setSchedules}
-              actions={actionItems}
-              fiveWhys={fiveWhys}
-              onOpenNewAction={() => setIsNewActionModalOpen(true)}
-              onUpdateActionStatus={handleUpdateActionStatus}
-              onAddNewFiveWhy={handleAddNewFiveWhy}
-              auditItems={auditChecks}
-              centerlines={centerlines}
-              onToggleAuditItem={handleToggleAuditItem}
-              onUpdateCenterlineValue={handleUpdateCenterlineValue}
-              lines={lines}
-              onAddTodoFromAudit={handleAddTodoFromAudit}
-              initialSubTab={checklistSubTab}
-            />
-          )}
-
-          {/* Page 4: Lean Tools */}
-          {currentTab === 'lean-tools' && (
-            <LeanToolsPage
-              actions={leanActions}
-              onUpdateActions={setLeanActions}
-              profile={profile}
-              lines={lines}
-              onSaveLine={handleSaveLine}
-              selectedLineNo={selectedLineNo}
-              onSelectLineNo={setSelectedLineNo}
-              onApplySimulationToLine={handleApplySimulationToLine}
-              onAddNewLineWithSimulation={handleAddNewLineWithSimulation}
-              onNavigate={handleNavigate}
-              initialSubTab={leanToolsSubTab}
-            />
-          )}
-
-          {/* Page 5: Settings (Control Center & Preferences) */}
-          {currentTab === 'settings' && (
+          {/* Unified Settings Section (Hosting Line Data Operations Hub, Check List Compliance Hub, Lean Tools, Reports & Analytics, World WCM, Control Center & Preferences) */}
+          {(currentTab === 'settings' || currentTab === 'linedata' || currentTab === 'checklist' || currentTab === 'lean-tools' || currentTab === 'world' || currentTab === 'reports') && (
             <SettingsControlCenterPage
               profile={profile}
               onUpdateProfile={(updated) => setProfile(prev => ({ ...prev, ...updated }))}
@@ -1948,24 +1897,55 @@ export default function App() {
               roleTiers={roleTiers}
               lines={lines}
               onNavigate={handleNavigate}
-            />
-          )}
-
-          {/* Standalone Reports view if accessed directly */}
-          {currentTab === 'reports' && (
-            <Reports
-              lines={lines}
-              todayDate={activeDate || todayStr}
+              activeSection={settingsSection}
+              onSelectSection={setSettingsSection}
+              // Line Data Operations Hub Props
+              checklists={checklists}
+              selectedLineNo={selectedLineNo}
+              onSelectLineNo={setSelectedLineNo}
+              onSaveLine={handleSaveLine}
+              onAddNewLine={handleAddNewLine}
+              onDeleteLine={handleDeleteLine}
+              onDeleteFloor={handleDeleteFloor}
+              onReorderLines={handleReorderLines}
               activeDate={activeDate}
               onSelectDate={handleSelectDate}
               activeFloor={activeFloor}
               onSelectFloor={setActiveFloor}
-              checklists={checklists}
-              profile={profile}
-              onNavigate={handleNavigate}
-              onDeleteFloor={handleDeleteFloor}
               onImportLines={handleImportLines}
-              onOpenDatabase={handleOpenDatabase}
+              lineDataSubTab={lineDataSubTab}
+              stations={stations}
+              hourlyData={hourlyData}
+              downtimeLog={downtimeLog}
+              onOpenNewDowntime={() => setIsNewDowntimeModalOpen(true)}
+              onUpdateHourNotes={handleUpdateHourNotes}
+              onUpdateHourOutput={handleUpdateHourOutput}
+              // Check List & Floor Compliance Hub Props
+              selectedChecklistDate={selectedChecklistDate}
+              onSelectChecklistDate={setSelectedChecklistDate}
+              onUpdateTaskStatus={handleUpdateChecklistTask}
+              onBatchUpdateChecklist={handleBatchUpdateChecklist}
+              todos={todos}
+              schedules={schedules}
+              onUpdateTodos={setTodos}
+              onUpdateSchedules={setSchedules}
+              actionItems={actionItems}
+              fiveWhys={fiveWhys}
+              onOpenNewAction={() => setIsNewActionModalOpen(true)}
+              onUpdateActionStatus={handleUpdateActionStatus}
+              onAddNewFiveWhy={handleAddNewFiveWhy}
+              auditChecks={auditChecks}
+              centerlines={centerlines}
+              onToggleAuditItem={handleToggleAuditItem}
+              onUpdateCenterlineValue={handleUpdateCenterlineValue}
+              onAddTodoFromAudit={handleAddTodoFromAudit}
+              checklistSubTab={checklistSubTab}
+              // Lean Tools & Industrial Engineering Cockpit Props
+              leanActions={leanActions}
+              onUpdateLeanActions={setLeanActions}
+              onApplySimulationToLine={handleApplySimulationToLine}
+              onAddNewLineWithSimulation={handleAddNewLineWithSimulation}
+              leanToolsSubTab={leanToolsSubTab}
             />
           )}
         </Suspense>
@@ -1998,13 +1978,13 @@ export default function App() {
         currentTab={currentTab}
         onTabChange={handleNavigate}
         checklistProgress={checklistCompletionPct}
+        settingsSection={settingsSection}
         pendingTodosCount={pendingTodosCount}
         unreadNotificationsCount={unreadNotificationsCount}
         onOpenNotifications={() => setIsNotificationsOpen(true)}
         onOpenDatabase={() => handleOpenDatabase('backup')}
         onOpenSettings={() => {
-          setSettingsInitialTab('all');
-          setIsSettingsOpen(true);
+          handleNavigate('settings');
         }}
         onOpenUserModal={handleOpenUserModal}
         onOpenChat={() => setIsChatOpen(true)}
