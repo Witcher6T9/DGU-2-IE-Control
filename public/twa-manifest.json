@@ -1,0 +1,61 @@
+{
+  "packageId": "com.debonair.iedailycontrol",
+  "host": "ais-dev-s35lk2uqf2wamikzv7zyhp-13523569486.asia-southeast1.run.app",
+  "name": "IE Daily Control",
+  "launcherName": "IE Daily",
+  "themeColor": "#176F78",
+  "themeColorDark": "#0B383D",
+  "navigationColor": "#0B383D",
+  "navigationColorDark": "#0B383D",
+  "navigationDividerColor": "#00000000",
+  "navigationDividerColorDark": "#00000000",
+  "backgroundColor": "#F6F4EE",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "/pwa-512x512.png",
+  "maskableIconUrl": "/pwa-maskable-512x512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Line Balance",
+      "shortName": "Balance",
+      "url": "/?tab=data",
+      "chosenIconUrl": "/pwa-192x192.png"
+    },
+    {
+      "name": "Daily Checklist",
+      "shortName": "Checklist",
+      "url": "/?tab=checklist",
+      "chosenIconUrl": "/pwa-192x192.png"
+    },
+    {
+      "name": "Security Lock",
+      "shortName": "Lock",
+      "url": "/?action=lock",
+      "chosenIconUrl": "/pwa-192x192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": false
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false
+}

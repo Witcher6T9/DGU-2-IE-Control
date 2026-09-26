@@ -1,0 +1,380 @@
+{
+  "entities": {
+    "user_profiles": {
+      "title": "User Profile",
+      "description": "Authenticated user profile and role within the factory industrial engineering cockpit",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Unique Firebase Authentication UID",
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "description": "Corporate or authenticated email address",
+          "format": "email",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the operator, supervisor, or engineer",
+          "maxLength": 100
+        },
+        "role": {
+          "type": "string",
+          "description": "Role in the factory system",
+          "enum": ["Admin", "IE Lead", "Floor Manager", "Line Supervisor", "QC In-Charge", "Mechanic", "Operator", "Viewer"]
+        },
+        "department": {
+          "type": "string",
+          "description": "Factory department",
+          "maxLength": 60
+        },
+        "assignedLine": {
+          "type": "string",
+          "description": "Assigned production line ID or number",
+          "maxLength": 30
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last profile update"
+        }
+      },
+      "required": ["userId", "email", "name", "role"]
+    },
+    "line_entries": {
+      "title": "Line Production Entry",
+      "description": "Real-time production, efficiency, manpower, and bottleneck status for a sewing line",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique line entry ID",
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "lineNo": {
+          "type": "string",
+          "description": "Line identifier (e.g. Line 01, L-12)",
+          "maxLength": 40
+        },
+        "style": {
+          "type": "string",
+          "description": "Garment style code / buyer PO",
+          "maxLength": 100
+        },
+        "buyer": {
+          "type": "string",
+          "description": "Garment buyer or brand name",
+          "maxLength": 100
+        },
+        "date": {
+          "type": "string",
+          "description": "Production date in YYYY-MM-DD format",
+          "maxLength": 20
+        },
+        "floor": {
+          "type": "string",
+          "description": "Factory floor location",
+          "maxLength": 50
+        },
+        "targetHourly": {
+          "type": "number",
+          "description": "Target hourly production rate in pieces"
+        },
+        "targetDay": {
+          "type": "number",
+          "description": "Target full day output in pieces"
+        },
+        "actualOutput": {
+          "type": "number",
+          "description": "Current cumulative output in pieces"
+        },
+        "efficiencyPct": {
+          "type": "number",
+          "description": "Actual sewing efficiency percentage"
+        },
+        "targetEfficiencyPct": {
+          "type": "number",
+          "description": "Target line efficiency percentage"
+        },
+        "smv": {
+          "type": "number",
+          "description": "Standard Minute Value per garment piece"
+        },
+        "operatorPresent": {
+          "type": "number",
+          "description": "Number of sewing operators present"
+        },
+        "helperPresent": {
+          "type": "number",
+          "description": "Number of helpers present"
+        },
+        "totalManpower": {
+          "type": "number",
+          "description": "Total active manpower on line"
+        },
+        "bottleneckStation": {
+          "type": "string",
+          "description": "Current bottleneck workstation name",
+          "maxLength": 100
+        },
+        "bottleneckCT": {
+          "type": "number",
+          "description": "Observed bottleneck cycle time in seconds"
+        },
+        "targetCT": {
+          "type": "number",
+          "description": "Target pitch cycle time in seconds"
+        },
+        "status": {
+          "type": "string",
+          "description": "Operating health status",
+          "enum": ["running", "delayed", "critical", "stopped", "setup"]
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "User UID who recorded the update",
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp of update"
+        }
+      },
+      "required": ["id", "lineNo", "style", "date", "status"]
+    },
+    "checklists": {
+      "title": "Daily IE Checklist",
+      "description": "Mandatory 12-task Industrial Engineering protocol audit record",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique checklist audit ID",
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "lineNo": {
+          "type": "string",
+          "description": "Line identifier audited",
+          "maxLength": 40
+        },
+        "date": {
+          "type": "string",
+          "description": "Audit date (YYYY-MM-DD)",
+          "maxLength": 20
+        },
+        "auditorId": {
+          "type": "string",
+          "description": "UID of the IE auditor",
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "auditorName": {
+          "type": "string",
+          "description": "Name of the auditor",
+          "maxLength": 100
+        },
+        "completionRate": {
+          "type": "number",
+          "description": "Percentage of verified checklist items"
+        },
+        "complianceGrade": {
+          "type": "string",
+          "description": "Audit compliance grade (A, B, C, F)",
+          "maxLength": 10
+        },
+        "notes": {
+          "type": "string",
+          "description": "Auditor qualitative feedback and corrective action notes",
+          "maxLength": 2000
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp of audit submission"
+        }
+      },
+      "required": ["id", "lineNo", "date", "auditorId"]
+    },
+    "todos": {
+      "title": "Floor Action Todo Item",
+      "description": "Action item, maintenance request, or supervisor floor task",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique task ID",
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Description of action needed",
+          "maxLength": 300
+        },
+        "lineNo": {
+          "type": "string",
+          "description": "Target line identifier or General",
+          "maxLength": 40
+        },
+        "priority": {
+          "type": "string",
+          "description": "Task urgency priority",
+          "enum": ["low", "medium", "high", "critical"]
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Whether task is completed"
+        },
+        "category": {
+          "type": "string",
+          "description": "Task category",
+          "enum": ["Bottleneck", "Quality", "Maintenance", "Manpower", "Safety", "5S", "General"]
+        },
+        "creatorId": {
+          "type": "string",
+          "description": "User UID who created task",
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "assignedTo": {
+          "type": "string",
+          "description": "Name or email of assigned personnel",
+          "maxLength": 100
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "Target resolution date",
+          "maxLength": 30
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["id", "title", "completed", "priority", "creatorId"]
+    },
+    "lean_actions": {
+      "title": "Lean Kaizen / 5S Action",
+      "description": "Kaizen improvement initiative or 5S audit finding",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Action ID",
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Kaizen project title",
+          "maxLength": 200
+        },
+        "tool": {
+          "type": "string",
+          "description": "Lean tool applied",
+          "maxLength": 50
+        },
+        "status": {
+          "type": "string",
+          "description": "Implementation status",
+          "enum": ["identified", "in_progress", "verified", "standardized"]
+        },
+        "expectedImpact": {
+          "type": "string",
+          "description": "Expected productivity or SMV gain",
+          "maxLength": 500
+        },
+        "lineNo": {
+          "type": "string",
+          "description": "Target line",
+          "maxLength": 40
+        },
+        "owner": {
+          "type": "string",
+          "description": "Lead owner of the Kaizen",
+          "maxLength": 100
+        },
+        "creatorId": {
+          "type": "string",
+          "description": "User UID who created the Kaizen",
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["id", "title", "status", "creatorId"]
+    },
+    "chat_messages": {
+      "title": "Team Communication Message",
+      "description": "Real-time communication message across floor radios, IE leads, and management",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Message ID",
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "senderId": {
+          "type": "string",
+          "description": "Sender UID",
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "senderName": {
+          "type": "string",
+          "description": "Sender display name",
+          "maxLength": 100
+        },
+        "senderRole": {
+          "type": "string",
+          "description": "Sender organizational role",
+          "maxLength": 50
+        },
+        "channel": {
+          "type": "string",
+          "description": "Target communication channel (general, line-dispatch, ie-alerts, management)",
+          "maxLength": 50
+        },
+        "text": {
+          "type": "string",
+          "description": "Content of message",
+          "maxLength": 2000
+        },
+        "urgency": {
+          "type": "string",
+          "description": "Priority level",
+          "enum": ["normal", "urgent", "critical"]
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO timestamp of transmission"
+        }
+      },
+      "required": ["id", "senderId", "senderName", "text", "channel"]
+    }
+  },
+  "firestore": {
+    "/user_profiles/{userId}": {
+      "schema": "user_profiles",
+      "description": "Individual user profiles and credentials"
+    },
+    "/line_entries/{lineId}": {
+      "schema": "line_entries",
+      "description": "Floor production tracking entries by line and date"
+    },
+    "/checklists/{checklistId}": {
+      "schema": "checklists",
+      "description": "Daily IE 12-task checklist protocol audits"
+    },
+    "/todos/{todoId}": {
+      "schema": "todos",
+      "description": "Floor action items, repairs, and supervisor tasks"
+    },
+    "/lean_actions/{actionId}": {
+      "schema": "lean_actions",
+      "description": "Kaizen and 5S continuous improvement initiatives"
+    },
+    "/chat_messages/{messageId}": {
+      "schema": "chat_messages",
+      "description": "Factory operational dispatch and chatter messages"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* Safe area inset utilities for iOS Safari & Android PWAs */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
+}
+
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0.5rem));
+}
+
+/* Hide scrollbars for slick horizontal touch sliders */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Fluid touch responsiveness */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes subtle-breathe {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 10px 25px -5px rgba(0, 128, 105, 0.4), 0 4px 12px -2px rgba(0, 128, 105, 0.25);
+  }
+  50% {
+    transform: scale(1.045);
+    box-shadow: 0 18px 36px -4px rgba(0, 128, 105, 0.65), 0 0 22px 5px rgba(37, 211, 102, 0.45);
+  }
+}
+
+.animate-subtle-breathe {
+  animation: subtle-breathe 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes ai-pulse-aura {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.07);
+  }
+}
+
+.animate-ai-pulse-aura {
+  animation: ai-pulse-aura 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+

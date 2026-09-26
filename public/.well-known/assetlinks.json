@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.debonair.iedailycontrol",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:7D:0F:52:AB:E0:41:A4:05:42:01:CE:A6:4E:94:0A:6D:3E:99:93:49:12:DE:09:A6:4E:83:8B:20:94"
+      ]
+    }
+  }
+]
