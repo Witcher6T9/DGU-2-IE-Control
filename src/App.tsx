@@ -146,7 +146,15 @@ export default function App() {
   const todayStr = getTodayDateStr();
 
   // Navigation State
-  const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  const [currentTab, setCurrentTab] = useState<string>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab === 'datas' || tab === 'data' || tab === 'linedata' || tab === 'lines') return 'settings';
+      if (tab) return tab;
+    } catch {}
+    return 'dashboard';
+  });
   const [selectedLineNo, setSelectedLineNo] = useState<string>('18');
   const [selectedChecklistDate, setSelectedChecklistDate] = useState<string>(DEBONAIR_SEPTEMBER_24_DATE);
   const [activeDate, setActiveDate] = useState<string>(DEBONAIR_SEPTEMBER_24_DATE);
@@ -157,7 +165,16 @@ export default function App() {
   const [lineDataSubTab, setLineDataSubTab] = useState<LineDataSubTab>('lines');
   const [checklistSubTab, setChecklistSubTab] = useState<ChecklistSubTab>('daily-checklist');
   const [leanToolsSubTab, setLeanToolsSubTab] = useState<LeanToolsSubTab>('toolkit');
-  const [settingsSection, setSettingsSection] = useState<SettingsPageSection>('control-center');
+  const [settingsSection, setSettingsSection] = useState<SettingsPageSection>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab === 'datas' || tab === 'data' || tab === 'linedata' || tab === 'lines') return 'line-data';
+      if (tab === 'checklist') return 'checklist';
+      if (tab === 'lean-tools' || tab === 'lean') return 'lean-tools';
+    } catch {}
+    return 'control-center';
+  });
 
   // DCS Interactive Data State
   const [stations, setStations] = useState<StationData[]>(INITIAL_STATIONS);
@@ -1640,8 +1657,8 @@ export default function App() {
       return;
     }
 
-    // 2. Line Data Operations Hub (In Settings)
-    if (tab === 'linedata' || tab === 'lines' || tab === 'line-data') {
+    // 2. Datas Operations Hub (Daily Data Collection)
+    if (tab === 'datas' || tab === 'data' || tab === 'linedata' || tab === 'lines' || tab === 'line-data') {
       setLineDataSubTab('lines');
       setSettingsSection('line-data');
       setCurrentTab('settings');
@@ -1882,8 +1899,8 @@ export default function App() {
             />
           )}
 
-          {/* Unified Settings Section (Hosting Line Data Operations Hub, Check List Compliance Hub, Lean Tools, Reports & Analytics, World WCM, Control Center & Preferences) */}
-          {(currentTab === 'settings' || currentTab === 'linedata' || currentTab === 'checklist' || currentTab === 'lean-tools' || currentTab === 'world' || currentTab === 'reports') && (
+          {/* Unified Settings Section (Hosting Datas Operations Hub, Check List Compliance Hub, Lean Tools, Reports & Analytics, World WCM, Control Center & Preferences) */}
+          {(currentTab === 'settings' || currentTab === 'datas' || currentTab === 'data' || currentTab === 'linedata' || currentTab === 'checklist' || currentTab === 'lean-tools' || currentTab === 'world' || currentTab === 'reports') && (
             <SettingsControlCenterPage
               profile={profile}
               onUpdateProfile={(updated) => setProfile(prev => ({ ...prev, ...updated }))}

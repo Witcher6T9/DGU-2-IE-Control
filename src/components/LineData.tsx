@@ -83,6 +83,7 @@ const TelemetryQuickEntryModal = React.lazy(() =>
 import { calculate8hShiftWorkingMinutesBalancing } from '../utils/workingMinutesBalancing';
 import { generateTelemetryCSV, downloadTelemetryCSV } from '../utils/telemetryCsv';
 import { LineEfficiencySparkline } from './LineEfficiencySparkline';
+import { QuickOutputUpdateModal } from './QuickOutputUpdateModal';
 
 export type LineSortCriterion = 'lineNo' | 'efficiency' | 'bottleneck' | 'wip' | 'critical';
 export type SortDirection = 'asc' | 'desc';
@@ -269,6 +270,7 @@ export const LineData: React.FC<LineDataProps> = ({
 
   // Date Stepper & Shift Presets State for Line Data Collection Day
   const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
+  const [quickOutputLine, setQuickOutputLine] = useState<LineEntry | null>(null);
   const datePickerPopoverRef = useRef<HTMLDivElement>(null);
   const nativeDateInputRef = useRef<HTMLInputElement>(null);
 
@@ -2119,8 +2121,21 @@ export const LineData: React.FC<LineDataProps> = ({
             <span className="text-[10px] text-[#527078]">Target: {formData.targetEff}%</span>
           </div>
 
-          <div className="p-3 rounded-xl bg-[#f1eee6] border border-[#d9d2c2]">
-            <span className="text-[10px] text-[#527078] font-bold uppercase block">Output vs Target</span>
+          <div className="p-3 rounded-xl bg-[#f1eee6] border border-[#d9d2c2] relative group">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-[#527078] font-bold uppercase block">Output vs Target</span>
+              {lineAccess.canEdit && (
+                <button
+                  type="button"
+                  onClick={() => setQuickOutputLine(currentLine)}
+                  title={`Quick Update Line ${currentLine.lineNo} Output`}
+                  className="px-2 py-0.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-[9.5px] font-bold transition-all shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer inline-flex items-center gap-1"
+                >
+                  <Zap className="w-2.5 h-2.5 fill-white" />
+                  <span>Quick Update</span>
+                </button>
+              )}
+            </div>
             <div className="font-display text-xl sm:text-2xl font-bold text-[#17343a] font-mono-numbers">
               {formData.achievedProd}
               <span className="text-xs text-[#527078] font-sans font-normal"> / {formData.targetProd}</span>
@@ -5169,7 +5184,7 @@ export const LineData: React.FC<LineDataProps> = ({
                       return (
                         <tr
                           key={line.id}
-                          className={`hover:bg-[#fbfaf6] transition-colors ${
+                          className={`hover:bg-[#fbfaf6] transition-colors relative group/row ${
                             isCurrent
                               ? 'bg-[#eef7f7]/60 font-semibold'
                               : bn.status === 'critical' && sortBy === 'bottleneck'
@@ -5199,8 +5214,25 @@ export const LineData: React.FC<LineDataProps> = ({
                             {line.plannedMP}
                           </td>
                           <td className="p-3 text-right font-mono-numbers">
-                            <span className="font-bold text-[#17343a]">{line.achievedProd}</span>
-                            <span className="text-[#527078]"> / {line.targetProd}</span>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <div>
+                                <span className="font-bold text-[#17343a]">{line.achievedProd}</span>
+                                <span className="text-[#527078]"> / {line.targetProd}</span>
+                              </div>
+                              {checkLineAccess(profile, roleTiers || DEFAULT_ROLE_TIERS, line.lineNo).canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setQuickOutputLine(line);
+                                  }}
+                                  title={`Quick Update Achieved Output for Line ${line.lineNo}`}
+                                  className="p-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white shadow-2xs hover:shadow-xs active:scale-95 transition-all cursor-pointer inline-flex items-center justify-center opacity-85 hover:opacity-100"
+                                >
+                                  <Zap className="w-3 h-3 fill-white" />
+                                </button>
+                              )}
+                            </div>
                           </td>
                           <td className="p-3 text-right font-mono-numbers">
                             <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
@@ -5254,7 +5286,7 @@ export const LineData: React.FC<LineDataProps> = ({
                             </span>
                           </td>
                           <td className="p-3 text-center">
-                            <div className="flex items-center justify-center gap-1">
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -5265,6 +5297,20 @@ export const LineData: React.FC<LineDataProps> = ({
                               >
                                 Select
                               </button>
+                              {checkLineAccess(profile, roleTiers || DEFAULT_ROLE_TIERS, line.lineNo).canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setQuickOutputLine(line);
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer inline-flex items-center gap-1 active:scale-95"
+                                  title={`Quick Update Achieved Output for Line ${line.lineNo}`}
+                                >
+                                  <Zap className="w-3 h-3 fill-white" />
+                                  <span>Quick Update</span>
+                                </button>
+                              )}
                               {isMasterAdmin && onDeleteLine && (
                                 <button
                                   type="button"
@@ -5285,6 +5331,28 @@ export const LineData: React.FC<LineDataProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Quick Output Update Compact Modal */}
+      {quickOutputLine && (
+        <QuickOutputUpdateModal
+          line={quickOutputLine}
+          isOpen={!!quickOutputLine}
+          onClose={() => setQuickOutputLine(null)}
+          onSave={(updated) => {
+            onSaveLine(updated);
+            if (updated.lineNo === selectedLineNo) {
+              setFormData(prev => ({
+                ...prev,
+                achievedProd: updated.achievedProd,
+                dailyOutput: updated.dailyOutput,
+                efficiency: updated.efficiency
+              }));
+            }
+            setQuickOutputLine(null);
+            setToastNotification(`Line ${updated.lineNo} output updated to ${updated.achievedProd} pcs (${updated.efficiency}%)`);
+          }}
+        />
       )}
 
       {/* Toast Notification */}

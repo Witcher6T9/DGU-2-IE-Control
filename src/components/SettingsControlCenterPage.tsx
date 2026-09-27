@@ -312,8 +312,8 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
     },
     {
       id: 'line-data' as SettingsPageSection,
-      label: 'Line Data Operations Hub',
-      shortLabel: 'Line Data Hub',
+      label: 'Datas (Daily Data Collection)',
+      shortLabel: 'Datas',
       icon: Layers,
       badge: `${totalActiveLines} Lines`
     },

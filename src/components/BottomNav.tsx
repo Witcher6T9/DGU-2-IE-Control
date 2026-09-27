@@ -55,10 +55,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       badge: undefined
     },
     {
-      id: 'linedata',
-      label: 'Line Data',
-      sublabel: 'Settings',
-      fullLabel: 'Line Data Operations Hub (In Settings)',
+      id: 'datas',
+      label: 'Datas',
+      sublabel: 'Datas',
+      fullLabel: 'Daily Data Collection',
       icon: Layers,
       badge: undefined
     },
@@ -93,9 +93,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     if (tabId === 'dashboard') {
       return currentTab === 'dashboard' || currentTab === 'home';
     }
-    if (tabId === 'linedata') {
-      if (currentTab === 'linedata' || currentTab === 'lines') return true;
-      if (currentTab === 'settings' && settingsSection === 'line-data') return true;
+    if (tabId === 'datas' || tabId === 'data' || tabId === 'linedata') {
+      if (currentTab === 'datas' || currentTab === 'data' || currentTab === 'linedata' || currentTab === 'lines') return true;
+      if (currentTab === 'settings' && (settingsSection === 'datas' || settingsSection === 'data' || settingsSection === 'line-data')) return true;
       return false;
     }
     if (tabId === 'checklist') {
