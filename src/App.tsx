@@ -2070,7 +2070,7 @@ export default function App() {
             pendingTodosCount={pendingTodosCount}
             unreadNotificationsCount={unreadNotificationsCount}
             scorecardScore={scorecardResult.overallScore}
-            linesCount={lines.length}
+            linesCount={currentDayLines.length}
             profile={profile}
             onOpenNotifications={() => setIsNotificationsOpen(true)}
             onOpenChat={() => setIsChatOpen(true)}
@@ -2190,7 +2190,7 @@ export default function App() {
                   Floor Status Snapshot
                 </h4>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                  Unit-02 Live Telemetry • {lines.length} Lines Monitored
+                  Unit-02 Live Telemetry • {currentDayLines.length} Lines Monitored
                 </span>
               </div>
             </div>

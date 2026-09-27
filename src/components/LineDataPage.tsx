@@ -266,8 +266,8 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
 
   // Group lines into the Debonair IE Org hierarchy
   const wingGroups = useMemo(() => {
-    return groupLinesByIEOrg(lines);
-  }, [lines]);
+    return groupLinesByIEOrg(lines, activeDate);
+  }, [lines, activeDate]);
 
   // Overall Department Totals calculated automatically for lines within user's active scope
   const departmentTotals = useMemo(() => {
@@ -277,9 +277,26 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
     let bottlenecks = 0;
     let criticalBottlenecks = 0;
 
+    // Deduplicate lines by lineNo so each physical active line is represented once (preferring activeDate)
+    const lineMap = new Map<string, LineEntry>();
+    if (activeDate) {
+      for (const line of lines) {
+        if (line.date === activeDate) {
+          lineMap.set(String(line.lineNo).trim(), line);
+        }
+      }
+    }
+    for (const line of lines) {
+      const key = String(line.lineNo).trim();
+      if (!lineMap.has(key)) {
+        lineMap.set(key, line);
+      }
+    }
+    const distinctLines = Array.from(lineMap.values());
+
     const scopedLines = isFullScope
-      ? lines
-      : lines.filter(l => checkLineAccess(effectiveProfile, roleTiers, l.lineNo).inScope);
+      ? distinctLines
+      : distinctLines.filter(l => checkLineAccess(effectiveProfile, roleTiers, l.lineNo).inScope);
 
     scopedLines.forEach(l => {
       target += Number(l.targetProd) || 0;
@@ -301,7 +318,7 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
       bottlenecks,
       criticalBottlenecks
     };
-  }, [lines, isFullScope, effectiveProfile, roleTiers]);
+  }, [lines, activeDate, isFullScope, effectiveProfile, roleTiers]);
 
   // Quick Edit Line Modal State
   const [editingLine, setEditingLine] = useState<LineEntry | null>(null);

@@ -110,7 +110,7 @@ export const CustomDateSelector: React.FC<CustomDateSelectorProps> = ({
     return map;
   }, [lines]);
 
-  // Individual Date / Day-wise shift report shortcuts
+  // Individual Date /Day wise Reports shortcuts
   const todayStr = useMemo(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -380,10 +380,10 @@ export const CustomDateSelector: React.FC<CustomDateSelectorProps> = ({
             </button>
           </div>
 
-          {/* Individual Date / Day-Wise Shift Reports */}
+          {/* Individual Date /Day wise Reports */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-[10px] font-bold uppercase text-[#527078] dark:text-slate-400 tracking-wider">
-              <span>Date / Day-Wise Shift Reports</span>
+              <span>Date /Day wise Reports</span>
               <span className="text-emerald-700 dark:text-emerald-400">All 34 Lines</span>
             </div>
             <div className="grid grid-cols-2 gap-1.5">

@@ -356,10 +356,10 @@ export const DailyChecklist: React.FC<DailyChecklistProps> = ({
                       </div>
                     </div>
 
-                    {/* Individual Date / Day-Wise Shift Reports */}
+                    {/* Individual Date /Day wise Reports */}
                     <div className="space-y-1.5">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[#527078] px-0.5">
-                        Date / Day-Wise Shift Reports
+                        Date /Day wise Reports
                       </span>
                       <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
                         {datePresets.map(preset => {

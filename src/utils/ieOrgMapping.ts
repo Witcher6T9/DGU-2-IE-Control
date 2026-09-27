@@ -248,7 +248,7 @@ export interface WingGroupData {
 /**
  * Groups lines into Wing and Incharge hierarchy for the IE Org & RBAC layout
  */
-export function groupLinesByIEOrg(lines: LineEntry[]): WingGroupData[] {
+export function groupLinesByIEOrg(lines: LineEntry[], preferredDate?: string): WingGroupData[] {
   const inchargeMap: { [key: number]: LineEntry[] } = {
     1: [],
     2: [],
@@ -258,8 +258,25 @@ export function groupLinesByIEOrg(lines: LineEntry[]): WingGroupData[] {
     6: []
   };
 
-  // Group lines into incharge buckets
-  lines.forEach(line => {
+  // Deduplicate lines by lineNo so each physical active line appears exactly once (preferring preferredDate)
+  const lineMap = new Map<string, LineEntry>();
+  if (preferredDate) {
+    for (const line of lines) {
+      if (line.date === preferredDate) {
+        lineMap.set(String(line.lineNo).trim(), line);
+      }
+    }
+  }
+  for (const line of lines) {
+    const key = String(line.lineNo).trim();
+    if (!lineMap.has(key)) {
+      lineMap.set(key, line);
+    }
+  }
+  const distinctLines = Array.from(lineMap.values());
+
+  // Group distinct lines into incharge buckets
+  distinctLines.forEach(line => {
     const meta = getLineIEMeta(line.lineNo);
     if (inchargeMap[meta.inchargeNo]) {
       inchargeMap[meta.inchargeNo].push(line);

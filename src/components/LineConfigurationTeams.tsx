@@ -227,26 +227,38 @@ export const LineConfigurationTeams: React.FC<LineConfigurationTeamsProps> = ({
     }
   };
 
+  // Deduplicate physical lines by lineNo so each physical line is configured once
+  const distinctLines = useMemo(() => {
+    const map = new Map<string, LineEntry>();
+    for (const l of lines) {
+      const key = String(l.lineNo).trim();
+      if (!map.has(key)) {
+        map.set(key, l);
+      }
+    }
+    return Array.from(map.values());
+  }, [lines]);
+
   // Distinct floors & apartments list
   const floorOptions = useMemo(() => {
     const set = new Set<string>();
-    lines.forEach(l => {
+    distinctLines.forEach(l => {
       if (l.floor) set.add(l.floor);
     });
     return Array.from(set);
-  }, [lines]);
+  }, [distinctLines]);
 
   const apartmentOptions = useMemo(() => {
     const set = new Set<string>();
-    lines.forEach(l => {
+    distinctLines.forEach(l => {
       if (l.apartment) set.add(l.apartment);
     });
     return Array.from(set);
-  }, [lines]);
+  }, [distinctLines]);
 
   // Filtered lines
   const filteredLines = useMemo(() => {
-    return lines.filter(line => {
+    return distinctLines.filter(line => {
       const matchesSearch =
         line.lineNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (line.style && line.style.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -267,18 +279,18 @@ export const LineConfigurationTeams: React.FC<LineConfigurationTeamsProps> = ({
 
       return matchesSearch && matchesFloor && matchesApartment && matchesStatus;
     });
-  }, [lines, searchQuery, selectedFloorFilter, selectedApartmentFilter, selectedStatusFilter]);
+  }, [distinctLines, searchQuery, selectedFloorFilter, selectedApartmentFilter, selectedStatusFilter]);
 
   // Factory Summary Metrics
   const summaryStats = useMemo(() => {
-    const totalLines = lines.length;
-    const activeLines = lines.filter(l => l.isActive !== false).length;
-    const totalStaff = lines.reduce((acc, l) => acc + (l.teamMembers?.length || 0), 0);
-    const totalMachines = lines.reduce((acc, l) => acc + (l.machineCount || l.plannedMP || 35), 0);
-    const floorsCount = new Set(lines.map(l => l.floor)).size;
+    const totalLines = distinctLines.length;
+    const activeLines = distinctLines.filter(l => l.isActive !== false).length;
+    const totalStaff = distinctLines.reduce((acc, l) => acc + (l.teamMembers?.length || 0), 0);
+    const totalMachines = distinctLines.reduce((acc, l) => acc + (l.machineCount || l.plannedMP || 35), 0);
+    const floorsCount = new Set(distinctLines.map(l => l.floor)).size;
 
     return { totalLines, activeLines, totalStaff, totalMachines, floorsCount };
-  }, [lines]);
+  }, [distinctLines]);
 
   // Handle Add Member Submit
   const handleSaveMember = (e: React.FormEvent) => {

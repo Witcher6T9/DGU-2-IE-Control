@@ -358,13 +358,14 @@ export const LineData: React.FC<LineDataProps> = ({
 
   const currentCompletionPct = Math.round((currentTasksDone / CHECKLIST_TASK_COUNT) * 100);
 
-  // Distinct active lines and shift report counts (Debonair Unit-2 has 34 Active Lines across 4 Days Reports)
+  // Distinct active lines and shift report counts (Debonair Unit-2 has 34 Active Lines across recorded Days Reports)
   const uniqueActiveLineCount = useMemo(() => {
     return new Set(lines.map(l => l.lineNo)).size || 34;
   }, [lines]);
 
   const uniqueDatesCount = useMemo(() => {
-    return new Set(lines.map(l => l.date).filter(Boolean)).size || 4;
+    const set = new Set(lines.map(l => l.date).filter(Boolean));
+    return set.size > 0 ? set.size : 7;
   }, [lines]);
 
   // Close popover on outside click or escape
@@ -1379,7 +1380,7 @@ export const LineData: React.FC<LineDataProps> = ({
                     <span className="text-[10px] text-[#527078] font-mono-numbers mt-0.5">
                       {filterDate === 'all'
                         ? `${uniqueActiveLineCount} Active Lines (${uniqueDatesCount} Days Reports)`
-                        : `${currentTasksDone}/${CHECKLIST_TASK_COUNT} Tasks Done (${currentCompletionPct}%) • ${lines.filter(l => l.date === effectiveDate).length || uniqueActiveLineCount} Active Lines`}
+                        : `${currentTasksDone}/${CHECKLIST_TASK_COUNT} Tasks Done (${currentCompletionPct}%) • ${new Set(lines.filter(l => l.date === effectiveDate).map(l => l.lineNo)).size || uniqueActiveLineCount} Active Lines`}
                     </span>
                   </div>
 
@@ -1483,16 +1484,17 @@ export const LineData: React.FC<LineDataProps> = ({
                         </div>
                       </div>
 
-                      {/* Individual Date / Day-Wise Shift Reports */}
+                      {/* Individual Date /Day wise Reports */}
                       <div className="space-y-1.5">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-[#527078] px-0.5">
-                          Date / Day-Wise Shift Reports
+                          Date /Day wise Reports
                         </span>
                         <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto pr-0.5">
                           {datePresets.map(preset => {
                             const isCurrent = (preset.date === filterDate) || (preset.date === effectiveDate && filterDate !== 'all');
                             const doneCount = getTasksDoneCount(preset.date);
                             const isFullyDone = doneCount === CHECKLIST_TASK_COUNT;
+                            const presetLineCount = new Set(lines.filter(l => l.date === preset.date).map(l => l.lineNo)).size || uniqueActiveLineCount;
 
                             return (
                               <button
@@ -1516,7 +1518,7 @@ export const LineData: React.FC<LineDataProps> = ({
                                       {preset.label}
                                     </div>
                                     <div className="text-[10px] text-[#527078] truncate">
-                                      {preset.phase} • {uniqueActiveLineCount} Active Lines
+                                      {preset.phase} • {presetLineCount} Active Lines
                                     </div>
                                   </div>
                                 </div>

@@ -47,6 +47,7 @@ import { isMasterAdminOrAdmin } from '../utils/rbac';
 import { motion, AnimatePresence } from 'motion/react';
 import { DashboardKpiCard, HourlyKpiPoint, HistoricalKpiPoint } from './DashboardKpiCard';
 import { KpiDrillDownModal } from './KpiDrillDownModal';
+import { ContextAwareFab, FabTabId } from './ContextAwareFab';
 
 interface DashboardProps {
   lines: LineEntry[];
@@ -78,6 +79,10 @@ interface DashboardProps {
   onBatchUpdateChecklist?: (date: string, statuses: ChecklistStatus[]) => void;
   onSaveMultipleLines?: (updatedLines: LineEntry[]) => void;
   factoryProfile?: FactoryIndustryProfile;
+  onAddNewLine?: () => void;
+  onOpenNewDowntime?: () => void;
+  onOpenNewAction?: () => void;
+  activeTab?: string;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -104,7 +109,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onUpdateChecklistTask,
   onBatchUpdateChecklist,
   onSaveMultipleLines,
-  factoryProfile
+  factoryProfile,
+  onAddNewLine,
+  onOpenNewDowntime,
+  onOpenNewAction,
+  activeTab
 }) => {
   const isMasterAdmin = isMasterAdminOrAdmin(profile);
   const availableRoleTiers = roleTiers && roleTiers.length > 0 ? roleTiers : ROLE_TIERS;
@@ -113,10 +122,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const effectiveDate = activeDate || todayDate;
 
-  // Filter lines by selected date
+  // Filter lines by selected date (deduplicating by lineNo fallback to ensure exact active lines count)
   const displayLines = React.useMemo(() => {
     const dayLines = lines.filter(l => l.date === effectiveDate);
-    return dayLines.length > 0 ? dayLines : lines;
+    if (dayLines.length > 0) return dayLines;
+    const map = new Map<string, LineEntry>();
+    lines.forEach(l => {
+      const key = String(l.lineNo).trim();
+      if (!map.has(key) || (l.date && map.get(key)!.date && l.date > map.get(key)!.date)) {
+        map.set(key, l);
+      }
+    });
+    return Array.from(map.values());
   }, [lines, effectiveDate]);
 
   // Available production report dates with counts and shift metrics
@@ -2423,6 +2440,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
           onNavigateToLine={onSelectLine}
         />
       )}
+
+      {/* Context-Aware Floating Action Button (FAB) - Changes icon & action based on active tab context */}
+      <ContextAwareFab
+        initialTab={
+          activeTab === 'downtime' || activeTab === 'loss-pareto'
+            ? 'downtime'
+            : activeTab === 'checklist'
+            ? 'checklist'
+            : activeTab === 'lean-tools' || activeTab === 'actions'
+            ? 'lean-tools'
+            : activeTab === 'reports'
+            ? 'reports'
+            : 'lines'
+        }
+        onAddNewLine={onAddNewLine}
+        onOpenNewDowntime={onOpenNewDowntime}
+        onOpenNewAction={onOpenNewAction}
+        onChecklistAction={handleQuickMorningMeetingDone}
+        onNavigate={onNavigate}
+        lines={displayLines}
+        effectiveDate={effectiveDate}
+        onTriggerToast={(title, message, type = 'success') => {
+          setQuickActionToast({
+            id: Date.now(),
+            type,
+            title,
+            message,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+        }}
+      />
     </div>
   );
 };
