@@ -379,14 +379,14 @@ export const LineProductionHistoryView: React.FC<LineProductionHistoryViewProps>
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-2 no-scrollbar snap-x snap-mandatory touch-scroll">
-            {filteredLineChips.map(lineNo => {
+            {filteredLineChips.map((lineNo, idx) => {
               const isSelected = lineNo === currentLineNo;
               const lineSamples = lines.filter(l => l.lineNo === lineNo);
               const latestEff = lineSamples.length > 0 ? lineSamples[lineSamples.length - 1].efficiency : null;
 
               return (
                 <button
-                  key={lineNo}
+                  key={`hist-chip-${lineNo}-${idx}`}
                   type="button"
                   onClick={() => onSelectLineNo(lineNo)}
                   className={`px-3 py-1.5 min-h-[40px] rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5 snap-start touch-manipulation active:scale-95 ${

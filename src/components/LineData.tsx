@@ -42,12 +42,22 @@ import {
   Download,
   RefreshCw,
   Lock,
-  ShieldCheck
+  ShieldCheck,
+  ClipboardCheck,
+  Radio,
+  Gauge,
+  Zap,
+  Play,
+  Pause,
+  BarChart3,
+  FastForward,
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LineEntry, StyleNature, SMVWeight, LearningCurveDayRecord, BalancingLossAnalysis, BuildUpCurve, ChecklistMap, UserProfile, Shift8hWorkingMinutesBalance, RoleTier } from '../types';
+import { LineEntry, StyleNature, SMVWeight, LearningCurveDayRecord, BalancingLossAnalysis, BuildUpCurve, ChecklistMap, UserProfile, Shift8hWorkingMinutesBalance, RoleTier, HandoffCheckItem, LineHandoffSignoff, LiveLineTelemetry, LiveStationCycleTime, LiveWipStation } from '../types';
 import { calculateLineMetrics } from '../utils';
 import { CHECKLIST_TASK_COUNT, normalizeChecklistStatuses, ROLE_TIERS as DEFAULT_ROLE_TIERS } from '../mockData';
+import { DEFAULT_HANDOFF_CHECKLIST, DEFAULT_HANDOFF_SIGNOFFS } from '../data/simulatorPresets';
 import { checkLineAccess, isMasterAdminOrAdmin } from '../utils/rbac';
 import { ProductionFloorDropdown, matchesProductionFloor, getProductionFloorLabel } from './ProductionFloorSelector';
 import {
@@ -65,6 +75,9 @@ const TelemetryImportModal = React.lazy(() =>
 );
 const WorkingMinutesBalancingModal = React.lazy(() =>
   import('./WorkingMinutesBalancingModal').then(m => ({ default: m.WorkingMinutesBalancingModal }))
+);
+const TelemetryQuickEntryModal = React.lazy(() =>
+  import('./TelemetryQuickEntryModal').then(m => ({ default: m.TelemetryQuickEntryModal }))
 );
 
 import { calculate8hShiftWorkingMinutesBalancing } from '../utils/workingMinutesBalancing';
@@ -203,6 +216,7 @@ interface LineDataProps {
   roleTiers?: RoleTier[];
   initialSortBy?: LineSortCriterion;
   initialSortDirection?: SortDirection;
+  onOpenOptimizer?: () => void;
 }
 
 export const LineData: React.FC<LineDataProps> = ({
@@ -220,7 +234,8 @@ export const LineData: React.FC<LineDataProps> = ({
   profile,
   roleTiers,
   initialSortBy,
-  initialSortDirection
+  initialSortDirection,
+  onOpenOptimizer
 }) => {
   const isMasterAdmin = isMasterAdminOrAdmin(profile);
   const [filterDate, setFilterDate] = useState<string>(activeDate || 'all');
@@ -808,15 +823,16 @@ export const LineData: React.FC<LineDataProps> = ({
   const [showProgressionModal, setShowProgressionModal] = useState(false);
   const [is8hBalancingModalOpen, setIs8hBalancingModalOpen] = useState(false);
 
-  // Collapsible sections state
+  // Collapsible sections state matching the Line Telemetry Logging Sections
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    planning: true,
-    manpower: true,
+    liveTelemetry: true,
     top5: true,
+    planning: true,
+    flowHandoff: true,
+    manpowerBalancing: true,
     bottleneck: true,
     timeStudy: true,
     learningCurve: true,
-    shift8hBalancing: true
   });
 
   const toggleSection = (key: string) => {
@@ -831,20 +847,144 @@ export const LineData: React.FC<LineDataProps> = ({
   const toggleAllSections = () => {
     const nextState = !isAllExpanded;
     setExpandedSections({
-      planning: nextState,
-      manpower: nextState,
+      liveTelemetry: nextState,
       top5: nextState,
+      planning: nextState,
+      flowHandoff: nextState,
+      manpowerBalancing: nextState,
       bottleneck: nextState,
       timeStudy: nextState,
       learningCurve: nextState,
-      shift8hBalancing: nextState
     });
   };
+
+  // Pre-production technical handoff state for Section 3
+  const [handoffChecks, setHandoffChecks] = useState<HandoffCheckItem[]>(DEFAULT_HANDOFF_CHECKLIST);
+  const [handoffSignoffs, setHandoffSignoffs] = useState<LineHandoffSignoff[]>(DEFAULT_HANDOFF_SIGNOFFS);
+
+  const handoffScore = useMemo(() => {
+    const passedCount = handoffChecks.filter(c => c.status === 'pass').length;
+    const checkPct = (passedCount / (handoffChecks.length || 1)) * 60;
+    const approvedCount = handoffSignoffs.filter(s => s.status === 'approved').length;
+    const signoffPct = (approvedCount / (handoffSignoffs.length || 1)) * 40;
+    return Math.round(checkPct + signoffPct);
+  }, [handoffChecks, handoffSignoffs]);
 
   // Derived 8h shift working minutes balancing reconciliation
   const shift8hBalance = useMemo(() => {
     return formData.shift8hBalancing || calculate8hShiftWorkingMinutesBalancing(formData);
   }, [formData.achievedProd, formData.targetProd, formData.smv, formData.plannedMP, formData.mp, formData.bottleneck, formData.shift8hBalancing]);
+
+  // Helper to generate default live telemetry values based on line parameters
+  function generateDefaultLiveTelemetry(entry: LineEntry, totalMP: number, hours: number): LiveLineTelemetry {
+    const smv = entry.smv || 14.5;
+    const targetPcsPerHour = entry.targetProd ? Math.round(entry.targetProd / (hours || 8)) : Math.round((totalMP * 60 * 0.85) / smv);
+    const actualPcsPerHour = entry.achievedProd ? Math.round(entry.achievedProd / (hours || 8)) : Math.round(targetPcsPerHour * 0.92);
+    const standardPitchSec = Math.round((smv * 60) / Math.max(1, totalMP));
+    const targetCTSec = Math.round(standardPitchSec * 1.05);
+    const bnCTSec = entry.bottleneck?.cycleTime || Math.round(targetCTSec * 1.25);
+    const currentWip = entry.wip || Math.round(targetPcsPerHour * 1.8);
+    const standardBuffer = Math.round(targetPcsPerHour * 1.5);
+    const bufferHours = targetPcsPerHour > 0 ? parseFloat((currentWip / targetPcsPerHour).toFixed(1)) : 1.5;
+
+    return {
+      lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      isLiveMonitoring: true,
+      averageCycleTimeSec: Math.round((targetCTSec + bnCTSec) / 2),
+      targetCycleTimeSec: targetCTSec,
+      bottleneckCycleTimeSec: bnCTSec,
+      pitchTimeSec: standardPitchSec,
+      currentHourlyRatePcs: actualPcsPerHour,
+      targetHourlyRatePcs: targetPcsPerHour,
+      runRatePcsPerHour: Math.round(actualPcsPerHour * 1.02),
+      pacingVariancePcs: actualPcsPerHour - targetPcsPerHour,
+      pacingStatus: actualPcsPerHour >= targetPcsPerHour ? 'on_pace' : actualPcsPerHour >= targetPcsPerHour * 0.85 ? 'behind' : 'critical_lag',
+      currentWipTotalPcs: currentWip,
+      standardWipBufferPcs: standardBuffer,
+      wipBufferHours: bufferHours,
+      wipHealthStatus: bufferHours > 3.0 ? 'high_accumulation' : bufferHours < 0.8 ? 'starvation_risk' : 'buffer_safe',
+      cycleTimeStations: [
+        {
+          stationId: 'st-1',
+          operationName: 'Front Placket Setting',
+          operatorName: 'Fatema Begum',
+          observedCycleTimeSec: bnCTSec,
+          standardCycleTimeSec: targetCTSec,
+          pitchTimeSec: standardPitchSec,
+          status: 'bottleneck',
+          lastLoggedAt: 'Just now'
+        },
+        {
+          stationId: 'st-2',
+          operationName: 'Collar Run & Topstitch',
+          operatorName: 'Abdul Malek',
+          observedCycleTimeSec: Math.round(targetCTSec * 0.95),
+          standardCycleTimeSec: targetCTSec,
+          pitchTimeSec: standardPitchSec,
+          status: 'optimal',
+          lastLoggedAt: '2 min ago'
+        },
+        {
+          stationId: 'st-3',
+          operationName: 'Sleeve Hem Overlock',
+          operatorName: 'Nasima Khatun',
+          observedCycleTimeSec: Math.round(targetCTSec * 0.88),
+          standardCycleTimeSec: targetCTSec,
+          pitchTimeSec: standardPitchSec,
+          status: 'optimal',
+          lastLoggedAt: '5 min ago'
+        },
+        {
+          stationId: 'st-4',
+          operationName: 'Side Seam Join & Close',
+          operatorName: 'Jahangir Alam',
+          observedCycleTimeSec: Math.round(targetCTSec * 1.12),
+          standardCycleTimeSec: targetCTSec,
+          pitchTimeSec: standardPitchSec,
+          status: 'bottleneck',
+          lastLoggedAt: 'Just now'
+        }
+      ],
+      wipStations: [
+        {
+          stage: 'input_loading',
+          label: '1. Input Loading / Batch Feed',
+          wipPcs: Math.round(currentWip * 0.22),
+          bufferHours: parseFloat((bufferHours * 0.25).toFixed(1)),
+          status: 'balanced'
+        },
+        {
+          stage: 'front_assembly',
+          label: '2. Front Body & Placket',
+          wipPcs: Math.round(currentWip * 0.28),
+          bufferHours: parseFloat((bufferHours * 0.32).toFixed(1)),
+          status: 'surging'
+        },
+        {
+          stage: 'back_assembly',
+          label: '3. Back Yoke & Shoulder',
+          wipPcs: Math.round(currentWip * 0.18),
+          bufferHours: parseFloat((bufferHours * 0.20).toFixed(1)),
+          status: 'balanced'
+        },
+        {
+          stage: 'side_seam',
+          label: '4. Side Seam & Sleeve Join',
+          wipPcs: Math.round(currentWip * 0.20),
+          bufferHours: parseFloat((bufferHours * 0.22).toFixed(1)),
+          status: 'balanced'
+        },
+        {
+          stage: 'end_line_qco',
+          label: '5. End-Line QC & Inspection',
+          wipPcs: Math.round(currentWip * 0.12),
+          bufferHours: parseFloat((bufferHours * 0.15).toFixed(1)),
+          status: 'balanced'
+        }
+      ],
+      telemetryNotes: `Real-time shop-floor telemetry active for Line ${entry.lineNo}. Station 1 & 4 cycle pacing monitored live.`
+    };
+  }
 
   // Sync draft when selected line changes
   useEffect(() => {
@@ -879,10 +1019,13 @@ export const LineData: React.FC<LineDataProps> = ({
       entry.targetProd ? Math.round(entry.targetProd / (entry.workingHours || 8)) : 110
     );
 
+    const liveTelemetry = entry.liveTelemetry || generateDefaultLiveTelemetry(entry, totalMP, entry.workingHours || 8);
+
     return {
       ...entry,
       learningCurve,
-      balancingAnalysis
+      balancingAnalysis,
+      liveTelemetry
     };
   }
 
@@ -910,6 +1053,7 @@ export const LineData: React.FC<LineDataProps> = ({
 
   // Telemetry modal state
   const [isTelemetryModalOpen, setIsTelemetryModalOpen] = useState(false);
+  const [isQuickEntryModalOpen, setIsQuickEntryModalOpen] = useState(false);
 
   // Update Line Build-Up parameters
   const handleUpdateBuildUp = (updates: Partial<BuildUpCurve>) => {
@@ -1127,7 +1271,8 @@ export const LineData: React.FC<LineDataProps> = ({
       ...formData,
       efficiency: metrics.efficiencyPct,
       learningCurve: lc,
-      balancingAnalysis: ba
+      balancingAnalysis: ba,
+      liveTelemetry: formData.liveTelemetry
     };
     onSaveLine(updated);
     setSaveToast(true);
@@ -1181,7 +1326,7 @@ export const LineData: React.FC<LineDataProps> = ({
               </span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold uppercase text-[#17343a] tracking-tight">
-              Line Data Collection
+              Daily Data Collection
             </h1>
             <p className="text-xs sm:text-sm text-[#527078] mt-0.5 max-w-xl">
               Record hourly output, SMV, manpower absents, bottleneck takt cycle times, and Top 5 monitoring.
@@ -1801,6 +1946,22 @@ export const LineData: React.FC<LineDataProps> = ({
                 <option value="wip-asc">📦 WIP Buffer: Low Buffer First</option>
               </optgroup>
             </select>
+
+            {/* AI Optimization Assistant Quick Action Trigger */}
+            {onOpenOptimizer && (
+              <button
+                type="button"
+                onClick={onOpenOptimizer}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 bg-gradient-to-r from-[#176f78] to-[#1a73e8] text-white shadow-2xs hover:from-[#135961] hover:to-[#1557b0] active:scale-95 shrink-0"
+                title="Launch AI Optimization Assistant for manpower reallocation across bottleneck lines"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>AI Reallocation Assistant</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-400 text-slate-950">
+                  AI
+                </span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -1988,21 +2149,10 @@ export const LineData: React.FC<LineDataProps> = ({
             <span className="text-[10px] text-[#527078]">Avail: {metrics.availableMinutes} min</span>
           </div>
         </div>
-
-        {/* Weekly Efficiency Trend Sparkline Chart */}
-        <div className="mt-4">
-          <LineEfficiencySparkline
-            line={formData}
-            allLines={lines}
-            currentEfficiency={metrics.efficiencyPct}
-            targetEfficiency={formData.targetEff || 85}
-            onNavigateHistory={onNavigate ? (lineNo) => onNavigate('line-history', lineNo) : undefined}
-          />
-        </div>
       </div>
 
-      {/* Main Form */}
-      <form onSubmit={handleSave} className="space-y-4">
+      {/* Line Telemetry Sections */}
+      <form id="line-telemetry-sections" onSubmit={handleSave} className="space-y-4">
         {/* Section Navigation & Expand/Collapse Master Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white border border-[#d9d2c2] shadow-2xs">
           <div className="flex items-center gap-2.5">
@@ -2014,7 +2164,7 @@ export const LineData: React.FC<LineDataProps> = ({
                 Line Telemetry Logging Sections
               </span>
               <span className="text-[11px] text-[#527078] ml-2">
-                ({Object.values(expandedSections).filter(Boolean).length} of 6 Open)
+                ({Object.values(expandedSections).filter(Boolean).length} of 8 Open)
               </span>
             </div>
           </div>
@@ -2031,7 +2181,806 @@ export const LineData: React.FC<LineDataProps> = ({
           </div>
         </div>
 
-        {/* ================= SECTION 1: Line Setup & IE Planning ================= */}
+        {/* ================= REAL-TIME LINE TELEMETRY: LIVE CYCLE TIMES, PRODUCTION RATES & WIP ================= */}
+        <div className="rounded-2xl border border-[#b2d8d8] bg-[#f7fcfc] overflow-hidden shadow-xs">
+          <div className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border-b border-[#b2d8d8] text-left">
+            <div
+              onClick={() => toggleSection('liveTelemetry')}
+              className="flex items-center gap-3 flex-1 cursor-pointer"
+            >
+              <div className="p-2.5 rounded-xl bg-[#dceceb] text-[#176f78] border border-[#b2d8d8] relative">
+                <Radio className="w-5 h-5 animate-pulse text-[#176f78]" />
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
+                    Live Line Telemetry
+                  </h2>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase tracking-wider flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                    Real-Time Feed
+                  </span>
+                  <span className="text-[10px] font-mono text-[#527078] bg-[#f1eee6] px-2 py-0.5 rounded-md">
+                    Line {formData.lineNo} • Updated {formData.liveTelemetry?.lastUpdated || 'Live'}
+                  </span>
+                </div>
+                <p className="text-xs text-[#527078] mt-0.5">
+                  Direct input for real-time station cycle times, hourly production pacing run-rate, and stage-by-stage WIP balance levels.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+              <div className="flex items-center gap-2 text-xs font-mono-numbers">
+                <span className="px-2.5 py-1 rounded-full bg-[#eef7f7] text-[#176f78] font-bold border border-[#b2d8d8]">
+                  {formData.liveTelemetry?.currentHourlyRatePcs || 0} pcs/hr
+                </span>
+                <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 font-bold border border-amber-200">
+                  WIP: {formData.liveTelemetry?.currentWipTotalPcs ?? formData.wip} pcs ({formData.liveTelemetry?.wipBufferHours ?? 1.5}h)
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsQuickEntryModalOpen(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-[#176f78] hover:bg-[#12555c] text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer touch-manipulation active:scale-95"
+                title="Open Floor Quick Entry Modal"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-300" />
+                <span>Quick Entry</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => toggleSection('liveTelemetry')}
+                className="p-1.5 rounded-lg text-[#527078] hover:bg-[#f1eee6] cursor-pointer transition-colors"
+                title={expandedSections.liveTelemetry ? "Collapse Live Line Telemetry" : "Expand Live Line Telemetry"}
+              >
+                {expandedSections.liveTelemetry ? (
+                  <ChevronUp className="w-4 h-4 text-[#527078]" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-[#527078]" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {expandedSections.liveTelemetry && (
+            <div className="p-4 sm:p-5 space-y-5 text-xs">
+              {/* Telemetry Core KPI Snapshot Bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* 1. Live Cycle Time Pace */}
+                <div className="p-3.5 rounded-2xl bg-white border border-[#b2d8d8] shadow-2xs">
+                  <div className="flex items-center justify-between text-[#527078] text-[11px] font-bold uppercase mb-1">
+                    <span className="flex items-center gap-1.5">
+                      <Timer className="w-3.5 h-3.5 text-[#176f78]" />
+                      Average Cycle Time
+                    </span>
+                    <span className="text-[10px] font-mono text-[#176f78]">Pitch: {formData.liveTelemetry?.pitchTimeSec || 42}s</span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-display text-2xl font-bold text-[#17343a] font-mono-numbers">
+                      {formData.liveTelemetry?.averageCycleTimeSec || 48}
+                    </span>
+                    <span className="text-xs text-[#527078]">sec / piece</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[10px]">
+                    <span className="text-[#527078]">Target: {formData.liveTelemetry?.targetCycleTimeSec || 44}s</span>
+                    <span className={`font-bold ${
+                      (formData.liveTelemetry?.averageCycleTimeSec || 0) <= (formData.liveTelemetry?.targetCycleTimeSec || 44)
+                        ? 'text-emerald-700'
+                        : 'text-amber-700'
+                    }`}>
+                      {((formData.liveTelemetry?.averageCycleTimeSec || 48) - (formData.liveTelemetry?.targetCycleTimeSec || 44)) > 0
+                        ? `+${(formData.liveTelemetry?.averageCycleTimeSec || 48) - (formData.liveTelemetry?.targetCycleTimeSec || 44)}s overrun`
+                        : 'On Takt Target'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Live Production Pacing Rate */}
+                <div className="p-3.5 rounded-2xl bg-white border border-[#b2d8d8] shadow-2xs">
+                  <div className="flex items-center justify-between text-[#527078] text-[11px] font-bold uppercase mb-1">
+                    <span className="flex items-center gap-1.5">
+                      <Gauge className="w-3.5 h-3.5 text-[#176f78]" />
+                      Current Hourly Rate
+                    </span>
+                    <span className="text-[10px] font-mono text-emerald-700 font-bold">Pacing</span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-display text-2xl font-bold text-[#176f78] font-mono-numbers">
+                      {formData.liveTelemetry?.currentHourlyRatePcs || 0}
+                    </span>
+                    <span className="text-xs text-[#527078]">pcs / hr</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[10px]">
+                    <span className="text-[#527078]">Target: {formData.liveTelemetry?.targetHourlyRatePcs || Math.round(formData.targetProd / (formData.workingHours || 8))} pcs</span>
+                    <span className={`font-bold ${
+                      (formData.liveTelemetry?.pacingVariancePcs || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                    }`}>
+                      {(formData.liveTelemetry?.pacingVariancePcs || 0) >= 0
+                        ? `+${formData.liveTelemetry?.pacingVariancePcs} pcs ahead`
+                        : `${formData.liveTelemetry?.pacingVariancePcs} pcs deficit`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Live WIP Buffer Hours */}
+                <div className="p-3.5 rounded-2xl bg-white border border-[#b2d8d8] shadow-2xs">
+                  <div className="flex items-center justify-between text-[#527078] text-[11px] font-bold uppercase mb-1">
+                    <span className="flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-amber-600" />
+                      Active Floor WIP
+                    </span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800">
+                      Buffer
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-display text-2xl font-bold text-amber-800 font-mono-numbers">
+                      {formData.liveTelemetry?.currentWipTotalPcs ?? formData.wip}
+                    </span>
+                    <span className="text-xs text-[#527078]">pcs in line</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[10px]">
+                    <span className="text-[#527078]">Coverage:</span>
+                    <span className="font-bold text-[#17343a] font-mono-numbers">
+                      {formData.liveTelemetry?.wipBufferHours || 1.8} Hours Run
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4. Instantaneous Run-Rate Forecast */}
+                <div className="p-3.5 rounded-2xl bg-white border border-[#b2d8d8] shadow-2xs">
+                  <div className="flex items-center justify-between text-[#527078] text-[11px] font-bold uppercase mb-1">
+                    <span className="flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-amber-500" />
+                      Run-Rate Forecast
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-700">8h Proj</span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-display text-2xl font-bold text-[#17343a] font-mono-numbers">
+                      {Math.round((formData.liveTelemetry?.currentHourlyRatePcs || 0) * (formData.workingHours || 8))}
+                    </span>
+                    <span className="text-xs text-[#527078]">pcs / shift</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[10px]">
+                    <span className="text-[#527078]">Shift Target: {formData.targetProd}</span>
+                    <span className={`font-bold ${
+                      Math.round((formData.liveTelemetry?.currentHourlyRatePcs || 0) * (formData.workingHours || 8)) >= formData.targetProd
+                        ? 'text-emerald-700'
+                        : 'text-amber-700'
+                    }`}>
+                      {Math.round(((formData.liveTelemetry?.currentHourlyRatePcs || 0) * (formData.workingHours || 8) / (formData.targetProd || 1)) * 100)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Real-time Telemetry Controls: Production Rates & WIP Totals Input Row */}
+              <div className="p-4 rounded-2xl bg-white border border-[#d9d2c2] shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-3 border-b border-[#e7e1d5]">
+                  <div className="flex items-center gap-2">
+                    <Gauge className="w-4 h-4 text-[#176f78]" />
+                    <h3 className="font-bold text-[#17343a] uppercase text-xs tracking-wide">
+                      Live Production Rates &amp; WIP Volume Telemetry Inputs
+                    </h3>
+                  </div>
+                  <span className="text-[11px] text-[#527078]">
+                    Inputs instantly recalculate hourly run-rates, buffer health, and synchronization with Line {formData.lineNo}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Input 1: Current Hourly Production Rate */}
+                  <div className="p-3 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2]">
+                    <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1 flex items-center justify-between">
+                      <span>Live Hourly Production Rate</span>
+                      <span className="text-[10px] text-[#176f78] font-mono">Pcs / Hour</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.liveTelemetry?.currentHourlyRatePcs ?? 0}
+                        onChange={e => {
+                          const val = parseInt(e.target.value) || 0;
+                          const target = formData.liveTelemetry?.targetHourlyRatePcs || Math.round(formData.targetProd / (formData.workingHours || 8));
+                          const variance = val - target;
+                          const currentWip = formData.liveTelemetry?.currentWipTotalPcs ?? formData.wip;
+                          const bufferHrs = val > 0 ? parseFloat((currentWip / val).toFixed(1)) : 0;
+                          setFormData(prev => ({
+                            ...prev,
+                            liveTelemetry: {
+                              ...(prev.liveTelemetry || generateDefaultLiveTelemetry(prev, metrics.totalPresentMP || 40, prev.workingHours || 8)),
+                              currentHourlyRatePcs: val,
+                              pacingVariancePcs: variance,
+                              wipBufferHours: bufferHrs,
+                              pacingStatus: val >= target ? 'on_pace' : val >= target * 0.85 ? 'behind' : 'critical_lag',
+                              lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                            }
+                          }));
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] text-sm font-bold font-mono-numbers text-[#176f78] focus:outline-hidden focus:ring-1 focus:ring-[#176f78]"
+                      />
+                      <span className="text-xs font-bold text-[#527078] shrink-0">pcs/hr</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-[10px] text-[#527078]">
+                      <span>Extrapolated 8h Run:</span>
+                      <strong className="text-[#17343a] font-mono-numbers">
+                        {(formData.liveTelemetry?.currentHourlyRatePcs || 0) * (formData.workingHours || 8)} pcs
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Input 2: Target Hourly Rate Pace */}
+                  <div className="p-3 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2]">
+                    <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1 flex items-center justify-between">
+                      <span>Target Hourly Pace</span>
+                      <span className="text-[10px] text-[#176f78] font-mono">Takt Standard</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.liveTelemetry?.targetHourlyRatePcs ?? Math.round(formData.targetProd / (formData.workingHours || 8))}
+                        onChange={e => {
+                          const val = parseInt(e.target.value) || 1;
+                          const current = formData.liveTelemetry?.currentHourlyRatePcs ?? 0;
+                          const variance = current - val;
+                          setFormData(prev => ({
+                            ...prev,
+                            liveTelemetry: {
+                              ...(prev.liveTelemetry || generateDefaultLiveTelemetry(prev, metrics.totalPresentMP || 40, prev.workingHours || 8)),
+                              targetHourlyRatePcs: val,
+                              pacingVariancePcs: variance,
+                              pacingStatus: current >= val ? 'on_pace' : current >= val * 0.85 ? 'behind' : 'critical_lag',
+                              lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                            }
+                          }));
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] text-sm font-bold font-mono-numbers text-[#17343a] focus:outline-hidden focus:ring-1 focus:ring-[#176f78]"
+                      />
+                      <span className="text-xs font-bold text-[#527078] shrink-0">target/hr</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-[10px] text-[#527078]">
+                      <span>Hourly Pacing Variance:</span>
+                      <strong className={`font-mono-numbers font-bold ${
+                        (formData.liveTelemetry?.pacingVariancePcs || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                      }`}>
+                        {(formData.liveTelemetry?.pacingVariancePcs || 0) >= 0
+                          ? `+${formData.liveTelemetry?.pacingVariancePcs} pcs`
+                          : `${formData.liveTelemetry?.pacingVariancePcs} pcs`}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Input 3: Current Live WIP on Floor */}
+                  <div className="p-3 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2]">
+                    <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1 flex items-center justify-between">
+                      <span>Total In-Line WIP Level</span>
+                      <span className="text-[10px] text-amber-700 font-mono font-bold">Active Buffer</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.liveTelemetry?.currentWipTotalPcs ?? formData.wip}
+                        onChange={e => {
+                          const val = parseInt(e.target.value) || 0;
+                          const hourlyRate = formData.liveTelemetry?.currentHourlyRatePcs || Math.round(formData.targetProd / (formData.workingHours || 8)) || 1;
+                          const bufferHrs = parseFloat((val / hourlyRate).toFixed(1));
+                          const healthStatus = bufferHrs > 3.0 ? 'high_accumulation' : bufferHrs < 0.8 ? 'starvation_risk' : 'buffer_safe';
+                          setFormData(prev => ({
+                            ...prev,
+                            wip: val, // also synchronize top-level WIP
+                            liveTelemetry: {
+                              ...(prev.liveTelemetry || generateDefaultLiveTelemetry(prev, metrics.totalPresentMP || 40, prev.workingHours || 8)),
+                              currentWipTotalPcs: val,
+                              wipBufferHours: bufferHrs,
+                              wipHealthStatus: healthStatus,
+                              lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                            }
+                          }));
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] text-sm font-bold font-mono-numbers text-amber-800 focus:outline-hidden focus:ring-1 focus:ring-[#176f78]"
+                      />
+                      <span className="text-xs font-bold text-[#527078] shrink-0">pcs</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-[10px]">
+                      <span className="text-[#527078]">Buffer Duration:</span>
+                      <span className="font-bold text-[#17343a] font-mono-numbers">
+                        {formData.liveTelemetry?.wipBufferHours || 1.8} Hours of Work
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Station-by-Station Live Cycle Times Table */}
+              <div className="p-4 rounded-2xl bg-white border border-[#d9d2c2] shadow-2xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Timer className="w-4 h-4 text-[#176f78]" />
+                    <h3 className="font-bold text-[#17343a] uppercase text-xs tracking-wide">
+                      Station Live Cycle Time Observations &amp; Takt Synchronizer
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newStation: LiveStationCycleTime = {
+                          stationId: `st-${Date.now()}`,
+                          operationName: 'Operation Process',
+                          operatorName: 'Sewing Operator',
+                          observedCycleTimeSec: formData.liveTelemetry?.targetCycleTimeSec || 44,
+                          standardCycleTimeSec: formData.liveTelemetry?.targetCycleTimeSec || 44,
+                          pitchTimeSec: formData.liveTelemetry?.pitchTimeSec || 42,
+                          status: 'optimal',
+                          lastLoggedAt: 'Just now'
+                        };
+                        const currentStations = formData.liveTelemetry?.cycleTimeStations || [];
+                        const updatedStations = [...currentStations, newStation];
+                        const avgCT = Math.round(updatedStations.reduce((acc, s) => acc + s.observedCycleTimeSec, 0) / updatedStations.length);
+                        const maxCT = Math.max(...updatedStations.map(s => s.observedCycleTimeSec));
+                        setFormData(prev => ({
+                          ...prev,
+                          liveTelemetry: {
+                            ...(prev.liveTelemetry || generateDefaultLiveTelemetry(prev, metrics.totalPresentMP || 40, prev.workingHours || 8)),
+                            cycleTimeStations: updatedStations,
+                            averageCycleTimeSec: avgCT,
+                            bottleneckCycleTimeSec: maxCT,
+                            lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                          }
+                        }));
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-[#eef7f7] hover:bg-[#dceceb] text-[#176f78] text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add Station</span>
+                    </button>
+                    <span className="text-[11px] text-[#527078]">
+                      Pitch: <strong className="text-[#17343a] font-mono">{formData.liveTelemetry?.pitchTimeSec || 42}s</strong>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-[#e7e1d5]">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-[#fbfaf6] border-b border-[#e7e1d5] text-[#527078] text-[10px] font-bold uppercase tracking-wider">
+                        <th className="py-2.5 px-3">Operation / Station</th>
+                        <th className="py-2.5 px-3">Assigned Operator</th>
+                        <th className="py-2.5 px-3 text-center">Observed Cycle (s)</th>
+                        <th className="py-2.5 px-3 text-center">Standard Takt (s)</th>
+                        <th className="py-2.5 px-3 text-center">Variance</th>
+                        <th className="py-2.5 px-3 text-center">Pacing Status</th>
+                        <th className="py-2.5 px-3 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#e7e1d5]">
+                      {(formData.liveTelemetry?.cycleTimeStations || []).map((station, idx) => {
+                        const varianceSec = station.observedCycleTimeSec - station.standardCycleTimeSec;
+                        const isOverrun = varianceSec > 0;
+                        const isCritical = varianceSec >= (station.standardCycleTimeSec * 0.2);
+
+                        return (
+                          <tr key={station.stationId || idx} className="hover:bg-[#fbfaf6] transition-colors">
+                            <td className="py-2 px-3">
+                              <input
+                                type="text"
+                                value={station.operationName}
+                                onChange={e => {
+                                  const name = e.target.value;
+                                  const updated = (formData.liveTelemetry?.cycleTimeStations || []).map(s =>
+                                    s.stationId === station.stationId ? { ...s, operationName: name } : s
+                                  );
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    liveTelemetry: {
+                                      ...(prev.liveTelemetry || generateDefaultLiveTelemetry(prev, metrics.totalPresentMP || 40, prev.workingHours || 8)),
+                                      cycleTimeStations: updated
+                                    }
+                                  }));
+                                }}
+                                className="w-full px-2 py-1 rounded-lg border border-[#d9d2c2] text-xs font-bold text-[#17343a] bg-white"
+                              />
+                            </td>
+                            <td className="py-2 px-3">
+                              <input
+                                type="text"
+                                value={station.operatorName}
+                                onChange={e => {
+                                  const op = e.target.value;
+                                  const updated = (formData.liveTelemetry?.cycleTimeStations || []).map(s =>
+                                    s.stationId === station.stationId ? { ...s, operatorName: op } : s
+                                  );
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    liveTelemetry: {
+                                      ...(prev.liveTelemetry || generateDefaultLiveTelemetry(prev, metrics.totalPresentMP || 40, prev.workingHours || 8)),
+                                      cycleTimeStations: updated
+                                    }
+                                  }));
+                                }}
+                                className="w-full px-2 py-1 rounded-lg border border-[#d9d2c2] text-xs text-[#527078] bg-white"
+                              />
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <div className="inline-flex items-center justify-center gap-1">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  step="0.5"
+                                  value={station.observedCycleTimeSec}
+                                  onChange={e => {
+                                    const ctVal = parseFloat(e.target.value) || 0;
+                                    const updated = (formData.liveTelemetry?.cycleTimeStations || []).map(s => {
+                                      if (s.stationId === station.stationId) {
+                                        const stat = ctVal > s.standardCycleTimeSec * 1.15 ? 'bottleneck' : ctVal < s.standardCycleTimeSec * 0.85 ? 'starved' : 'optimal';
+                                        return { ...s, observedCycleTimeSec: ctVal, status: stat as any, lastLoggedAt: 'Just now' };
+                                      }
+                                      return s;
+                                    });
+                                    const avgCT = Math.round(updated.reduce((acc, s) => acc + s.observedCycleTimeSec, 0) / updated.length);
+                                    const maxCT = Math.max(...updated.map(s => s.observedCycleTimeSec));
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      liveTelemetry: {
+                                        ...(prev.liveTelemetry || generateDefaultLiveTelemetry(prev, metrics.totalPresentMP || 40, prev.workingHours || 8)),
+                                        cycleTimeStations: updated,
+                                        averageCycleTimeSec: avgCT,
+                                        bottleneckCycleTimeSec: maxCT,
+                                        lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                                      }
+                                    }));
+                                  }}
+                                  className={`w-20 px-2 py-1 rounded-lg border font-mono-numbers font-bold text-center ${
+                                    isCritical
+                                      ? 'bg-rose-50 border-rose-300 text-rose-800'
+                                      : isOverrun
+                                      ? 'bg-amber-50 border-amber-300 text-amber-800'
+                                      : 'bg-white border-[#d9d2c2] text-[#17343a]'
+                                  }`}
+                                />
+                                <span className="text-[10px] text-[#527078]">s</span>
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <div className="inline-flex items-center justify-center gap-1">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  step="0.5"
+                                  value={station.standardCycleTimeSec}
+                                  onChange={e => {
+                                    const stdVal = parseFloat(e.target.value) || 1;
+                                    const updated = (formData.liveTelemetry?.cycleTimeStations || []).map(s =>
+                                      s.stationId === station.stationId ? { ...s, standardCycleTimeSec: stdVal } : s
+                                    );
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      liveTelemetry: {
+                                        ...(prev.liveTelemetry || generateDefaultLiveTelemetry(prev, metrics.totalPresentMP || 40, prev.workingHours || 8)),
+                                        cycleTimeStations: updated
+                                      }
+                                    }));
+                                  }}
+                                  className="w-18 px-2 py-1 rounded-lg border border-[#d9d2c2] text-xs font-mono-numbers text-center bg-white"
+                                />
+                                <span className="text-[10px] text-[#527078]">s</span>
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <span className={`font-mono-numbers text-xs font-bold ${
+                                isCritical ? 'text-rose-700' : isOverrun ? 'text-amber-700' : 'text-emerald-700'
+                              }`}>
+                                {varianceSec > 0 ? `+${varianceSec.toFixed(1)}s` : `${varianceSec.toFixed(1)}s`}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                isCritical
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                  : isOverrun
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              }`}>
+                                {isCritical ? 'Bottleneck' : isOverrun ? 'High CT' : 'Optimal Pace'}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (formData.liveTelemetry?.cycleTimeStations || []).filter(s => s.stationId !== station.stationId);
+                                  const avgCT = updated.length > 0 ? Math.round(updated.reduce((acc, s) => acc + s.observedCycleTimeSec, 0) / updated.length) : 0;
+                                  const maxCT = updated.length > 0 ? Math.max(...updated.map(s => s.observedCycleTimeSec)) : 0;
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    liveTelemetry: {
+                                      ...(prev.liveTelemetry || generateDefaultLiveTelemetry(prev, metrics.totalPresentMP || 40, prev.workingHours || 8)),
+                                      cycleTimeStations: updated,
+                                      averageCycleTimeSec: avgCT,
+                                      bottleneckCycleTimeSec: maxCT
+                                    }
+                                  }));
+                                }}
+                                className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition-colors"
+                                title="Remove Station Observation"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Sub-Assembly Stage-by-Stage WIP Balancing Breakdown */}
+              <div className="p-4 rounded-2xl bg-white border border-[#d9d2c2] shadow-2xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-amber-600" />
+                    <h3 className="font-bold text-[#17343a] uppercase text-xs tracking-wide">
+                      Stage-by-Stage Current In-Line WIP Buffer Balance
+                    </h3>
+                  </div>
+                  <span className="text-[11px] text-[#527078]">
+                    Summed WIP: <strong className="text-amber-800 font-mono-numbers">{(formData.liveTelemetry?.wipStations || []).reduce((acc, st) => acc + st.wipPcs, 0)} pcs</strong>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                  {(formData.liveTelemetry?.wipStations || []).map((stageItem, sIdx) => {
+                    return (
+                      <div key={stageItem.stage || sIdx} className="p-3 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2] space-y-2">
+                        <div className="text-[10px] font-bold uppercase text-[#17343a] truncate" title={stageItem.label}>
+                          {stageItem.label}
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-bold uppercase text-[#527078] mb-0.5">WIP (Pcs)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={stageItem.wipPcs}
+                            onChange={e => {
+                              const val = parseInt(e.target.value) || 0;
+                              const updatedWipStations = (formData.liveTelemetry?.wipStations || []).map(st =>
+                                st.stage === stageItem.stage ? { ...st, wipPcs: val } : st
+                              );
+                              const totalSumWip = updatedWipStations.reduce((acc, st) => acc + st.wipPcs, 0);
+                              const hourlyRate = formData.liveTelemetry?.currentHourlyRatePcs || Math.round(formData.targetProd / (formData.workingHours || 8)) || 1;
+                              const bufferHrs = parseFloat((totalSumWip / hourlyRate).toFixed(1));
+
+                              setFormData(prev => ({
+                                ...prev,
+                                wip: totalSumWip,
+                                liveTelemetry: {
+                                  ...(prev.liveTelemetry || generateDefaultLiveTelemetry(prev, metrics.totalPresentMP || 40, prev.workingHours || 8)),
+                                  wipStations: updatedWipStations,
+                                  currentWipTotalPcs: totalSumWip,
+                                  wipBufferHours: bufferHrs,
+                                  wipHealthStatus: bufferHrs > 3.0 ? 'high_accumulation' : bufferHrs < 0.8 ? 'starvation_risk' : 'buffer_safe',
+                                  lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                                }
+                              }));
+                            }}
+                            className="w-full px-2 py-1 rounded-lg border border-[#d9d2c2] font-mono-numbers font-bold text-center text-xs bg-white text-[#17343a]"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] pt-1 border-t border-[#e7e1d5]">
+                          <span className="text-[#527078]">Buffer:</span>
+                          <span className="font-mono-numbers font-bold text-[#176f78]">
+                            {formData.liveTelemetry?.currentHourlyRatePcs ? ((stageItem.wipPcs / Math.max(1, formData.liveTelemetry.currentHourlyRatePcs))).toFixed(1) : 0.3}h
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Floor Observation Log & Timestamp Sign-off */}
+              <div className="p-3 rounded-xl bg-white border border-[#d9d2c2] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <label className="block text-[10px] font-bold uppercase text-[#527078] mb-1">
+                    Live Floor Observation Notes &amp; IE Lead Remarks
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.liveTelemetry?.telemetryNotes || ''}
+                    onChange={e => {
+                      const notes = e.target.value;
+                      setFormData(prev => ({
+                        ...prev,
+                        liveTelemetry: {
+                          ...(prev.liveTelemetry || generateDefaultLiveTelemetry(prev, metrics.totalPresentMP || 40, prev.workingHours || 8)),
+                          telemetryNotes: notes
+                        }
+                      }));
+                    }}
+                    placeholder="e.g. Front placket folder needle swap complete; pacing recovering to 95 pcs/hr"
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#d9d2c2] text-xs text-[#17343a] bg-[#fbfaf6]"
+                  />
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 pt-2 sm:pt-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickEntryModalOpen(true)}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#176f78] hover:bg-[#125860] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Quick Entry Modal</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                      setFormData(prev => ({
+                        ...prev,
+                        liveTelemetry: {
+                          ...(prev.liveTelemetry || generateDefaultLiveTelemetry(prev, metrics.totalPresentMP || 40, prev.workingHours || 8)),
+                          lastUpdated: nowTime
+                        }
+                      }));
+                      showToastNotification(`Telemetry timestamp refreshed: ${nowTime}`);
+                    }}
+                    className="px-3 py-1.5 rounded-lg border border-[#b2d8d8] bg-[#eef7f7] hover:bg-[#dceceb] text-[#176f78] text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-[#176f78]" />
+                    <span>Sync Timestamp</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ================= 1. TOP 5 MEETING MONITORING ================= */}
+        <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] overflow-hidden shadow-xs">
+          <button
+            type="button"
+            onClick={() => toggleSection('top5')}
+            className="w-full p-4 flex items-center justify-between bg-white border-b border-[#e7e1d5] text-left hover:bg-[#fbfaf6] transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-[#f3e8fd] text-[#7627bb] border border-[#e9d5ff]">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
+                    Top 5 Meeting Monitoring
+                  </h2>
+                </div>
+                <p className="text-xs text-[#527078] mt-0.5">
+                  Daily floor alignment, critical defect resolutions &amp; team attendance
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs px-2.5 py-1 rounded-full font-bold uppercase ${
+                formData.top5.held === 'yes' ? 'bg-[#f3e8fd] text-[#7627bb]' : 'bg-rose-100 text-rose-700'
+              }`}>
+                Status: {formData.top5.held.toUpperCase()} • {formData.top5.attendance}%
+              </span>
+              {expandedSections.top5 ? (
+                <ChevronUp className="w-4 h-4 text-[#527078]" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-[#527078]" />
+              )}
+            </div>
+          </button>
+
+          {expandedSections.top5 && (
+            <div className="p-5 space-y-4 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-4 p-3 rounded-xl bg-white border border-[#d9d2c2]">
+                <div className="flex items-center gap-3">
+                  <span className="font-bold text-[#17343a] uppercase">Meeting Conducted?</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, top5: { ...formData.top5, held: 'yes' } })}
+                      className={`px-3 py-1 rounded-lg font-bold cursor-pointer ${
+                        formData.top5.held === 'yes'
+                          ? 'bg-[#176f78] text-white shadow-xs'
+                          : 'bg-[#f1eee6] text-[#527078]'
+                      }`}
+                    >
+                      YES
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, top5: { ...formData.top5, held: 'no' } })}
+                      className={`px-3 py-1 rounded-lg font-bold cursor-pointer ${
+                        formData.top5.held === 'no'
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'bg-[#f1eee6] text-[#527078]'
+                      }`}
+                    >
+                      NO
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-[#527078] uppercase">Attendance %:</span>
+                  <input
+                    type="number"
+                    value={formData.top5.attendance}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        top5: { ...formData.top5, attendance: parseInt(e.target.value) || 0 }
+                      })
+                    }
+                    className="w-20 px-2.5 py-1 rounded-lg border border-[#d9d2c2] font-mono-numbers font-bold"
+                  />
+                  <span>%</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1.5">
+                  Top 5 Floor Review Items Discussed
+                </label>
+                <div className="space-y-1.5">
+                  {formData.top5.items.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-[#f1eee6] text-[#17343a] font-bold flex items-center justify-center text-[10px] shrink-0">
+                        {idx + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={item}
+                        onChange={e => {
+                          const newItems = [...formData.top5.items];
+                          newItems[idx] = e.target.value;
+                          setFormData({
+                            ...formData,
+                            top5: { ...formData.top5, items: newItems }
+                          });
+                        }}
+                        className="flex-1 px-3 py-1.5 rounded-lg bg-white border border-[#d9d2c2] text-xs"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">
+                  Meeting Resolution &amp; Supervisor Acknowledgement
+                </label>
+                <input
+                  type="text"
+                  value={formData.top5.notes || ''}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      top5: { ...formData.top5, notes: e.target.value }
+                    })
+                  }
+                  placeholder="Supervisor confirmed all actions acknowledged by batch chiefs"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2]"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ================= 2. LINE SETUP & PLANNING ================= */}
         <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] overflow-hidden shadow-xs">
           <button
             type="button"
@@ -2043,11 +2992,13 @@ export const LineData: React.FC<LineDataProps> = ({
                 <Layers className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
-                  Line Setup &amp; IE Planning
-                </h2>
-                <p className="text-xs text-[#527078]">
-                  SMV, working hours, planned manpower, buyer style specifications
+                <div className="flex items-center gap-2">
+                  <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
+                    Line Setup &amp; Planning
+                  </h2>
+                </div>
+                <p className="text-xs text-[#527078] mt-0.5">
+                  SMV, working hours, planned manpower, buyer &amp; style technical specifications
                 </p>
               </div>
             </div>
@@ -2168,74 +3119,37 @@ export const LineData: React.FC<LineDataProps> = ({
                   />
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-[#e7e1d5]">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">Order Qty</label>
-                  <input
-                    type="number"
-                    value={formData.orderQty}
-                    onChange={e => setFormData({ ...formData, orderQty: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] font-mono-numbers"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">Daily Input</label>
-                  <input
-                    type="number"
-                    value={formData.dailyInput}
-                    onChange={e => setFormData({ ...formData, dailyInput: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] font-mono-numbers"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">Daily Output</label>
-                  <input
-                    type="number"
-                    value={formData.dailyOutput}
-                    onChange={e => setFormData({ ...formData, dailyOutput: parseInt(e.target.value) || 0, achievedProd: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] font-mono-numbers font-bold text-[#176f78]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">Current WIP (Pcs)</label>
-                  <input
-                    type="number"
-                    value={formData.wip}
-                    onChange={e => setFormData({ ...formData, wip: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] font-mono-numbers"
-                  />
-                </div>
-              </div>
             </div>
           )}
         </div>
 
-        {/* ================= SECTION 2: Manpower Allocation & Absenteeism Balancing ================= */}
+        {/* ================= 3. PRODUCTION FLOW & HANDOFF ================= */}
         <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] overflow-hidden shadow-xs">
           <button
             type="button"
-            onClick={() => toggleSection("manpower")}
+            onClick={() => toggleSection("flowHandoff")}
             className="w-full p-4 flex items-center justify-between bg-white border-b border-[#e7e1d5] text-left hover:bg-[#fbfaf6] transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-[#fef7e0] text-[#b06000] border border-[#feefa3]">
-                <Users className="w-5 h-5" />
+              <div className="p-2.5 rounded-xl bg-[#e0f2fe] text-[#0284c7] border border-[#bae6fd]">
+                <Activity className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
-                  Manpower Allocation &amp; Absenteeism Balancing
-                </h2>
-                <p className="text-xs text-[#527078]">
-                  Operators, helpers, iron men, absenteeism rate &amp; balance method
+                <div className="flex items-center gap-2">
+                  <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
+                    Production Flow &amp; Handoff
+                  </h2>
+                </div>
+                <p className="text-xs text-[#527078] mt-0.5">
+                  Daily inputs, output pace, WIP buffer inventory, order progress &amp; pre-production technical handoff
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono-numbers px-2.5 py-1 rounded-full bg-[#fef7e0] text-[#8c4600] font-bold">
-                Present: {metrics.totalPresentMP} • Absent: {metrics.totalAbsentMP}
+              <span className="text-xs font-mono-numbers px-2.5 py-1 rounded-full bg-[#e0f2fe] text-[#0369a1] font-bold">
+                Output: {formData.achievedProd || formData.dailyOutput} / {formData.targetProd} pcs • WIP {formData.wip}
               </span>
-              {expandedSections.manpower ? (
+              {expandedSections.flowHandoff ? (
                 <ChevronUp className="w-4 h-4 text-[#527078]" />
               ) : (
                 <ChevronDown className="w-4 h-4 text-[#527078]" />
@@ -2243,8 +3157,263 @@ export const LineData: React.FC<LineDataProps> = ({
             </div>
           </button>
 
-          {expandedSections.manpower && (
+          {expandedSections.flowHandoff && (
             <div className="p-5 space-y-4 text-xs">
+              {/* Core Output & WIP Flow Inputs */}
+              <div className="p-4 rounded-xl bg-white border border-[#d9d2c2] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[#17343a] uppercase text-xs">Floor Flow &amp; WIP Metrics</span>
+                  <span className="text-[11px] text-[#527078]">
+                    Buffer: {formData.targetProd > 0 ? (formData.wip / (formData.targetProd / (formData.workingHours || 8))).toFixed(1) : 0} hrs WIP
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">Order Qty (Pcs)</label>
+                    <input
+                      type="number"
+                      value={formData.orderQty}
+                      onChange={e => setFormData({ ...formData, orderQty: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2] font-mono-numbers"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">Daily Input (Cut Pcs)</label>
+                    <input
+                      type="number"
+                      value={formData.dailyInput}
+                      onChange={e => setFormData({ ...formData, dailyInput: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2] font-mono-numbers"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">Daily Output (Passed Pcs)</label>
+                    <input
+                      type="number"
+                      value={formData.dailyOutput}
+                      onChange={e => setFormData({ ...formData, dailyOutput: parseInt(e.target.value) || 0, achievedProd: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2] font-mono-numbers font-bold text-[#176f78]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">Current WIP (In-Line)</label>
+                    <input
+                      type="number"
+                      value={formData.wip}
+                      onChange={e => setFormData({ ...formData, wip: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2] font-mono-numbers font-bold text-amber-700"
+                    />
+                  </div>
+                </div>
+
+                {/* Style transition plan */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#f1eee6]">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">Next Style Transition</label>
+                    <input
+                      type="text"
+                      value={formData.nextStyle || ''}
+                      onChange={e => setFormData({ ...formData, nextStyle: e.target.value })}
+                      placeholder="e.g. Mens Pique Polo 2026"
+                      className="w-full px-3 py-2 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">Next Style Loading Date</label>
+                    <input
+                      type="date"
+                      value={formData.nextStyleDate || ''}
+                      onChange={e => setFormData({ ...formData, nextStyleDate: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Technical Line Handoff Scorecard & Protocols */}
+              <div className="p-4 rounded-xl bg-white border border-[#d9d2c2] space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ClipboardCheck className="w-4 h-4 text-[#176f78]" />
+                    <h3 className="font-bold text-[#17343a] uppercase text-xs">
+                      Pre-Production Technical Line Handoff Protocols
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase text-[#527078]">Handoff Readiness:</span>
+                    <span className="px-2.5 py-0.5 rounded-full font-mono-numbers font-bold text-xs bg-[#eef7f7] text-[#176f78] border border-[#c4e5e5]">
+                      {handoffScore}% Ready
+                    </span>
+                  </div>
+                </div>
+
+                {/* Checkpoint list */}
+                <div className="space-y-2">
+                  {handoffChecks.map(item => (
+                    <div
+                      key={item.id}
+                      className="p-2.5 rounded-xl border border-[#e7e1d5] bg-[#fbfaf6] flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-[#17343a] text-xs">{item.item}</span>
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-[#f1eee6] text-[#527078]">
+                            {item.responsible}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#527078] truncate mt-0.5">{item.standard}</p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHandoffChecks(prev =>
+                              prev.map(c => c.id === item.id ? { ...c, status: 'pass' } : c)
+                            );
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                            item.status === 'pass'
+                              ? 'bg-emerald-600 text-white shadow-2xs'
+                              : 'bg-white border border-[#d9d2c2] text-[#527078] hover:bg-[#f1eee6]'
+                          }`}
+                        >
+                          Pass
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHandoffChecks(prev =>
+                              prev.map(c => c.id === item.id ? { ...c, status: 'pending' } : c)
+                            );
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                            item.status === 'pending'
+                              ? 'bg-amber-600 text-white shadow-2xs'
+                              : 'bg-white border border-[#d9d2c2] text-[#527078] hover:bg-[#f1eee6]'
+                          }`}
+                        >
+                          Pending
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHandoffChecks(prev =>
+                              prev.map(c => c.id === item.id ? { ...c, status: 'fail' } : c)
+                            );
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                            item.status === 'fail'
+                              ? 'bg-rose-600 text-white shadow-2xs'
+                              : 'bg-white border border-[#d9d2c2] text-[#527078] hover:bg-[#f1eee6]'
+                          }`}
+                        >
+                          Fail
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Handoff Signoff Summary */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[#f1eee6]">
+                  {handoffSignoffs.map(sign => (
+                    <div
+                      key={sign.role}
+                      onClick={() => {
+                        setHandoffSignoffs(prev =>
+                          prev.map(s =>
+                            s.role === sign.role
+                              ? { ...s, status: s.status === 'approved' ? 'pending' : 'approved', signedAt: new Date().toISOString().split('T')[0] }
+                              : s
+                          )
+                        );
+                      }}
+                      className={`p-2.5 rounded-xl border text-center cursor-pointer transition-all ${
+                        sign.status === 'approved'
+                          ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900'
+                          : 'bg-white border-[#d9d2c2] text-[#527078] hover:bg-[#fbfaf6]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-[10px] font-bold uppercase">{sign.title}</span>
+                        {sign.status === 'approved' && <Check className="w-3 h-3 text-emerald-600" />}
+                      </div>
+                      <span className="text-[11px] font-bold block mt-0.5 truncate">{sign.signedByName}</span>
+                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md inline-block mt-1 ${
+                        sign.status === 'approved' ? 'bg-emerald-200/80 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {sign.status === 'approved' ? 'Signed Off' : 'Pending'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ================= 4. MANPOWER ALLOCATION & ABSENTEEISM : SHIFT WORKING MINUTES BALANCING ================= */}
+        <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] overflow-hidden shadow-xs">
+          <div className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border-b border-[#e7e1d5] text-left">
+            <div
+              onClick={() => toggleSection("manpowerBalancing")}
+              className="flex items-center gap-3 flex-1 cursor-pointer"
+            >
+              <div className="p-2.5 rounded-xl bg-[#fef7e0] text-[#b06000] border border-[#feefa3]">
+                <Users className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
+                    Manpower Allocation &amp; Absenteeism : Shift Working Minutes Balancing
+                  </h2>
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-[#dceceb] text-[#176f78] px-2 py-0.5 rounded-md">
+                    480 Min Std
+                  </span>
+                  {shift8hBalance.signOff.isSignedOff && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-300">
+                      Signed Off
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-[#527078] mt-0.5">
+                  Operators, helpers, iron men, absenteeism rate, shift 480-minute working minutes reconciliation &amp; loss drains audit
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <span className="text-xs font-mono-numbers px-2.5 py-1 rounded-full bg-[#fef7e0] text-[#8c4600] font-bold">
+                Present: {metrics.totalPresentMP} • Absent: {metrics.totalAbsentMP}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setIs8hBalancingModalOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-[#176f78] hover:bg-[#125860] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer touch-manipulation active:scale-95"
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Open Cockpit</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => toggleSection("manpowerBalancing")}
+                className="p-1 rounded-lg text-[#527078] hover:bg-[#f1eee6] cursor-pointer"
+              >
+                {expandedSections.manpowerBalancing ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {expandedSections.manpowerBalancing && (
+            <div className="p-5 space-y-5 text-xs">
+              {/* Part 1: Manpower Deployment Breakdown */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Operator */}
                 <div className="p-3.5 rounded-xl bg-white border border-[#d9d2c2] space-y-2">
@@ -2397,7 +3566,7 @@ export const LineData: React.FC<LineDataProps> = ({
                 </div>
               </div>
 
-              {/* Balancing Method & Notes */}
+              {/* Absenteeism Mitigation Method & Notes */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-[#e7e1d5]">
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">
@@ -2429,142 +3598,136 @@ export const LineData: React.FC<LineDataProps> = ({
                   />
                 </div>
               </div>
-            </div>
-          )}
-        </div>
 
-        {/* ================= SECTION 3: Top 5 Meeting Monitoring ================= */}
-        <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] overflow-hidden shadow-xs">
-          <button
-            type="button"
-            onClick={() => toggleSection('top5')}
-            className="w-full p-4 flex items-center justify-between bg-white border-b border-[#e7e1d5] text-left hover:bg-[#fbfaf6] transition-colors cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-[#f3e8fd] text-[#7627bb] border border-[#e9d5ff]">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
-                  Top 5 Meeting Monitoring
-                </h2>
-                <p className="text-xs text-[#527078]">
-                  Daily floor alignment, critical defect resolutions &amp; team attendance
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs px-2.5 py-1 rounded-full font-bold uppercase ${
-                formData.top5.held === 'yes' ? 'bg-[#f3e8fd] text-[#7627bb]' : 'bg-rose-100 text-rose-700'
-              }`}>
-                Status: {formData.top5.held.toUpperCase()}
-              </span>
-              {expandedSections.top5 ? (
-                <ChevronUp className="w-4 h-4 text-[#527078]" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-[#527078]" />
-              )}
-            </div>
-          </button>
+              {/* Part 2: Shift Working Minutes Balancing Metrics (480-minute standard) */}
+              <div className="pt-3 border-t border-[#e7e1d5] space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[#17343a] uppercase text-xs flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#176f78]" />
+                    480-Minute Shift Minutes Reconciliation &amp; Loss Drains
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIs8hBalancingModalOpen(true)}
+                    className="text-xs font-bold text-[#176f78] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Full Balancing Cockpit</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
-          {expandedSections.top5 && (
-            <div className="p-5 space-y-4 text-xs">
-              <div className="flex flex-wrap items-center justify-between gap-4 p-3 rounded-xl bg-white border border-[#d9d2c2]">
-                <div className="flex items-center gap-3">
-                  <span className="font-bold text-[#17343a] uppercase">Meeting Conducted?</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, top5: { ...formData.top5, held: 'yes' } })}
-                      className={`px-3 py-1 rounded-lg font-bold ${
-                        formData.top5.held === 'yes'
-                          ? 'bg-[#176f78] text-white shadow-xs'
-                          : 'bg-[#f1eee6] text-[#527078]'
-                      }`}
-                    >
-                      YES
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, top5: { ...formData.top5, held: 'no' } })}
-                      className={`px-3 py-1 rounded-lg font-bold ${
-                        formData.top5.held === 'no'
-                          ? 'bg-rose-600 text-white shadow-xs'
-                          : 'bg-[#f1eee6] text-[#527078]'
-                      }`}
-                    >
-                      NO
-                    </button>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-xl bg-white border border-[#d9d2c2] shadow-2xs">
+                    <span className="text-[10px] text-[#527078] font-bold uppercase block tracking-wider">
+                      Gross 8h Minutes
+                    </span>
+                    <div className="font-display text-xl font-bold text-[#17343a] font-mono-numbers mt-0.5">
+                      {shift8hBalance.grossAvailableMinutes.toLocaleString()}
+                      <span className="text-xs font-semibold text-[#527078] ml-1">min</span>
+                    </div>
+                    <span className="text-[10px] text-[#527078] mt-0.5 block">
+                      {shift8hBalance.totalPresentMP} MP × 480 working min
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-white border border-[#d9d2c2] shadow-2xs">
+                    <span className="text-[10px] text-[#527078] font-bold uppercase block tracking-wider">
+                      Earned Std Minutes
+                    </span>
+                    <div className="font-display text-xl font-bold text-[#176f78] font-mono-numbers mt-0.5">
+                      {shift8hBalance.earnedStandardMinutes.toLocaleString()}
+                      <span className="text-xs font-semibold text-[#527078] ml-1">min</span>
+                    </div>
+                    <span className="text-[10px] text-[#527078] mt-0.5 block">
+                      {shift8hBalance.achievedProd8h} pcs × {shift8hBalance.smv} SMV
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-white border border-[#d9d2c2] shadow-2xs">
+                    <span className="text-[10px] text-[#527078] font-bold uppercase block tracking-wider">
+                      8h Realized Efficiency
+                    </span>
+                    <div className={`font-display text-xl font-bold font-mono-numbers mt-0.5 ${
+                      shift8hBalance.realizedShiftEfficiencyPct >= formData.targetEff
+                        ? 'text-emerald-700'
+                        : shift8hBalance.realizedShiftEfficiencyPct >= 65
+                        ? 'text-amber-700'
+                        : 'text-rose-700'
+                    }`}>
+                      {shift8hBalance.realizedShiftEfficiencyPct}%
+                    </div>
+                    <span className="text-[10px] text-[#527078] mt-0.5 block">
+                      Target: {formData.targetEff}% ({shift8hBalance.targetProd8h} pcs)
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-white border border-[#d9d2c2] shadow-2xs">
+                    <span className="text-[10px] text-[#527078] font-bold uppercase block tracking-wider">
+                      Post-8h OT Directive
+                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-md ${
+                        shift8hBalance.postShiftBalancing.deficitPcs === 0
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : shift8hBalance.postShiftBalancing.requiresOvertime
+                          ? 'bg-rose-100 text-rose-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {shift8hBalance.postShiftBalancing.deficitPcs === 0 ? 'No OT Needed' : `${shift8hBalance.postShiftBalancing.recommendedOtMinutes}m OT Suggested`}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-[#527078] mt-0.5 block">
+                      {shift8hBalance.postShiftBalancing.deficitPcs === 0
+                        ? 'Daily quota achieved'
+                        : `Deficit: ${shift8hBalance.postShiftBalancing.deficitPcs} pcs`}
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-[#527078] uppercase">Attendance %:</span>
-                  <input
-                    type="number"
-                    value={formData.top5.attendance}
-                    onChange={e =>
-                      setFormData({
-                        ...formData,
-                        top5: { ...formData.top5, attendance: parseInt(e.target.value) || 0 }
-                      })
-                    }
-                    className="w-20 px-2.5 py-1 rounded-lg border border-[#d9d2c2] font-mono-numbers font-bold"
-                  />
-                  <span>%</span>
-                </div>
-              </div>
+                {/* Minute Loss Breakdown Highlights */}
+                <div className="p-4 rounded-2xl bg-white border border-[#d9d2c2] space-y-3">
+                  <div>
+                    <h3 className="font-display text-xs font-bold uppercase text-[#17343a]">
+                      Shop-Floor Working Minutes Drains (480-Minute Variance Audit)
+                    </h3>
+                    <p className="text-[11px] text-[#527078]">
+                      Realized working minutes lost across sewing, mechanical stoppage, and balancing starved stations
+                    </p>
+                  </div>
 
-              <div>
-                <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1.5">
-                  Top 5 Floor Review Items Discussed
-                </label>
-                <div className="space-y-1.5">
-                  {formData.top5.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-[#f1eee6] text-[#17343a] font-bold flex items-center justify-center text-[10px] shrink-0">
-                        {idx + 1}
-                      </span>
-                      <input
-                        type="text"
-                        value={item}
-                        onChange={e => {
-                          const newItems = [...formData.top5.items];
-                          newItems[idx] = e.target.value;
-                          setFormData({
-                            ...formData,
-                            top5: { ...formData.top5, items: newItems }
-                          });
-                        }}
-                        className="flex-1 px-3 py-1.5 rounded-lg bg-white border border-[#d9d2c2] text-xs"
-                      />
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 pt-1 text-center font-mono-numbers">
+                    <div className="p-2 rounded-xl bg-rose-50/60 border border-rose-200">
+                      <span className="text-[9px] font-bold text-rose-700 uppercase block">Balancing Delay</span>
+                      <span className="font-bold text-xs text-rose-800">{shift8hBalance.lostMinutes.lineBalancingDelayMinutes}m</span>
                     </div>
-                  ))}
+                    <div className="p-2 rounded-xl bg-amber-50/60 border border-amber-200">
+                      <span className="text-[9px] font-bold text-amber-700 uppercase block">Needle Stops</span>
+                      <span className="font-bold text-xs text-amber-800">{shift8hBalance.lostMinutes.needleDowntimeMinutes}m</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-orange-50/60 border border-orange-200">
+                      <span className="text-[9px] font-bold text-orange-700 uppercase block">Machine Stops</span>
+                      <span className="font-bold text-xs text-orange-800">{shift8hBalance.lostMinutes.machineBreakdownMinutes}m</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-indigo-50/60 border border-indigo-200">
+                      <span className="text-[9px] font-bold text-indigo-700 uppercase block">Material Waiting</span>
+                      <span className="font-bold text-xs text-indigo-800">{shift8hBalance.lostMinutes.materialFeedingDelayMinutes}m</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-pink-50/60 border border-pink-200">
+                      <span className="text-[9px] font-bold text-pink-700 uppercase block">Quality Rework</span>
+                      <span className="font-bold text-xs text-pink-800">{shift8hBalance.lostMinutes.reworkAndAlterationMinutes}m</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-teal-50/60 border border-teal-200">
+                      <span className="text-[9px] font-bold text-teal-700 uppercase block">Huddle &amp; Setup</span>
+                      <span className="font-bold text-xs text-teal-800">{shift8hBalance.lostMinutes.morningBriefingAndSetupMinutes}m</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">
-                  Meeting Resolution &amp; Supervisor Acknowledgement
-                </label>
-                <input
-                  type="text"
-                  value={formData.top5.notes || ''}
-                  onChange={e =>
-                    setFormData({
-                      ...formData,
-                      top5: { ...formData.top5, notes: e.target.value }
-                    })
-                  }
-                  placeholder="Supervisor confirmed all actions acknowledged by batch chiefs"
-                  className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2]"
-                />
               </div>
             </div>
           )}
         </div>
 
-        {/* ================= SECTION 4: Bottleneck Flow Analysis & Cycle Time Checking ================= */}
+        {/* ================= 5. BOTTLENECK ANALYSIS & BALANCING ================= */}
         <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] overflow-hidden shadow-xs">
           <button
             type="button"
@@ -2576,10 +3739,12 @@ export const LineData: React.FC<LineDataProps> = ({
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
-                  Bottleneck Flow Analysis &amp; Cycle Time Checking
-                </h2>
-                <p className="text-xs text-[#527078]">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
+                    Bottleneck Analysis &amp; Balancing
+                  </h2>
+                </div>
+                <p className="text-xs text-[#527078] mt-0.5">
                   Pacing station study, takt vs observed cycle times &amp; line balancing action
                 </p>
               </div>
@@ -2679,7 +3844,7 @@ export const LineData: React.FC<LineDataProps> = ({
           )}
         </div>
 
-        {/* ================= SECTION 5: Time / Production Study ================= */}
+        {/* ================= 6. TIME / PRODUCTION STUDY'S ================= */}
         <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] overflow-hidden shadow-xs">
           <button
             type="button"
@@ -2691,10 +3856,12 @@ export const LineData: React.FC<LineDataProps> = ({
                 <Clock className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
-                  Time / Production Study
-                </h2>
-                <p className="text-xs text-[#527078]">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
+                    Time / Production Study's
+                  </h2>
+                </div>
+                <p className="text-xs text-[#527078] mt-0.5">
                   Stopwatch audit, standard vs observed output rate &amp; operator rating
                 </p>
               </div>
@@ -2726,7 +3893,7 @@ export const LineData: React.FC<LineDataProps> = ({
                         timeStudy: { ...formData.timeStudy, done: e.target.value as any }
                       })
                     }
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] font-bold"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] font-bold cursor-pointer"
                   >
                     <option value="yes">YES - Full Study Completed</option>
                     <option value="partial">PARTIAL - Sample Audit Only</option>
@@ -2746,7 +3913,7 @@ export const LineData: React.FC<LineDataProps> = ({
                         timeStudy: { ...formData.timeStudy, type: e.target.value as any }
                       })
                     }
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2]"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] cursor-pointer"
                   >
                     <option value="time">Time Study (Snap-back / Continuous)</option>
                     <option value="production">Production Study (Output Log)</option>
@@ -2816,7 +3983,7 @@ export const LineData: React.FC<LineDataProps> = ({
           )}
         </div>
 
-        {/* ================= SECTION 6: Line Build-Up & 6-Day Learning Curve Telemetry Logging ================= */}
+        {/* ================= 7. LINE BUILD-UP & LEARNING CURVE TRACKING ================= */}
         <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] overflow-hidden shadow-xs">
           <div className="w-full p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white border-b border-[#e7e1d5] text-left">
             <div className="flex items-center gap-3">
@@ -2830,7 +3997,7 @@ export const LineData: React.FC<LineDataProps> = ({
               <div onClick={() => toggleSection("learningCurve")} className="cursor-pointer">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
-                    Line Build-Up &amp; 6-Day Learning Curve Telemetry Logging
+                    Line Build-Up &amp; Learning Curve Tracking
                   </h2>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-[#176f78] text-white">
                     Period: 6 Days
@@ -2839,7 +4006,7 @@ export const LineData: React.FC<LineDataProps> = ({
                     Import &amp; Updateable
                   </span>
                 </div>
-                <p className="text-xs text-[#527078]">
+                <p className="text-xs text-[#527078] mt-0.5">
                   Import/export CSV telemetry, update daily targets &amp; actual logs, and adjust line build-up ramp
                 </p>
               </div>
@@ -3388,183 +4555,6 @@ export const LineData: React.FC<LineDataProps> = ({
           )}
         </div>
 
-        {/* ================= SECTION 8: Full 8-Hour Shift Working Minutes Balancing & Post-Shift Reconciliation ================= */}
-        <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] overflow-hidden shadow-xs">
-          <div className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border-b border-[#e7e1d5] text-left">
-            <div
-              onClick={() => toggleSection("shift8hBalancing")}
-              className="flex items-center gap-3 flex-1 cursor-pointer"
-            >
-              <div className="p-2.5 rounded-xl bg-[#dceceb] text-[#176f78] border border-[#176f78]/20">
-                <Clock className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="font-display text-base sm:text-lg font-bold uppercase text-[#17343a]">
-                    Full 8-Hour Shift Working Minutes Balancing
-                  </h2>
-                  <span className="text-[10px] font-black uppercase tracking-wider bg-[#dceceb] text-[#176f78] px-2 py-0.5 rounded-md">
-                    480 Min Standard
-                  </span>
-                  {shift8hBalance.signOff.isSignedOff && (
-                    <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-300">
-                      Signed Off
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-[#527078]">
-                  Standard 480 working minutes reconciliation, loss drains audit, and post-shift overtime balancing
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 self-end sm:self-auto">
-              <button
-                type="button"
-                onClick={() => setIs8hBalancingModalOpen(true)}
-                className="px-3.5 py-1.5 rounded-xl bg-[#176f78] hover:bg-[#125860] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer touch-manipulation active:scale-95"
-              >
-                <Sliders className="w-3.5 h-3.5" />
-                <span>Open 8h Balancing Cockpit</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => toggleSection("shift8hBalancing")}
-                className="p-1 rounded-lg text-[#527078] hover:bg-[#f1eee6] cursor-pointer"
-              >
-                {expandedSections.shift8hBalancing ? (
-                  <ChevronUp className="w-4 h-4" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {expandedSections.shift8hBalancing && (
-            <div className="p-5 space-y-4 text-xs">
-              {/* Top 480-minute reconciliation metric cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3.5 rounded-xl bg-white border border-[#d9d2c2] shadow-2xs">
-                  <span className="text-[10px] text-[#527078] font-bold uppercase block tracking-wider">
-                    Gross 8h Minutes
-                  </span>
-                  <div className="font-display text-xl font-bold text-[#17343a] font-mono-numbers mt-0.5">
-                    {shift8hBalance.grossAvailableMinutes.toLocaleString()}
-                    <span className="text-xs font-semibold text-[#527078] ml-1">min</span>
-                  </div>
-                  <span className="text-[10px] text-[#527078] mt-0.5 block">
-                    {shift8hBalance.totalPresentMP} MP × 480 working min
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-white border border-[#d9d2c2] shadow-2xs">
-                  <span className="text-[10px] text-[#527078] font-bold uppercase block tracking-wider">
-                    Earned Std Minutes
-                  </span>
-                  <div className="font-display text-xl font-bold text-[#176f78] font-mono-numbers mt-0.5">
-                    {shift8hBalance.earnedStandardMinutes.toLocaleString()}
-                    <span className="text-xs font-semibold text-[#527078] ml-1">min</span>
-                  </div>
-                  <span className="text-[10px] text-[#527078] mt-0.5 block">
-                    {shift8hBalance.achievedProd8h} pcs × {shift8hBalance.smv} SMV
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-white border border-[#d9d2c2] shadow-2xs">
-                  <span className="text-[10px] text-[#527078] font-bold uppercase block tracking-wider">
-                    8h Realized Efficiency
-                  </span>
-                  <div className={`font-display text-xl font-bold font-mono-numbers mt-0.5 ${
-                    shift8hBalance.realizedShiftEfficiencyPct >= formData.targetEff
-                      ? 'text-emerald-700'
-                      : shift8hBalance.realizedShiftEfficiencyPct >= 65
-                      ? 'text-amber-700'
-                      : 'text-rose-700'
-                  }`}>
-                    {shift8hBalance.realizedShiftEfficiencyPct}%
-                  </div>
-                  <span className="text-[10px] text-[#527078] mt-0.5 block">
-                    Target: {formData.targetEff}% ({shift8hBalance.targetProd8h} pcs)
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-white border border-[#d9d2c2] shadow-2xs">
-                  <span className="text-[10px] text-[#527078] font-bold uppercase block tracking-wider">
-                    Post-8h OT Directive
-                  </span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-md ${
-                      shift8hBalance.postShiftBalancing.deficitPcs === 0
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : shift8hBalance.postShiftBalancing.requiresOvertime
-                        ? 'bg-rose-100 text-rose-800'
-                        : 'bg-amber-100 text-amber-800'
-                    }`}>
-                      {shift8hBalance.postShiftBalancing.deficitPcs === 0 ? 'No OT Needed' : `${shift8hBalance.postShiftBalancing.recommendedOtMinutes}m OT Suggested`}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-[#527078] mt-0.5 block">
-                    {shift8hBalance.postShiftBalancing.deficitPcs === 0
-                      ? 'Daily quota achieved'
-                      : `Deficit: ${shift8hBalance.postShiftBalancing.deficitPcs} pcs`}
-                  </span>
-                </div>
-              </div>
-
-              {/* Minute Loss Breakdown Highlights */}
-              <div className="p-4 rounded-2xl bg-white border border-[#d9d2c2] space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <h3 className="font-display text-xs font-bold uppercase text-[#17343a]">
-                      Shop-Floor Working Minutes Drains (480-Minute Variance Audit)
-                    </h3>
-                    <p className="text-[11px] text-[#527078]">
-                      Realized working minutes lost across sewing, mechanical stoppage, and balancing starved stations
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIs8hBalancingModalOpen(true)}
-                    className="text-xs font-bold text-[#176f78] hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>Full Audit Breakdown</span>
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 pt-1 text-center font-mono-numbers">
-                  <div className="p-2 rounded-xl bg-rose-50/60 border border-rose-200">
-                    <span className="text-[9px] font-bold text-rose-700 uppercase block">Balancing Delay</span>
-                    <span className="font-bold text-xs text-rose-800">{shift8hBalance.lostMinutes.lineBalancingDelayMinutes}m</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-amber-50/60 border border-amber-200">
-                    <span className="text-[9px] font-bold text-amber-700 uppercase block">Needle Stops</span>
-                    <span className="font-bold text-xs text-amber-800">{shift8hBalance.lostMinutes.needleDowntimeMinutes}m</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-orange-50/60 border border-orange-200">
-                    <span className="text-[9px] font-bold text-orange-700 uppercase block">Machine Stops</span>
-                    <span className="font-bold text-xs text-orange-800">{shift8hBalance.lostMinutes.machineBreakdownMinutes}m</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-indigo-50/60 border border-indigo-200">
-                    <span className="text-[9px] font-bold text-indigo-700 uppercase block">Material Waiting</span>
-                    <span className="font-bold text-xs text-indigo-800">{shift8hBalance.lostMinutes.materialFeedingDelayMinutes}m</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-pink-50/60 border border-pink-200">
-                    <span className="text-[9px] font-bold text-pink-700 uppercase block">Quality Rework</span>
-                    <span className="font-bold text-xs text-pink-800">{shift8hBalance.lostMinutes.reworkAndAlterationMinutes}m</span>
-                  </div>
-                  <div className="p-2 rounded-xl bg-teal-50/60 border border-teal-200">
-                    <span className="text-[9px] font-bold text-teal-700 uppercase block">Huddle &amp; Setup</span>
-                    <span className="font-bold text-xs text-teal-800">{shift8hBalance.lostMinutes.morningBriefingAndSetupMinutes}m</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* General Remarks & Save Actions */}
         <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] p-5 shadow-xs space-y-4">
           <div>
@@ -3606,6 +4596,17 @@ export const LineData: React.FC<LineDataProps> = ({
         </div>
       </form>
 
+      {/* Weekly Efficiency Trend — Line {formData.lineNo} */}
+      <div className="rounded-3xl border border-[#d9d2c2] bg-[#fbfaf6] p-4 sm:p-5 shadow-xs">
+        <LineEfficiencySparkline
+          line={formData}
+          allLines={lines}
+          currentEfficiency={metrics.efficiencyPct}
+          targetEfficiency={formData.targetEff || 85}
+          onNavigateHistory={onNavigate ? (lineNo) => onNavigate('line-history', lineNo) : undefined}
+        />
+      </div>
+
       {/* Full 40-Day Style Progression Chart Modal - Lazy Loaded */}
       {showProgressionModal && (
         <React.Suspense fallback={null}>
@@ -3629,6 +4630,24 @@ export const LineData: React.FC<LineDataProps> = ({
             smv={formData.smv}
             totalMP={metrics.totalPresentMP || 40}
             workingHours={formData.workingHours || 8}
+          />
+        </React.Suspense>
+      )}
+
+      {/* Quick Entry Modal for Line Telemetry - Lazy Loaded */}
+      {isQuickEntryModalOpen && (
+        <React.Suspense fallback={null}>
+          <TelemetryQuickEntryModal
+            isOpen={isQuickEntryModalOpen}
+            onClose={() => setIsQuickEntryModalOpen(false)}
+            line={formData}
+            canEdit={lineAccess.canEdit}
+            readOnlyReason={lineAccess.reason}
+            onSaveQuickTelemetry={(updated) => {
+              setFormData(updated);
+              if (onSaveLine) onSaveLine(updated);
+              showToastNotification(`Line ${updated.lineNo} telemetry & WIP updated from Quick Entry!`);
+            }}
           />
         </React.Suspense>
       )}

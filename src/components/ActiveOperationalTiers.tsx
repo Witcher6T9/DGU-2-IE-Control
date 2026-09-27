@@ -1414,9 +1414,9 @@ export const ActiveOperationalTiers: React.FC<ActiveOperationalTiersProps> = ({
                 {selectedNode.type === 'line_ie' && onSelectLineFilter && (
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {selectedLieMember ? (
-                      selectedLieMember.lines.map(lineNo => (
+                      selectedLieMember.lines.map((lineNo, idx) => (
                         <button
-                          key={lineNo}
+                          key={`org-line-${lineNo}-${idx}`}
                           type="button"
                           onClick={() => onSelectLineFilter(lineNo.replace(/^0+/, ''))}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#f1eee6] text-[#17343a] border border-[#d9d2c2] text-xs font-bold transition-all shadow-2xs hover:border-[#176f78] cursor-pointer"

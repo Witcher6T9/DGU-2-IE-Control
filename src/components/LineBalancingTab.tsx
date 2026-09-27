@@ -27,33 +27,40 @@ export const LineBalancingTab: React.FC<LineBalancingTabProps> = ({
   const [st3Reduction, setSt3Reduction] = useState<number>(0); // 0 to 2.5s reduction
 
   // Calculate actual sum of cycle times and bottleneck
-  const currentTotalCycle = stations.reduce((sum, s) => sum + s.cycleTime, 0);
-  const actualBottleneck = Math.max(...stations.map((s) => s.cycleTime));
-  const currentLbe = ((currentTotalCycle / (stations.length * actualBottleneck)) * 100).toFixed(1);
+  const count = stations.length || 1;
+  const currentTotalCycle = stations.reduce((sum, s) => sum + (s.cycleTime || 0), 0);
+  const actualBottleneck = stations.length > 0 ? Math.max(...stations.map((s) => s.cycleTime || 0)) : 18.0;
+  const currentLbe = stations.length > 0 && actualBottleneck > 0
+    ? ((currentTotalCycle / (stations.length * actualBottleneck)) * 100).toFixed(1)
+    : '85.0';
   const currentBalanceDelay = (100 - parseFloat(currentLbe)).toFixed(1);
 
   // Simulated metrics with Kaizen
   const simulatedStations = stations.map((s) => {
     if (s.code === 'ST-03') {
-      const newCycle = Math.max(16.0, s.cycleTime - st3Reduction);
+      const newCycle = Math.max(16.0, (s.cycleTime || 18.0) - st3Reduction);
       return {
         ...s,
         simulatedCycle: newCycle,
         simulatedBreakdown: {
           ...s.breakdownTime,
-          waste: Math.max(0.2, s.breakdownTime.waste - st3Reduction * 0.4),
-          nonValueAdded: Math.max(2.0, s.breakdownTime.nonValueAdded - st3Reduction * 0.6),
+          waste: Math.max(0.2, (s.breakdownTime?.waste || 1.0) - st3Reduction * 0.4),
+          nonValueAdded: Math.max(2.0, (s.breakdownTime?.nonValueAdded || 3.0) - st3Reduction * 0.6),
         }
       };
     }
-    return { ...s, simulatedCycle: s.cycleTime, simulatedBreakdown: s.breakdownTime };
+    return { ...s, simulatedCycle: s.cycleTime || 18.0, simulatedBreakdown: s.breakdownTime };
   });
 
   const simTotalCycle = simulatedStations.reduce((sum, s) => sum + s.simulatedCycle, 0);
-  const simBottleneck = Math.max(...simulatedStations.map((s) => s.simulatedCycle));
-  const simLbe = ((simTotalCycle / (simulatedStations.length * simBottleneck)) * 100).toFixed(1);
-  const simCapacityShift = Math.floor((8 * 3600 * 0.90) / simBottleneck); // 90% net avail
-  const actualCapacityShift = Math.floor((8 * 3600 * 0.90) / actualBottleneck);
+  const simBottleneck = simulatedStations.length > 0
+    ? Math.max(...simulatedStations.map((s) => s.simulatedCycle || 0))
+    : 18.0;
+  const simLbe = simulatedStations.length > 0 && simBottleneck > 0
+    ? ((simTotalCycle / (simulatedStations.length * simBottleneck)) * 100).toFixed(1)
+    : '85.0';
+  const simCapacityShift = simBottleneck > 0 ? Math.floor((8 * 3600 * 0.90) / simBottleneck) : 1600;
+  const actualCapacityShift = actualBottleneck > 0 ? Math.floor((8 * 3600 * 0.90) / actualBottleneck) : 1600;
 
   return (
     <div className="space-y-6">

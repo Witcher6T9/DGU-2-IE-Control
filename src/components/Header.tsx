@@ -18,7 +18,8 @@ import {
   MessageSquare,
   Lock,
   Factory,
-  Building2
+  Building2,
+  Sliders
 } from 'lucide-react';
 import { SaveStatus, UserProfile, LineEntry, FactoryIndustryProfile } from '../types';
 import { CustomDateSelector } from './CustomDateSelector';
@@ -319,6 +320,20 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <MessageSquare className="w-4 h-4 transition-transform group-hover:scale-110" />
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+              </button>
+            )}
+
+            {/* Control Center & Preferences Button */}
+            {onOpenSettings && (
+              <button
+                id="header-control-preferences-btn"
+                type="button"
+                onClick={onOpenSettings}
+                title="Control Center & Preferences"
+                aria-label="Control Center & Preferences"
+                className="hidden sm:flex relative w-9 h-9 rounded-xl border border-[#d9d2c2] bg-white text-slate-700 hover:text-[#176f78] hover:border-[#176f78] items-center justify-center transition-all shadow-2xs cursor-pointer group touch-manipulation active:scale-95 shrink-0"
+              >
+                <Sliders className="w-4 h-4 transition-transform group-hover:rotate-45" />
               </button>
             )}
 

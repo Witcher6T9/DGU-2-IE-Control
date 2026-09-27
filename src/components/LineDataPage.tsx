@@ -5,7 +5,15 @@
 
 import React, { useState } from 'react';
 import {
-  ChevronLeft
+  ChevronLeft,
+  Sparkles,
+  Layers,
+  Sliders,
+  Clock,
+  History,
+  LayoutGrid,
+  BarChart2,
+  PieChart
 } from 'lucide-react';
 import { LineEntry, ChecklistMap, UserProfile, RoleTier, LeanActionItem } from '../types';
 import { StationData, HourlyOutput, DowntimeIncident } from '../types/dcs';
@@ -16,9 +24,11 @@ import { LossParetoTab } from './LossParetoTab';
 import { FloorPlanLineSetup } from './FloorPlanLineSetup';
 import { LineProductionHistoryView } from './LineProductionHistoryView';
 import { CapacityCalculatorWorkspace } from './CapacityCalculatorWorkspace';
+import { AiOptimizationAssistant } from './AiOptimizationAssistant';
 
 export type LineDataSubTab =
   | 'lines'
+  | 'optimizer'
   | 'balancing'
   | 'hourly'
   | 'loss-pareto'
@@ -96,6 +106,116 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* Sub-tab Navigation Bar */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+        <button
+          type="button"
+          onClick={() => setSubTab('lines')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+            subTab === 'lines'
+              ? 'bg-[#176f78] text-white shadow-2xs'
+              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Lines Telemetry</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSubTab('optimizer')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+            subTab === 'optimizer'
+              ? 'bg-gradient-to-r from-[#176f78] to-[#1a73e8] text-white shadow-2xs ring-2 ring-[#176f78]/30'
+              : 'bg-gradient-to-r from-amber-50 to-teal-50 border border-amber-300/80 text-[#17343a] hover:border-[#176f78]'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+          <span>AI Optimization Assistant</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-400 text-slate-950">
+            AI
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSubTab('balancing')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+            subTab === 'balancing'
+              ? 'bg-[#176f78] text-white shadow-2xs'
+              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
+          }`}
+        >
+          <Sliders className="w-3.5 h-3.5" />
+          <span>Line Balancing</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSubTab('hourly')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+            subTab === 'hourly'
+              ? 'bg-[#176f78] text-white shadow-2xs'
+              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5" />
+          <span>Hourly Pacing</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSubTab('capacity')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+            subTab === 'capacity'
+              ? 'bg-[#176f78] text-white shadow-2xs'
+              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
+          }`}
+        >
+          <BarChart2 className="w-3.5 h-3.5" />
+          <span>Capacity Calculator</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSubTab('floor-plan')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+            subTab === 'floor-plan'
+              ? 'bg-[#176f78] text-white shadow-2xs'
+              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
+          }`}
+        >
+          <LayoutGrid className="w-3.5 h-3.5" />
+          <span>Floor Plan</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSubTab('history')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+            subTab === 'history'
+              ? 'bg-[#176f78] text-white shadow-2xs'
+              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
+          }`}
+        >
+          <History className="w-3.5 h-3.5" />
+          <span>Production History</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSubTab('loss-pareto')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+            subTab === 'loss-pareto'
+              ? 'bg-[#176f78] text-white shadow-2xs'
+              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
+          }`}
+        >
+          <PieChart className="w-3.5 h-3.5" />
+          <span>Loss Pareto</span>
+        </button>
+      </div>
+
       {/* Return to Lines telemetry banner when viewing a deep operational workspace */}
       {subTab !== 'lines' && (
         <div className="flex items-center justify-between bg-[#fbfaf6] border border-[#d9d2c2] rounded-xl px-3 py-2 text-xs">
@@ -130,6 +250,15 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
             roleTiers={roleTiers}
             initialSortBy={hubSortBy}
             initialSortDirection={hubSortDirection}
+            onOpenOptimizer={() => setSubTab('optimizer')}
+          />
+        )}
+
+        {subTab === 'optimizer' && (
+          <AiOptimizationAssistant
+            lines={lines}
+            onSaveLine={onSaveLine}
+            onNavigateToLine={onSelectLineNo}
           />
         )}
 

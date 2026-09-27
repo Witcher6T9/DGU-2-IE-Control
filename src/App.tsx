@@ -8,6 +8,7 @@ import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { BottomNav } from './components/BottomNav';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { FloorWipSparkline } from './components/FloorWipSparkline';
 import { initAuth } from './lib/firebaseAuth';
 import { Sparkles, Bot, MessageSquare, Activity, AlertTriangle, Flame, X, Video } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -1006,9 +1007,22 @@ export default function App() {
   const pendingTodosCount = todos.filter(t => t.status !== 'completed').length;
   const unreadNotificationsCount = notifications.filter(n => !n.read).length;
 
+  // Active lines for currently selected production date
+  const currentDayLines = useMemo(() => {
+    const dayLines = lines.filter(l => l.date === activeDate);
+    if (dayLines.length > 0) return dayLines;
+    const map = new Map<string, LineEntry>();
+    lines.forEach(l => {
+      if (!map.has(l.lineNo) || (l.date && map.get(l.lineNo)!.date && l.date > map.get(l.lineNo)!.date)) {
+        map.set(l.lineNo, l);
+      }
+    });
+    return Array.from(map.values());
+  }, [lines, activeDate]);
+
   // Active Bottlenecks & WIP Breaches calculation for Floor Status Snapshot
   const activeBottleneckLines = useMemo(() => {
-    return lines.filter(line =>
+    return currentDayLines.filter(line =>
       Boolean(
         line.bottleneck && (
           line.bottleneck.status === 'critical' ||
@@ -1017,11 +1031,11 @@ export default function App() {
         )
       )
     );
-  }, [lines]);
+  }, [currentDayLines]);
 
   const activeWipBreachedLines = useMemo(() => {
-    return lines.filter(line => calculateStyleWipThreshold(line).isBreached);
-  }, [lines]);
+    return currentDayLines.filter(line => calculateStyleWipThreshold(line).isBreached);
+  }, [currentDayLines]);
 
   const handleChatButtonPointerDown = () => {
     isLongPressTriggeredRef.current = false;
@@ -2141,11 +2155,11 @@ export default function App() {
         )}
       </Suspense>
 
-      {/* Miniature 'Floor Status Snapshot' Overlay (Activated by long-press on floating chat button) */}
+      {/* Miniature 'Floor Status Snapshot' Overlay (Activated by long-press on floating chat button or quick trigger) */}
       {isFloorSnapshotOpen && (
         <div
           id="floor-status-snapshot-overlay"
-          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-3.5 sm:bottom-24 sm:right-6 z-40 w-80 sm:w-88 rounded-3xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-[#d9d2c2] dark:border-slate-700 shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200 select-none text-slate-800 dark:text-slate-100"
+          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-3.5 sm:bottom-24 sm:right-6 z-40 w-[330px] sm:w-[380px] max-h-[85vh] overflow-y-auto scrollbar-none rounded-3xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-[#d9d2c2] dark:border-slate-700 shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200 select-none text-slate-800 dark:text-slate-100"
         >
           {/* Header */}
           <div className="flex items-center justify-between pb-2.5 border-b border-slate-200 dark:border-slate-800">
@@ -2174,7 +2188,7 @@ export default function App() {
           </div>
 
           {/* Metrics Row */}
-          <div className="grid grid-cols-2 gap-2.5 py-3">
+          <div className="grid grid-cols-2 gap-2.5 py-2.5">
             {/* Active Bottlenecks */}
             <div
               className={`p-2.5 rounded-2xl border transition-all ${
@@ -2232,6 +2246,17 @@ export default function App() {
             </div>
           </div>
 
+          {/* 4-Hour WIP Level Trend Mini Sparkline Chart */}
+          <div className="pb-2">
+            <FloorWipSparkline
+              lines={currentDayLines}
+              initialSelectedLineNo={selectedLineNo}
+              onNavigateLine={(lineNo) => {
+                setSelectedLineNo(lineNo);
+              }}
+            />
+          </div>
+
           {/* Quick Line Tags if breached */}
           {(activeBottleneckLines.length > 0 || activeWipBreachedLines.length > 0) && (
             <div className="pb-2 text-[10px] text-slate-500 dark:text-slate-400">
@@ -2248,7 +2273,7 @@ export default function App() {
           {/* Snapshot Footer & Commit to Open Chat */}
           <div className="pt-2.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
             <span className="text-[10px] text-slate-400 font-mono">
-              Long-press toggled
+              Live floor telemetry
             </span>
             <button
               type="button"
@@ -2264,6 +2289,28 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Floating Floor Snapshot Quick Trigger Button (Single Click) */}
+      <button
+        id="floating-floor-snapshot-quick-btn"
+        type="button"
+        onClick={() => setIsFloorSnapshotOpen(prev => !prev)}
+        title="Toggle Floor Status Snapshot (4-Hour WIP Trend & Bottlenecks)"
+        aria-label="Floor Status Snapshot"
+        className={`fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] right-18 sm:bottom-22 sm:right-48 z-30 flex items-center justify-center gap-1.5 px-3 py-2 sm:py-2.5 rounded-full sm:rounded-2xl transition-all cursor-pointer shadow-xl border touch-manipulation active:scale-95 ${
+          isFloorSnapshotOpen
+            ? 'bg-[#176f78] text-white border-[#176f78] ring-2 ring-[#176f78]/30 shadow-[#176f78]/20'
+            : 'bg-white/95 dark:bg-slate-900/95 text-slate-700 dark:text-slate-200 border-[#d9d2c2] dark:border-slate-700 hover:border-[#176f78]'
+        }`}
+      >
+        <Activity className="w-4 h-4 text-[#176f78] dark:text-teal-400" />
+        <span className="hidden sm:inline text-xs font-bold font-display">Floor Snapshot</span>
+        {activeWipBreachedLines.length > 0 && (
+          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-400 text-slate-950">
+            {activeWipBreachedLines.length}
+          </span>
+        )}
+      </button>
 
       {/* Floating Google Chat Trigger Button (Click to open, Long-press to toggle Floor Status Snapshot) */}
       <button

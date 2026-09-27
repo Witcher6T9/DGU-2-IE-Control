@@ -46,9 +46,22 @@ export const CapacityCalculatorWorkspace: React.FC<CapacityCalculatorWorkspacePr
   // Current active line selection
   const [activeLineNo, setActiveLineNo] = useState<string>(selectedLineNo);
 
+  // Deduplicate lines by lineNo for dropdown selector
+  const uniqueDropdownLines = useMemo(() => {
+    const map = new Map<string, LineEntry>();
+    lines.forEach(l => {
+      if (!map.has(l.lineNo)) map.set(l.lineNo, l);
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const numA = parseInt(a.lineNo.replace(/\D/g, ''), 10) || 0;
+      const numB = parseInt(b.lineNo.replace(/\D/g, ''), 10) || 0;
+      return numA - numB;
+    });
+  }, [lines]);
+
   const selectedLine = useMemo(() => {
-    return lines.find(l => l.lineNo === activeLineNo) || lines[0];
-  }, [lines, activeLineNo]);
+    return uniqueDropdownLines.find(l => l.lineNo === activeLineNo) || uniqueDropdownLines[0] || lines[0];
+  }, [uniqueDropdownLines, lines, activeLineNo]);
 
   // Mode for Machine Hours: 'calculate' (machines * hours) or 'direct' (manual input)
   const [hoursInputMode, setHoursInputMode] = useState<'calculate' | 'direct'>('calculate');
@@ -298,8 +311,8 @@ Estimated Completion Time: ${estimatedDaysToComplete} working days
             onChange={e => setActiveLineNo(e.target.value)}
             className="px-3.5 py-2 rounded-xl bg-white border border-[#d9d2c2] text-xs font-extrabold text-[#17343a] shadow-2xs focus:outline-hidden focus:border-[#176f78]"
           >
-            {lines.map(l => (
-              <option key={l.lineNo} value={l.lineNo}>
+            {uniqueDropdownLines.map((l, idx) => (
+              <option key={`cap-opt-${l.lineNo}-${idx}`} value={l.lineNo}>
                 Line {l.lineNo} - {l.style} ({l.buyer})
               </option>
             ))}

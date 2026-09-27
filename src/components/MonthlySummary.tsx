@@ -842,9 +842,9 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
                         </div>
                       </div>
                     ))
-                  : comparativeLines.map(line => (
+                  : comparativeLines.map((line, idx) => (
                       <div
-                        key={line.lineNo}
+                        key={`comp-line-${line.lineNo}-${idx}`}
                         className="p-3.5 rounded-xl border border-[#e7e1d5] bg-[#f1eee6]/50 flex items-center justify-between gap-4"
                       >
                         <div className="flex items-center gap-3">

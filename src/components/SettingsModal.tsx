@@ -790,7 +790,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       case 'tier_0':
         return 'Tier_0 Only • Root Suite';
       default:
-        return 'Settings';
+        return 'Control Center & Preferences';
     }
   };
 
@@ -813,7 +813,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="flex items-center gap-1 text-[#007aff] hover:opacity-80 active:opacity-60 transition-opacity cursor-pointer font-medium text-[16px] py-1 -ml-1 touch-manipulation"
               >
                 <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
-                <span>Settings</span>
+                <span>Control &amp; Preferences</span>
               </button>
             ) : (
               <div className="flex items-center gap-2.5">
@@ -823,14 +823,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-[18px] tracking-tight text-[#000000] dark:text-white leading-tight">
-                      Settings
+                      Control Center &amp; Preferences
                     </span>
                     <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-[#007aff]/15 text-[#007aff] dark:text-blue-400 font-mono">
                       DEFAULT
                     </span>
                   </div>
                   <span className="text-[11px] text-[#8e8e93] font-medium leading-none">
-                    IE Control Center &amp; Preferences
+                    Operations, Tools &amp; Workstation Preferences
                   </span>
                 </div>
               </div>
@@ -874,7 +874,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search settings..."
+              placeholder="Search control center, preferences, modules..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full bg-[#e3e3e8] dark:bg-[#1c1c1e] text-[#1c1c1e] dark:text-white text-[14px] rounded-xl pl-9 pr-8 py-2.5 placeholder-[#8e8e93] border-0 focus:ring-2 focus:ring-[#007aff] transition-all touch-manipulation shadow-2xs"

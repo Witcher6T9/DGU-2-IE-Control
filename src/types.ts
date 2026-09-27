@@ -337,6 +337,50 @@ export interface Shift8hWorkingMinutesBalance {
 
 export type LineStatus = 'Active' | 'Maintenance' | 'Stopped';
 
+export interface LiveStationCycleTime {
+  stationId: string;
+  operationName: string;
+  operatorName: string;
+  observedCycleTimeSec: number;
+  standardCycleTimeSec: number;
+  pitchTimeSec: number;
+  status: 'optimal' | 'bottleneck' | 'starved';
+  lastLoggedAt: string;
+}
+
+export interface LiveWipStation {
+  stage: 'input_loading' | 'front_assembly' | 'back_assembly' | 'collar_cuff' | 'side_seam' | 'end_line_qco' | 'finishing_transfer';
+  label: string;
+  wipPcs: number;
+  bufferHours: number;
+  status: 'balanced' | 'surging' | 'critical_overflow' | 'starving';
+}
+
+export interface LiveLineTelemetry {
+  lastUpdated: string;
+  isLiveMonitoring: boolean;
+  // Live Cycle Time Metrics
+  averageCycleTimeSec: number;
+  targetCycleTimeSec: number; // calculated from takt/pitch or SMV
+  bottleneckCycleTimeSec: number;
+  pitchTimeSec: number;
+  cycleTimeStations: LiveStationCycleTime[];
+  // Live Production Rates
+  currentHourlyRatePcs: number; // Pieces produced in current hour
+  targetHourlyRatePcs: number; // Hourly target pace
+  runRatePcsPerHour: number; // Instantaneous pacing extrapolated
+  pacingVariancePcs: number; // Current pacing vs target pace
+  pacingStatus: 'ahead' | 'on_pace' | 'behind' | 'critical_lag';
+  // Live WIP Levels
+  currentWipTotalPcs: number; // Live current WIP on the line
+  standardWipBufferPcs: number; // Ideal buffer e.g. 1.5 - 2 hrs production
+  wipBufferHours: number; // WIP / hourly rate
+  wipHealthStatus: 'lean_optimal' | 'buffer_safe' | 'high_accumulation' | 'starvation_risk';
+  wipStations: LiveWipStation[];
+  // Quick Floor Observation Notes
+  telemetryNotes?: string;
+}
+
 export interface LineEntry {
   id: number;
   date: string; // YYYY-MM-DD
@@ -377,6 +421,7 @@ export interface LineEntry {
   teamMembers?: LineTeamMember[];
   machineCount?: number;
   shift8hBalancing?: Shift8hWorkingMinutesBalance;
+  liveTelemetry?: LiveLineTelemetry;
 }
 
 export type ChecklistStatus = 'yes' | 'no' | 'pending';

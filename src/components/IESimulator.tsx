@@ -139,6 +139,19 @@ export const IESimulator: React.FC<IESimulatorProps> = ({
   const [showSimProgressionModal, setShowSimProgressionModal] = useState<boolean>(false);
   const smvWeight = useMemo(() => getSMVWeight(smvMinutes), [smvMinutes]);
 
+  // Deduplicate lines by lineNo for simulator selectors
+  const uniqueSimulatorLines = useMemo(() => {
+    const map = new Map<string, LineEntry>();
+    lines.forEach(l => {
+      if (!map.has(l.lineNo)) map.set(l.lineNo, l);
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const numA = parseInt(a.lineNo.replace(/\D/g, ''), 10) || 0;
+      const numB = parseInt(b.lineNo.replace(/\D/g, ''), 10) || 0;
+      return numA - numB;
+    });
+  }, [lines]);
+
   // Synchronize Target Efficiency Level with Standard 40-Day Style Progression Matrix
   useEffect(() => {
     if (isMatrixEffMode) {
@@ -1640,8 +1653,8 @@ export const IESimulator: React.FC<IESimulatorProps> = ({
                     onChange={e => setSimBalancingLineNo(e.target.value)}
                     className="px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] text-xs font-bold text-[#17343a] focus:outline-hidden focus:ring-1 focus:ring-[#176f78]"
                   >
-                    {lines.map(l => (
-                      <option key={l.lineNo} value={l.lineNo}>
+                    {uniqueSimulatorLines.map((l, idx) => (
+                      <option key={`sim-opt-${l.lineNo}-${idx}`} value={l.lineNo}>
                         Line {l.lineNo} — {l.style} ({l.buyer})
                       </option>
                     ))}
@@ -3684,9 +3697,9 @@ export const IESimulator: React.FC<IESimulatorProps> = ({
                   Select Target Production Line:
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {lines.map(line => (
+                  {uniqueSimulatorLines.map((line, idx) => (
                     <button
-                      key={line.lineNo}
+                      key={`sim-target-line-${line.lineNo}-${idx}`}
                       onClick={() => setSelectedTargetLineNo(line.lineNo)}
                       className={`p-2 rounded-xl text-center font-bold transition-all cursor-pointer ${
                         selectedTargetLineNo === line.lineNo

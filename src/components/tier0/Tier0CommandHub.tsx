@@ -227,7 +227,7 @@ export const Tier0CommandHub: React.FC<Tier0CommandHubProps> = ({
               onClick={onClose}
               className="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 cursor-pointer transition-all shadow-xs"
             >
-              Return to Settings
+              Return to Control Center &amp; Preferences
             </button>
           )}
         </div>

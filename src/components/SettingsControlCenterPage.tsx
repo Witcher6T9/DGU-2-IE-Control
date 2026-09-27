@@ -385,13 +385,13 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                 </div>
                 <div>
                   <h1 className="text-base sm:text-lg font-bold text-[#17343a] font-display flex items-center gap-2">
-                    <span>Settings &amp; Operations Cockpit</span>
+                    <span>Control Center &amp; Preferences</span>
                     <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-[#176f78]/10 text-[#176f78] font-bold border border-[#176f78]/25">
-                      All Modules Integrated
+                      Operations &amp; Config
                     </span>
                   </h1>
                   <p className="text-xs text-[#527078]">
-                    Plant configuration, Line Data, Floor Checklists, Lean Tools, Reports &amp; Analytics, World Class (WCM), and Preferences.
+                    Plant configuration, floor control, line balancing telemetry, checklists, lean tools, reports, and personalized preferences.
                   </p>
                 </div>
               </div>
@@ -710,7 +710,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                       Integrated Operational Hubs
                     </h3>
                     <p className="text-[11px] text-[#527078]">
-                      All frontline manufacturing and engineering tools centralized in Settings.
+                      All frontline manufacturing and engineering tools centralized in Control Center &amp; Preferences.
                     </p>
                   </div>
                   <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">

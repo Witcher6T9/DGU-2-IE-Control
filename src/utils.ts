@@ -583,25 +583,34 @@ export function generateDefaultChecklists(): ChecklistMap {
 
 // IE Metrics calculations
 export function calculateLineMetrics(line: LineEntry) {
-  const totalPresentMP =
-    line.mp.Operator.present + line.mp.Helper.present + line.mp['Iron Man'].present;
-  const totalAbsentMP =
-    line.mp.Operator.absent + line.mp.Helper.absent + line.mp['Iron Man'].absent;
+  const opPresent = line.mp?.Operator?.present ?? 0;
+  const helperPresent = line.mp?.Helper?.present ?? 0;
+  const ironPresent = line.mp?.['Iron Man']?.present ?? 0;
+  const totalPresentMP = opPresent + helperPresent + ironPresent;
+
+  const opAbsent = line.mp?.Operator?.absent ?? 0;
+  const helperAbsent = line.mp?.Helper?.absent ?? 0;
+  const ironAbsent = line.mp?.['Iron Man']?.absent ?? 0;
+  const totalAbsentMP = opAbsent + helperAbsent + ironAbsent;
+
   const totalAllocatedMP = totalPresentMP + totalAbsentMP;
 
-  const totalWorkingMins = line.workingHours * 60;
+  const hours = line.workingHours > 0 ? line.workingHours : 8;
+  const totalWorkingMins = hours * 60;
   const availableMinutes = totalPresentMP * totalWorkingMins;
-  const standardProducedMinutes = line.achievedProd * line.smv;
+  const lineSmv = line.smv > 0 ? line.smv : 1.0;
+  const standardProducedMinutes = (line.achievedProd || 0) * lineSmv;
 
   const calculatedEff =
     availableMinutes > 0 ? (standardProducedMinutes / availableMinutes) * 100 : 0;
 
-  const plannedProducedMins = line.targetProd * line.smv;
-  const targetAvailableMins = line.plannedMP * totalWorkingMins;
+  const plannedProducedMins = (line.targetProd || 0) * lineSmv;
+  const plannedMpVal = line.plannedMP > 0 ? line.plannedMP : Math.max(1, totalAllocatedMP || 1);
+  const targetAvailableMins = plannedMpVal * totalWorkingMins;
   const calculatedTargetEff =
     targetAvailableMins > 0 ? (plannedProducedMins / targetAvailableMins) * 100 : 0;
 
-  const variancePcs = line.achievedProd - line.targetProd;
+  const variancePcs = (line.achievedProd || 0) - (line.targetProd || 0);
   const absenteeismPct = totalAllocatedMP > 0 ? (totalAbsentMP / totalAllocatedMP) * 100 : 0;
 
   return {
@@ -792,11 +801,13 @@ export function calculateStyleWipThreshold(line: LineEntry): StyleWipThresholdIn
   const target = line.targetProd > 0 ? line.targetProd : 1000;
   const hourlyTarget = Math.round((target / hours) * 10) / 10;
 
-  // Buffer hours factor based on garment SMV / construction complexity
+  // Buffer hours factor based on garment SMV / construction complexity:
+  // Apparel SMVs: Minutes convention (complex >= 18.0 min, basic < 12.0 min) or Hours ratio (complex >= 1.2h, basic < 0.85h)
+  const smvVal = line.smv || 14.0;
   let bufferHours = 2.0;
-  if (line.smv >= 1.2) {
+  if (smvVal >= 18.0 || (smvVal >= 1.2 && smvVal < 5.0)) {
     bufferHours = 2.5;
-  } else if (line.smv < 0.85) {
+  } else if (smvVal < 12.0 || smvVal < 0.85) {
     bufferHours = 1.8;
   }
 
