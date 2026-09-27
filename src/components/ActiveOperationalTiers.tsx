@@ -43,6 +43,7 @@ import {
   KeyRound
 } from 'lucide-react';
 import { RoleTier, UserProfile } from '../types';
+import { WingBlockLineDropdown } from './WingBlockLineSelector';
 import { ROLE_TIERS as DEFAULT_ROLE_TIERS } from '../mockData';
 import {
   DEBONAIR_IE_ORG_CHART,
@@ -515,44 +516,30 @@ export const ActiveOperationalTiers: React.FC<ActiveOperationalTiersProps> = ({
           {/* Filter & Search Bar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-white border border-[#d9d2c2] shadow-2xs">
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <span className="text-xs font-bold text-[#527078] uppercase shrink-0">Filter Wing:</span>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setWingFilter('all')}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                    wingFilter === 'all'
-                      ? 'bg-[#17343a] text-white shadow-2xs'
-                      : 'bg-[#f1eee6] text-[#527078] hover:bg-[#e6e0d2]'
-                  }`}
-                >
-                  All Wings (27)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWingFilter('blue')}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer ${
-                    wingFilter === 'blue'
-                      ? 'bg-[#2563eb] text-white shadow-2xs'
-                      : 'bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-blue-500" />
-                  <span>Blue Wing (Mgr 1)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWingFilter('green')}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer ${
-                    wingFilter === 'green'
-                      ? 'bg-[#16a34a] text-white shadow-2xs'
-                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span>Green Wing (Mgr 2)</span>
-                </button>
-              </div>
+              <span className="text-xs font-bold text-[#527078] uppercase shrink-0">Org Scope:</span>
+              <WingBlockLineDropdown
+                selectedWing={wingFilter === 'blue' ? 'Blue Wing' : wingFilter === 'green' ? 'Green Wing' : 'all'}
+                onSelectWing={(w) => {
+                  setWingFilter(w === 'Blue Wing' ? 'blue' : w === 'Green Wing' ? 'green' : 'all');
+                }}
+                onSelectBlock={(_bId, bDef) => {
+                  if (bDef) {
+                    setWingFilter(bDef.wing === 'Blue Wing' ? 'blue' : 'green');
+                    setSearchQuery(bDef.inchargeName);
+                  } else {
+                    setWingFilter('all');
+                    setSearchQuery('');
+                  }
+                }}
+                onSelectLineNo={(lNo) => {
+                  if (lNo !== 'all') {
+                    setSearchQuery(lNo);
+                  } else {
+                    setSearchQuery('');
+                  }
+                }}
+                variant="filter"
+              />
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">

@@ -356,6 +356,7 @@ export const Reports: React.FC<ReportsProps> = ({
                 setFloorFilter(id);
                 if (onSelectFloor) onSelectFloor(id, label);
               }}
+              lines={lines}
               variant="filter"
             />
 

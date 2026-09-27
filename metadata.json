@@ -2,7 +2,6 @@
   "name": "Remix DGU-2 IE Control",
   "description": "Streamlined interface for managing and monitoring DGU-2 industrial equipment settings and operational parameters.",
   "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
+

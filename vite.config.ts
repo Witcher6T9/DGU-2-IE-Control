@@ -22,7 +22,7 @@ export default defineConfig(() => {
         ],
         manifest: {
           id: '/',
-          name: 'IE Daily Control',
+          name: 'Remix DGU-2 IE Control',
           short_name: 'IE Daily',
           description: 'Industrial Engineering Daily Control, Sewing Line Balancing, and Floor Operations Platform.',
           theme_color: '#176f78',
@@ -51,32 +51,11 @@ export default defineConfig(() => {
               type: 'image/png',
               purpose: 'maskable'
             }
-          ],
-          shortcuts: [
-            {
-              name: 'Line Balancing',
-              short_name: 'Lines',
-              url: '/?tab=data',
-              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
-            },
-            {
-              name: 'Daily Checklist',
-              short_name: 'Checklist',
-              url: '/?tab=checklist',
-              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
-            },
-            {
-              name: 'Floor Security Lock',
-              short_name: 'Lock',
-              url: '/?action=lock',
-              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }]
-            }
           ]
         },
         workbox: {
           maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-          // Offline-first: zero external network calls, cache-only local assets
           runtimeCaching: []
         },
         devOptions: {
@@ -86,7 +65,7 @@ export default defineConfig(() => {
     ],
     resolve: {
       alias: {
-        '@': path.resolve('.'),
+        '@': path.resolve(__dirname, '.'),
       },
     },
     build: {
@@ -120,9 +99,11 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // Offline local server - zero external socket connections
-      hmr: false,
-      watch: null,
+      // HMR is disabled in AI Studio via DISABLE_HMR env var.
+      // Do not modify—file watching is disabled to prevent flickering during agent edits.
+      hmr: process.env.DISABLE_HMR !== 'true',
+      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
+      watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };
 });

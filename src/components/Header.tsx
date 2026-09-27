@@ -170,6 +170,7 @@ export const Header: React.FC<HeaderProps> = ({
               <ProductionFloorDropdown
                 selectedFloor={activeFloor}
                 onSelectFloor={onSelectFloor}
+                lines={lines}
                 variant="header"
               />
             )}

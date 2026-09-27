@@ -1610,24 +1610,65 @@ export const LineData: React.FC<LineDataProps> = ({
                 </AnimatePresence>
               </div>
 
-              {/* Floor Dropdown Filter */}
+              {/* Merged Floor / Scope Dropdown Filter */}
               <div className="shrink-0">
                 <ProductionFloorDropdown
                   selectedFloor={selectedFloorFilter}
                   onSelectFloor={(id) => setSelectedFloorFilter(id)}
+                  selectedLineNo={selectedLineNo}
+                  onSelectLineNo={(lNo) => onSelectLineNo(lNo)}
+                  lines={lines}
                   variant="filter"
                 />
               </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {isMasterAdmin && (
+                  <button
+                    onClick={handleOpenAddLineModal}
+                    title="Add New Sewing Line"
+                    className="p-1.5 h-8.5 rounded-xl bg-[#176f78] text-white hover:bg-[#125860] transition-colors cursor-pointer shrink-0 shadow-2xs flex items-center gap-1 text-xs font-bold px-2.5 touch-manipulation active:scale-95"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add</span>
+                  </button>
+                )}
+                {onNavigate && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('floor-plan')}
+                      className="px-2.5 py-1.5 h-8.5 rounded-xl bg-[#f1eee6] text-[#176f78] hover:bg-[#dceceb] border border-[#d9d2c2] text-xs font-bold flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer touch-manipulation active:scale-95"
+                      title="Open Visual Floor Plan & Line Setup"
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Floor &amp; Setup</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('simulator')}
+                      className="px-2.5 py-1.5 h-8.5 rounded-xl bg-[#f1eee6] text-[#176f78] hover:bg-[#dceceb] border border-[#d9d2c2] text-xs font-bold flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer touch-manipulation active:scale-95"
+                      title="Open IE Simulator"
+                    >
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Simulator</span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* Active Floor Filter Status Notice */}
-            {selectedFloorFilter && selectedFloorFilter !== 'all' && (
+            {/* Active Merged Filter Status Notice */}
+            {(selectedFloorFilter !== 'all' || (selectedLineNo && selectedLineNo !== 'all')) && (
               <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#176f78]/10 border border-[#176f78]/25 text-xs text-[#17343a]">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-[#176f78] animate-pulse" />
-                  <span className="font-medium text-[#527078]">Floor Filter:</span>
+                  <span className="font-medium text-[#527078]">Active Filter:</span>
                   <span className="font-bold text-[#176f78]">
-                    {getProductionFloorLabel(selectedFloorFilter)}
+                    {selectedLineNo && selectedLineNo !== 'all'
+                      ? `${selectedLineNo} • ${getProductionFloorLabel(selectedFloorFilter)}`
+                      : getProductionFloorLabel(selectedFloorFilter)}
                   </span>
                   <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white font-bold text-[#176f78] border border-[#176f78]/20">
                     {sortedLines.length} of 34 Lines
@@ -1635,7 +1676,10 @@ export const LineData: React.FC<LineDataProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setSelectedFloorFilter('all')}
+                  onClick={() => {
+                    setSelectedFloorFilter('all');
+                    onSelectLineNo('all');
+                  }}
                   className="text-[11px] font-bold text-[#176f78] hover:text-[#114b51] hover:underline cursor-pointer flex items-center gap-1"
                 >
                   <span>Show All 34 Lines</span>
@@ -1643,134 +1687,6 @@ export const LineData: React.FC<LineDataProps> = ({
                 </button>
               </div>
             )}
-
-            {/* Quick Line Selector Row */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 sm:pb-0 max-w-full snap-x snap-mandatory touch-scroll no-scrollbar">
-              {sortedLines.map(line => {
-                const isSelected = line.lineNo === selectedLineNo;
-                const bn = getBottleneckSeverity(line);
-                const urgency = getFloorInterventionUrgency(line);
-
-                return (
-                  <button
-                    key={line.id}
-                    onClick={() => onSelectLineNo(line.lineNo)}
-                    className={`px-3 py-1.5 min-h-[40px] rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 snap-start touch-manipulation active:scale-95 ${
-                      isSelected
-                        ? 'bg-[#176f78] text-white shadow-xs'
-                        : urgency.level === 'urgent' && (sortBy === 'bottleneck' || sortBy === 'critical' || (sortBy === 'efficiency' && sortDirection === 'asc'))
-                        ? 'bg-rose-50/80 text-rose-900 border border-rose-300 hover:bg-rose-100'
-                        : 'bg-[#f1eee6] text-[#527078] hover:bg-[#e7e1d5] border border-[#d9d2c2]'
-                    }`}
-                  >
-                    <span>Line {line.lineNo}</span>
-
-                    {/* Bottleneck Status Badge */}
-                    {sortBy === 'bottleneck' && (
-                      <span
-                        className={`text-[9.5px] px-1.5 py-0.2 rounded-md font-mono font-bold flex items-center gap-0.5 ${
-                          isSelected
-                            ? 'bg-white/20 text-white'
-                            : bn.status === 'critical'
-                            ? 'bg-rose-200 text-rose-900 border border-rose-300'
-                            : bn.status === 'high'
-                            ? 'bg-amber-200 text-amber-900 border border-amber-300'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
-                        title={`Bottleneck: ${bn.station} (${bn.cycleTime}s vs ${bn.targetCT}s)`}
-                      >
-                        {bn.status === 'critical' && <AlertTriangle className="w-2.5 h-2.5 text-rose-700 shrink-0" />}
-                        <span>{bn.status === 'critical' ? 'CRIT' : bn.status === 'high' ? `${bn.cycleTime}s` : 'OK'}</span>
-                      </span>
-                    )}
-
-                    {/* Efficiency % Badge */}
-                    {sortBy === 'efficiency' && (
-                      <span
-                        className={`text-[10px] px-1.5 py-0.2 rounded font-mono-numbers font-bold ${
-                          isSelected
-                            ? 'bg-white/20 text-white'
-                            : (line.efficiency ?? 0) < 60
-                            ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                            : (line.efficiency ?? 0) < 80
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
-                      >
-                        {line.efficiency}%
-                      </span>
-                    )}
-
-                    {/* Compound Critical Urgency Badge */}
-                    {sortBy === 'critical' && (
-                      <span
-                        className={`text-[9.5px] px-1.5 py-0.2 rounded font-mono font-bold flex items-center gap-0.5 ${
-                          isSelected
-                            ? 'bg-white/20 text-white'
-                            : urgency.level === 'urgent'
-                            ? 'bg-rose-200 text-rose-900 border border-rose-300'
-                            : urgency.level === 'warning'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
-                      >
-                        {urgency.level === 'urgent' && <Flame className="w-2.5 h-2.5 text-rose-700 shrink-0" />}
-                        <span>{urgency.level.toUpperCase()}</span>
-                      </span>
-                    )}
-
-                    {/* WIP Level Badge */}
-                    {sortBy === 'wip' && (
-                      <span
-                        className={`text-[10px] px-1.5 py-0.2 rounded font-mono-numbers ${
-                          isSelected
-                            ? 'bg-white/20 text-white'
-                            : (line.wip ?? 0) > 350
-                            ? 'bg-rose-100 text-rose-800'
-                            : (line.wip ?? 0) > 220
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-slate-200 text-slate-700'
-                        }`}
-                      >
-                        {line.wip ?? 0} wip
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-              {isMasterAdmin && (
-                <button
-                  onClick={handleOpenAddLineModal}
-                  title="Add New Sewing Line"
-                  className="p-1.5 min-h-[40px] rounded-xl bg-[#176f78] text-white hover:bg-[#125860] transition-colors cursor-pointer shrink-0 shadow-2xs flex items-center gap-1 text-xs font-bold px-2.5 snap-start touch-manipulation active:scale-95"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add</span>
-                </button>
-              )}
-              {onNavigate && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('floor-plan')}
-                    className="px-3 py-1.5 min-h-[40px] rounded-xl bg-[#f1eee6] text-[#176f78] hover:bg-[#dceceb] border border-[#d9d2c2] text-xs font-bold flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer ml-1 snap-start touch-manipulation active:scale-95"
-                    title="Open Visual Floor Plan & Line Setup"
-                  >
-                    <LayoutGrid className="w-3.5 h-3.5" />
-                    <span>Floor &amp; Setup</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('simulator')}
-                    className="px-3 py-1.5 min-h-[40px] rounded-xl bg-[#f1eee6] text-[#176f78] hover:bg-[#dceceb] border border-[#d9d2c2] text-xs font-bold flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer snap-start touch-manipulation active:scale-95"
-                    title="Open IE Simulator"
-                  >
-                    <Sliders className="w-3.5 h-3.5" />
-                    <span>Simulate Setup</span>
-                  </button>
-                </>
-              )}
-            </div>
           </div>
         </div>
 

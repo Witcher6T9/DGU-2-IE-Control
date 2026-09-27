@@ -1952,6 +1952,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <ProductionFloorDropdown
                 selectedFloor={selectedDashboardFloor}
                 onSelectFloor={(id) => setSelectedDashboardFloor(id)}
+                lines={lines}
                 variant="button"
               />
               <button

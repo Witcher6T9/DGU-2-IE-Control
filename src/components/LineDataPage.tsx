@@ -65,6 +65,7 @@ import { checkLineAccess, isMasterAdminOrAdmin, isSystemAdmin, normalizeLineNo }
 import { ROLE_TIERS as DEFAULT_ROLE_TIERS } from '../mockData';
 import { LineEfficiencySparkline } from './LineEfficiencySparkline';
 import { QuickOutputUpdateModal } from './QuickOutputUpdateModal';
+import { WingBlockLineSelector, WingId } from './WingBlockLineSelector';
 
 /**
  * Fast export of all lines data with IE Org hierarchy metadata as CSV
@@ -203,12 +204,13 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
   onUpdateActions = () => {}
 }) => {
   const [subTab, setSubTab] = useState<LineDataSubTab>(initialSubTab);
-  const [viewMode, setViewMode] = useState<OrgDataViewMode>('hierarchy');
+  const [simulatedTierId, setSimulatedTierId] = useState<string>(profile?.tierId || 'tier_1');
 
   // Search and Filter State
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedWingFilter, setSelectedWingFilter] = useState<'all' | 'Blue Wing' | 'Green Wing'>('all');
+  const [selectedWingFilter, setSelectedWingFilter] = useState<WingId>('all');
   const [selectedInchargeFilter, setSelectedInchargeFilter] = useState<number | 'all'>('all');
+  const [selectedLineFilter, setSelectedLineFilter] = useState<string>('all');
   const [bottlenecksOnly, setBottlenecksOnly] = useState(false);
 
   // Accordion state for wings and incharge blocks
@@ -382,6 +384,14 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
                 return false;
               }
 
+              // Specific Line Selection Filter
+              if (selectedLineFilter !== 'all') {
+                const normReq = normalizeLineNo(selectedLineFilter);
+                if (normalizeLineNo(line.lineNo) !== normReq) {
+                  return false;
+                }
+              }
+
               // Search query
               if (!q) return true;
               return (
@@ -408,7 +418,7 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
         };
       })
       .filter((wing: WingGroupData) => wing.incharges.some((inc: InchargeGroupData) => inc.lines.length > 0) || !q);
-  }, [wingGroups, searchQuery, selectedWingFilter, selectedInchargeFilter, bottlenecksOnly, isFullScope, effectiveProfile, roleTiers]);
+  }, [wingGroups, searchQuery, selectedWingFilter, selectedInchargeFilter, selectedLineFilter, bottlenecksOnly, isFullScope, effectiveProfile, roleTiers]);
 
   return (
     <div className="space-y-4">
@@ -600,8 +610,32 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
         </div>
       )}
 
-      {/* SUB-TAB 1: MAIN DATA HUB (IE Org & Telemetry) */}
+      {/* SUB-TAB 1: MAIN DATA HUB (Daily Data Collection Workspace) */}
       {subTab === 'lines' && (
+        <div className="space-y-4">
+          <LineData
+            lines={lines}
+            checklists={checklists}
+            selectedLineNo={selectedLineNo}
+            onSelectLineNo={onSelectLineNo}
+            onSaveLine={onSaveLine}
+            onAddNewLine={onAddNewLine}
+            onDeleteLine={onDeleteLine}
+            onDeleteFloor={onDeleteFloor}
+            onNavigate={onNavigate}
+            activeDate={activeDate}
+            onSelectDate={onSelectDate}
+            profile={effectiveProfile}
+            roleTiers={roleTiers}
+            initialSortBy={initialSortBy}
+            initialSortDirection={initialSortDirection}
+            onOpenOptimizer={() => setSubTab('optimizer')}
+          />
+        </div>
+      )}
+
+      {/* SUB-TAB 2: IE ORGANOGRAM & RBAC MATRIX */}
+      {subTab === 'ie-org' && (
         <div className="space-y-4">
           {/* RBAC Active Identity & Automatic Scope Clearance Banner */}
           <div className="bg-white border border-[#d9d2c2] rounded-2xl p-3 sm:p-4 shadow-2xs">
@@ -638,35 +672,6 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
                     Clearance: <span className="font-semibold text-[#17343a]">{activeRoleTier.accessControlLevel}</span>
                   </p>
                 </div>
-              </div>
-
-              {/* View Mode Toggle: Hierarchy vs Flat Grid */}
-              <div className="flex items-center bg-[#f1eee6] p-0.5 rounded-xl border border-[#d9d2c2]">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('hierarchy')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    viewMode === 'hierarchy'
-                      ? 'bg-[#176f78] text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-[#176f78]'
-                  }`}
-                >
-                  <Network className="w-3 h-3" />
-                  <span>IE Org Hierarchy</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setViewMode('flat')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    viewMode === 'flat'
-                      ? 'bg-[#176f78] text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-[#176f78]'
-                  }`}
-                >
-                  <Layers className="w-3 h-3" />
-                  <span>Flat Telemetry</span>
-                </button>
               </div>
             </div>
           </div>
@@ -741,173 +746,90 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
             </div>
           </div>
 
-          {/* Quick Filter Bar */}
-          <div className="bg-[#fbfaf6] border border-[#d9d2c2] rounded-2xl p-3 shadow-2xs space-y-2">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-              {/* Search Box */}
-              <div className="relative flex-1 max-w-md">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by line #, style, buyer, floor, incharge, or engineer..."
-                  className="w-full bg-white border border-[#d9d2c2] rounded-xl pl-9 pr-3 py-1.5 text-xs text-[#17343a] focus:outline-hidden focus:border-[#176f78] placeholder:text-slate-400"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+          {/* Organogram & Multi-Tier RBAC Command Architecture */}
+          <div className="bg-white rounded-2xl border border-[#d9d2c2] p-4 sm:p-6 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-[#d9d2c2]">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-[#17343a] font-display flex items-center gap-2">
+                  <Network className="w-5 h-5 text-blue-600" />
+                  <span>Industrial Engineering Organogram &amp; Multi-Tier RBAC Architecture</span>
+                </h2>
+                <p className="text-xs text-[#527078]">
+                  Debonair LTD (Unit-02) 6-Tier Command Structure: Sr. Manager, Wing Managers, Floor Incharges, and Line IEs.
+                </p>
               </div>
+            </div>
 
-              {/* Wing Filter Pills */}
-              <div className="flex items-center gap-1 flex-wrap text-xs">
-                <span className="text-[11px] font-bold text-[#527078] mr-1">Wing:</span>
-                {(['all', 'Blue Wing', 'Green Wing'] as const).map(w => (
-                  <button
-                    key={w}
-                    type="button"
-                    onClick={() => setSelectedWingFilter(w)}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
-                      selectedWingFilter === w
-                        ? 'bg-[#176f78] text-white shadow-2xs'
-                        : 'bg-white border border-[#d9d2c2] text-slate-600 hover:border-[#176f78]'
-                    }`}
-                  >
-                    {w === 'all' ? 'All Wings (34 Lines)' : w}
-                  </button>
-                ))}
-              </div>
+            <ActiveOperationalTiers
+              currentTierId={simulatedTierId}
+              onSelectTier={(tier) => setSimulatedTierId(tier.id)}
+              profile={effectiveProfile}
+              roleTiers={roleTiers}
+              onSelectLineFilter={(lineNo) => {
+                onSelectLineNo(lineNo);
+                setSubTab('lines');
+              }}
+            />
+          </div>
 
-              {/* Bottleneck Filter Pill */}
+          {/* Unified Merged (Wings, Blocks, Lines) Selector */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2 px-1">
+              <span className="text-xs font-bold text-[#527078] uppercase tracking-wider">
+                Sewing Line &amp; Org Filter
+              </span>
               <button
                 type="button"
                 onClick={() => setBottlenecksOnly(!bottlenecksOnly)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs ${
                   bottlenecksOnly
-                    ? 'bg-red-600 text-white shadow-2xs'
+                    ? 'bg-red-600 text-white shadow-xs'
                     : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-red-600'
                 }`}
               >
                 <AlertTriangle className="w-3.5 h-3.5" />
                 <span>Bottlenecks Only</span>
+                {bottlenecksOnly && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                )}
               </button>
             </div>
 
-            {/* Incharge Block Filter Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pt-1">
-              <span className="text-[11px] font-bold text-[#527078] mr-1 shrink-0">Incharge Block:</span>
-              <button
-                type="button"
-                onClick={() => setSelectedInchargeFilter('all')}
-                className={`px-2 py-0.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
-                  selectedInchargeFilter === 'all'
-                    ? 'bg-[#17343a] text-white'
-                    : 'bg-white border border-[#d9d2c2] text-slate-600 hover:border-[#17343a]'
-                }`}
-              >
-                All Blocks
-              </button>
-              {[
-                { no: 1, label: 'Block 1 • Padma (Lines 01–06)' },
-                { no: 2, label: 'Block 2 • Meghna (Lines 07–12)' },
-                { no: 3, label: 'Block 3 • Karnophuli (Lines 13–17)' },
-                { no: 4, label: 'Block 4 • Korotoya (Lines 18–23)' },
-                { no: 5, label: 'Block 5 • Shitalokshya (Lines 24–29)' },
-                { no: 6, label: 'Block 6 • Turag (Lines 30–34)' }
-              ].map(b => (
-                <button
-                  key={b.no}
-                  type="button"
-                  onClick={() => setSelectedInchargeFilter(b.no)}
-                  className={`px-2 py-0.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
-                    selectedInchargeFilter === b.no
-                      ? 'bg-[#176f78] text-white shadow-2xs'
-                      : 'bg-white border border-[#d9d2c2] text-slate-600 hover:border-[#176f78]'
-                  }`}
-                >
-                  {b.label}
-                </button>
-              ))}
-            </div>
+            <WingBlockLineSelector
+              selectedWing={selectedWingFilter}
+              onSelectWing={setSelectedWingFilter}
+              selectedBlockId={selectedInchargeFilter === 'all' ? 'all' : `block_${selectedInchargeFilter}`}
+              onSelectBlock={(bId, bDef) => {
+                setSelectedInchargeFilter(bDef ? bDef.blockNo : 'all');
+              }}
+              selectedLineNo={selectedLineFilter}
+              onSelectLineNo={setSelectedLineFilter}
+              onSelectionChange={(sel) => {
+                setSelectedWingFilter(sel.wing);
+                if (sel.blockId === 'all') {
+                  setSelectedInchargeFilter('all');
+                } else {
+                  const bNum = parseInt(sel.blockId.replace('block_', ''), 10);
+                  setSelectedInchargeFilter(isNaN(bNum) ? 'all' : bNum);
+                }
+                setSelectedLineFilter(sel.lineNo);
+              }}
+              lines={lines}
+              variant="inline"
+            />
           </div>
 
-          {/* VIEW MODE 1: IE ORG HIERARCHY (Wings → Incharge Blocks → Line Pairs) */}
-          {viewMode === 'hierarchy' && (
-            <div className="space-y-6">
+          {/* IE ORG HIERARCHY: Incharge Blocks → Line Pairs */}
+          <div className="space-y-6">
               {filteredWingGroups.map((wing: WingGroupData) => (
-                <div key={wing.wing} className="space-y-3">
-                  {/* Wing Header Card */}
-                  <div
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl text-white shadow-sm transition-all"
-                    style={{
-                      background: wing.wingCode === 'A'
-                        ? 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)'
-                        : 'linear-gradient(135deg, #14532d 0%, #16a34a 100%)'
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-xs flex items-center justify-center font-bold text-lg border border-white/20">
-                        {wing.wingCode}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h2 className="text-base sm:text-lg font-bold font-display">{wing.wingTitle}</h2>
-                          <span className="px-2 py-0.5 rounded-md bg-white/20 text-white font-mono text-[10px] font-bold">
-                            Tier 2 Divisional Wing
-                          </span>
-                        </div>
-                        <p className="text-xs text-white/80">
-                          Wing Manager: <strong>{wing.managerName} ({wing.managerCode})</strong> • {wing.totalLines} Production Lines
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Wing KPI Rollup */}
-                    <div className="flex items-center gap-3 sm:gap-4 font-mono-numbers text-xs">
-                      <div>
-                        <span className="text-[10px] uppercase text-white/70 block">Target</span>
-                        <strong className="text-sm font-bold">{wing.totalTarget.toLocaleString()} pcs</strong>
-                      </div>
-                      <div className="h-6 w-px bg-white/20" />
-                      <div>
-                        <span className="text-[10px] uppercase text-white/70 block">Actual</span>
-                        <strong className="text-sm font-bold">{wing.totalActual.toLocaleString()} pcs</strong>
-                      </div>
-                      <div className="h-6 w-px bg-white/20" />
-                      <div>
-                        <span className="text-[10px] uppercase text-white/70 block">Efficiency</span>
-                        <strong className="text-sm font-bold">{wing.averageEfficiency}%</strong>
-                      </div>
-                      <div className="h-6 w-px bg-white/20" />
-                      <button
-                        type="button"
-                        onClick={() => toggleWing(wing.wing)}
-                        className="p-1 rounded-lg bg-white/15 hover:bg-white/25 transition-colors cursor-pointer"
-                        title="Toggle Wing Section"
-                      >
-                        {expandedWings[wing.wing] ? (
-                          <ChevronUp className="w-5 h-5 text-white" />
-                        ) : (
-                          <ChevronDown className="w-5 h-5 text-white" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
+                <div key={wing.wing} className="space-y-4">
                   {/* Incharge Blocks under this Wing */}
-                  {expandedWings[wing.wing] && (
-                    <div className="space-y-4 pl-0 sm:pl-2">
-                      {wing.incharges.map((inc: InchargeGroupData) => (
-                        <div
-                          key={inc.inchargeNo}
-                          className="bg-white border border-[#d9d2c2] rounded-2xl overflow-hidden shadow-2xs"
-                        >
+                  <div className="space-y-4">
+                    {wing.incharges.map((inc: InchargeGroupData) => (
+                      <div
+                        key={inc.inchargeNo}
+                        className="bg-white border border-[#d9d2c2] rounded-2xl overflow-hidden shadow-2xs"
+                      >
                           {/* Incharge Block Header */}
                           <div className="bg-[#fbfaf6] border-b border-[#d9d2c2] p-3 sm:p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
@@ -1171,7 +1093,7 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
                                         type="button"
                                         onClick={() => {
                                           onSelectLineNo(line.lineNo);
-                                          setViewMode('flat');
+                                          setSubTab('lines');
                                         }}
                                         className="text-[10px] font-bold text-[#176f78] hover:underline cursor-pointer flex items-center gap-0.5"
                                       >
@@ -1187,79 +1109,9 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
                         </div>
                       ))}
                     </div>
-                  )}
                 </div>
               ))}
             </div>
-          )}
-
-          {/* VIEW MODE 2: FLAT TELEMETRY (Detailed Table / Cards via LineData component) */}
-          {viewMode === 'flat' && (
-            <div className="bg-white rounded-2xl border border-[#d9d2c2] p-4 shadow-2xs">
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#d9d2c2]">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-[#176f78]" />
-                  <span className="font-bold text-sm text-[#17343a]">Detailed Floor Telemetry Engine</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('hierarchy')}
-                  className="text-xs font-bold text-[#176f78] hover:underline cursor-pointer"
-                >
-                  Switch to IE Org Hierarchy View
-                </button>
-              </div>
-
-              <LineData
-                lines={lines}
-                checklists={checklists}
-                selectedLineNo={selectedLineNo}
-                onSelectLineNo={onSelectLineNo}
-                onSaveLine={onSaveLine}
-                onAddNewLine={onAddNewLine}
-                onDeleteLine={onDeleteLine}
-                onDeleteFloor={onDeleteFloor}
-                onNavigate={onNavigate}
-                activeDate={activeDate}
-                onSelectDate={onSelectDate}
-                profile={effectiveProfile}
-                roleTiers={roleTiers}
-                initialSortBy={initialSortBy}
-                initialSortDirection={initialSortDirection}
-                onOpenOptimizer={() => setSubTab('optimizer')}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* SUB-TAB 2: IE ORGANOGRAM & RBAC MATRIX */}
-      {subTab === 'ie-org' && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-[#d9d2c2] p-4 sm:p-6 shadow-2xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-[#d9d2c2]">
-              <div>
-                <h2 className="text-base sm:text-lg font-bold text-[#17343a] font-display flex items-center gap-2">
-                  <Network className="w-5 h-5 text-blue-600" />
-                  <span>Industrial Engineering Organogram &amp; Multi-Tier RBAC Architecture</span>
-                </h2>
-                <p className="text-xs text-[#527078]">
-                  Debonair LTD (Unit-02) 6-Tier Command Structure: Sr. Manager, Wing Managers, Floor Incharges, and Line IEs.
-                </p>
-              </div>
-            </div>
-
-            <ActiveOperationalTiers
-              currentTierId={simulatedTierId}
-              onSelectTier={(tier) => setSimulatedTierId(tier.id)}
-              profile={effectiveProfile}
-              roleTiers={roleTiers}
-              onSelectLineFilter={(lineNo) => {
-                onSelectLineNo(lineNo);
-                setSubTab('lines');
-              }}
-            />
-          </div>
         </div>
       )}
 

@@ -63,12 +63,12 @@ export function getLineStatus(line: LineEntry): LineStatus {
 }
 
 export const CANONICAL_FLOORS_CONFIG = [
-  { name: 'Padma Floor', linesCount: 6, linesCountStr: '06 Lines', range: 'Lines 01 - 06', lineNums: [1, 2, 3, 4, 5, 6] },
-  { name: 'Meghna Floor', linesCount: 6, linesCountStr: '06 Lines', range: 'Lines 07 - 12', lineNums: [7, 8, 9, 10, 11, 12] },
-  { name: 'Karnophuli Floor', linesCount: 5, linesCountStr: '05 Lines', range: 'Lines 13 - 17', lineNums: [13, 14, 15, 16, 17] },
-  { name: 'Korotoya Floor', linesCount: 6, linesCountStr: '06 Lines', range: 'Lines 18 - 23', lineNums: [18, 19, 20, 21, 22, 23] },
-  { name: 'Shitalokshya Floor', linesCount: 6, linesCountStr: '06 Lines', range: 'Lines 24 - 29', lineNums: [24, 25, 26, 27, 28, 29] },
-  { name: 'Turag Floor', linesCount: 5, linesCountStr: '05 Lines', range: 'Lines 30 - 34', lineNums: [30, 31, 32, 33, 34] },
+  { name: 'Padma Floor', block: 'Block 1', blockCode: 'B1', wing: 'Blue Wing', linesCount: 6, linesCountStr: '06 Lines', range: 'Lines 01 - 06', lineNums: [1, 2, 3, 4, 5, 6] },
+  { name: 'Meghna Floor', block: 'Block 2', blockCode: 'B2', wing: 'Blue Wing', linesCount: 6, linesCountStr: '06 Lines', range: 'Lines 07 - 12', lineNums: [7, 8, 9, 10, 11, 12] },
+  { name: 'Karnophuli Floor', block: 'Block 3', blockCode: 'B3', wing: 'Blue Wing', linesCount: 5, linesCountStr: '05 Lines', range: 'Lines 13 - 17', lineNums: [13, 14, 15, 16, 17] },
+  { name: 'Korotoya Floor', block: 'Block 4', blockCode: 'B4', wing: 'Green Wing', linesCount: 6, linesCountStr: '06 Lines', range: 'Lines 18 - 23', lineNums: [18, 19, 20, 21, 22, 23] },
+  { name: 'Shitalokshya Floor', block: 'Block 5', blockCode: 'B5', wing: 'Green Wing', linesCount: 6, linesCountStr: '06 Lines', range: 'Lines 24 - 29', lineNums: [24, 25, 26, 27, 28, 29] },
+  { name: 'Turag Floor', block: 'Block 6', blockCode: 'B6', wing: 'Green Wing', linesCount: 5, linesCountStr: '05 Lines', range: 'Lines 30 - 34', lineNums: [30, 31, 32, 33, 34] },
 ];
 
 export function normalizeFloorName(floorStr?: string): string {
@@ -141,6 +141,9 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
     }
     return availableFloors[0] || 'Padma Floor';
   });
+
+  // Wing Filter State for Floor Plan Navigation
+  const [selectedWingFilter, setSelectedWingFilter] = useState<'all' | 'Blue Wing' | 'Green Wing'>('all');
 
   // Filter & Search States
   const [statusFilter, setStatusFilter] = useState<'ALL' | LineStatus>('ALL');
@@ -531,42 +534,124 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
           </div>
         </div>
 
-        {/* Floor Selection Tabs */}
-        <div className="mt-5 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
-            <span className="text-xs font-bold uppercase text-[#527078] mr-1 shrink-0 flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-[#176f78]" /> Floor:
+        {/* Merged Wing, Block & Floor Selection Tabs */}
+        <div className="mt-5 space-y-2.5">
+          {/* Wing Filter Bar */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-extrabold uppercase text-[#527078] tracking-wider mr-1 flex items-center gap-1">
+              <Layers className="w-3.5 h-3.5 text-[#176f78]" /> Wing:
             </span>
-            {availableFloors.map(floorName => {
-              const cfg = CANONICAL_FLOORS_CONFIG.find(c => c.name.toLowerCase() === floorName.toLowerCase());
-              const matchLines = layoutPhysicalLines.filter(l => normalizeFloorName(l.floor) === floorName);
-              const count = matchLines.length > 0 ? matchLines.length : (cfg ? cfg.linesCount : 0);
-              const isSelected = selectedFloor === floorName;
-              const formattedCount = String(count).padStart(2, '0');
-
-              return (
-                <button
-                  key={floorName}
-                  id={`floor-tab-${floorName.replace(/\s+/g, '-').toLowerCase()}`}
-                  onClick={() => setSelectedFloor(floorName)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 border ${
-                    isSelected
-                      ? 'bg-[#176f78] text-white border-[#176f78] shadow-sm'
-                      : 'bg-[#fbfaf6] text-[#17343a] border-[#d9d2c2] hover:bg-[#f1eee6]'
-                  }`}
-                >
-                  <span>{floorName}</span>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-[#e7e1d5] text-[#17343a]'
-                    }`}
-                  >
-                    {formattedCount} Lines
-                  </span>
-                </button>
-              );
-            })}
+            <div className="flex items-center bg-[#f1eee6] p-0.5 rounded-xl border border-[#d9d2c2] gap-1">
+              <button
+                type="button"
+                onClick={() => setSelectedWingFilter('all')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  selectedWingFilter === 'all'
+                    ? 'bg-[#176f78] text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-[#17343a]'
+                }`}
+              >
+                All Wings (34 Lines)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedWingFilter('Blue Wing');
+                  // If current floor is in green wing, auto-switch to first floor of blue wing
+                  const currentCfg = CANONICAL_FLOORS_CONFIG.find(c => c.name.toLowerCase() === selectedFloor.toLowerCase());
+                  if (currentCfg && currentCfg.wing !== 'Blue Wing') {
+                    setSelectedFloor('Padma Floor');
+                  }
+                }}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  selectedWingFilter === 'Blue Wing'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-blue-700 hover:text-blue-900'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                <span>Blue Wing (B1–B3)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedWingFilter('Green Wing');
+                  // If current floor is in blue wing, auto-switch to first floor of green wing
+                  const currentCfg = CANONICAL_FLOORS_CONFIG.find(c => c.name.toLowerCase() === selectedFloor.toLowerCase());
+                  if (currentCfg && currentCfg.wing !== 'Green Wing') {
+                    setSelectedFloor('Korotoya Floor');
+                  }
+                }}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  selectedWingFilter === 'Green Wing'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'text-emerald-700 hover:text-emerald-900'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span>Green Wing (B4–B6)</span>
+              </button>
+            </div>
           </div>
+
+          {/* Block / Floor Tabs */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
+              <span className="text-xs font-bold uppercase text-[#527078] mr-1 shrink-0 flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-[#176f78]" /> Block / Floor:
+              </span>
+              {availableFloors
+                .filter(floorName => {
+                  if (selectedWingFilter === 'all') return true;
+                  const cfg = CANONICAL_FLOORS_CONFIG.find(c => c.name.toLowerCase() === floorName.toLowerCase());
+                  return cfg ? cfg.wing === selectedWingFilter : true;
+                })
+                .map(floorName => {
+                  const cfg = CANONICAL_FLOORS_CONFIG.find(c => c.name.toLowerCase() === floorName.toLowerCase());
+                  const matchLines = layoutPhysicalLines.filter(l => normalizeFloorName(l.floor) === floorName);
+                  const count = matchLines.length > 0 ? matchLines.length : (cfg ? cfg.linesCount : 0);
+                  const isSelected = selectedFloor === floorName;
+                  const formattedCount = String(count).padStart(2, '0');
+
+                  return (
+                    <button
+                      key={floorName}
+                      id={`floor-tab-${floorName.replace(/\s+/g, '-').toLowerCase()}`}
+                      onClick={() => {
+                        setSelectedFloor(floorName);
+                        if (cfg) setSelectedWingFilter(cfg.wing as 'Blue Wing' | 'Green Wing');
+                      }}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 border ${
+                        isSelected
+                          ? 'bg-[#176f78] text-white border-[#176f78] shadow-sm'
+                          : 'bg-[#fbfaf6] text-[#17343a] border-[#d9d2c2] hover:bg-[#f1eee6]'
+                      }`}
+                    >
+                      {cfg?.blockCode && (
+                        <span
+                          className={`text-[9.5px] font-mono px-1 rounded font-black ${
+                            isSelected
+                              ? 'bg-white/20 text-white'
+                              : cfg.wing === 'Blue Wing'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {cfg.blockCode}
+                        </span>
+                      )}
+                      <span>{floorName}</span>
+                      <span
+                        className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold ${
+                          isSelected ? 'bg-white/20 text-white' : 'bg-[#e7e1d5] text-[#17343a]'
+                        }`}
+                      >
+                        {formattedCount}L
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
 
           {/* View Mode Segment */}
           <div className="flex items-center gap-1 bg-[#f1eee6] p-1 rounded-xl border border-[#d9d2c2] text-xs font-semibold">
@@ -608,6 +693,7 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
             </button>
           </div>
         </div>
+      </div>
 
         {/* Floor Level Live Telemetry Counters */}
         <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">

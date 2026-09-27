@@ -11,12 +11,9 @@ import {
   X,
   Building2,
   Factory,
-  Compass,
-  ArrowRight,
-  Filter,
-  SlidersHorizontal,
-  Sparkles
+  ArrowRight
 } from 'lucide-react';
+import { LineEntry } from '../types';
 
 export interface ProductionFloorOption {
   id: string;
@@ -173,24 +170,15 @@ export function getProductionFloorId(floorIdOrName: string | undefined | null): 
   return patternMatch ? patternMatch.id : 'all';
 }
 
-interface ProductionFloorCardProps {
-  selectedFloor: string; // floor id ('all', 'padma', etc.) or label
+export interface ProductionFloorCardProps {
+  selectedFloor: string;
   onSelectFloor: (floorId: string, floorLabel: string) => void;
   className?: string;
   showHeader?: boolean;
   onClose?: () => void;
+  lines?: LineEntry[];
 }
 
-/**
- * ProductionFloorCard with Mobile Bottom Sheet Polish:
- * - Mobile pull handle bar
- * - Touch-optimized padding and active haptic-like scaling
- * - Debonair Unit-02 facility brand header
- * - Wing filter segment (All, Blue Wing: Fl 1-3, Green Wing: Fl 4-6)
- * - Hero master card for "All Production Floors"
- * - Individual floor cards with clear floor badges, line count, and range
- * - Safe area inset bottom support
- */
 export const ProductionFloorCard: React.FC<ProductionFloorCardProps> = ({
   selectedFloor,
   onSelectFloor,
@@ -237,7 +225,7 @@ export const ProductionFloorCard: React.FC<ProductionFloorCardProps> = ({
                 </span>
               </div>
               <p className="text-[10.5px] text-[#527078] leading-tight mt-0.5">
-                Filter live sewing lines by floor & section wing
+                Filter live sewing lines by floor &amp; section wing
               </p>
             </div>
           </div>
@@ -295,7 +283,6 @@ export const ProductionFloorCard: React.FC<ProductionFloorCardProps> = ({
 
       {/* Options List Container */}
       <div className="p-2.5 sm:p-3 space-y-2 overflow-y-auto max-h-[50vh] sm:max-h-[380px] overscroll-contain scrollbar-thin">
-        {/* Master Option: All Production Floors */}
         {wingFilter === 'all' && (
           <button
             type="button"
@@ -343,7 +330,6 @@ export const ProductionFloorCard: React.FC<ProductionFloorCardProps> = ({
           </button>
         )}
 
-        {/* Individual Floors */}
         {specificFloors.map(option => {
           const isSelected = currentId === option.id;
 
@@ -359,7 +345,6 @@ export const ProductionFloorCard: React.FC<ProductionFloorCardProps> = ({
               }`}
             >
               <div className="flex items-center gap-3">
-                {/* Floor Number Badge */}
                 <div
                   className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center shrink-0 border shadow-2xs ${
                     isSelected
@@ -396,7 +381,6 @@ export const ProductionFloorCard: React.FC<ProductionFloorCardProps> = ({
                 </div>
               </div>
 
-              {/* Radio Indicator */}
               <div className="shrink-0 ml-2">
                 {isSelected ? (
                   <div className="w-6 h-6 rounded-full bg-[#176f78] text-white flex items-center justify-center shadow-xs">
@@ -411,7 +395,7 @@ export const ProductionFloorCard: React.FC<ProductionFloorCardProps> = ({
         })}
       </div>
 
-      {/* Footer Quick Action */}
+      {/* Footer */}
       <div className="px-4 sm:px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-[#faf8f4] border-t border-[#ece7dc] flex items-center justify-between text-xs shrink-0">
         <div className="text-[11px] sm:text-xs text-[#527078] font-medium">
           {currentId === 'all' ? (
@@ -439,11 +423,12 @@ export const ProductionFloorCard: React.FC<ProductionFloorCardProps> = ({
   );
 };
 
-interface ProductionFloorModalProps {
+export interface ProductionFloorModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedFloor: string;
   onSelectFloor: (floorId: string, floorLabel: string) => void;
+  lines?: LineEntry[];
 }
 
 export const ProductionFloorModal: React.FC<ProductionFloorModalProps> = ({
@@ -472,18 +457,16 @@ export const ProductionFloorModal: React.FC<ProductionFloorModalProps> = ({
   );
 };
 
-interface ProductionFloorDropdownProps {
+export interface ProductionFloorDropdownProps {
   selectedFloor: string;
   onSelectFloor: (floorId: string, floorLabel: string) => void;
+  selectedLineNo?: string;
+  onSelectLineNo?: (lineNo: string) => void;
+  lines?: LineEntry[];
   variant?: 'header' | 'filter' | 'button';
   className?: string;
 }
 
-/**
- * Dropdown trigger button that pops open the Production Floor selection card
- * - On Mobile (< sm): Slides up as an ergonomic native Bottom Sheet with backdrop
- * - On Tablet/Desktop (>= sm): Appears as an anchored popover dropdown
- */
 export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = ({
   selectedFloor,
   onSelectFloor,
@@ -497,7 +480,6 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
   const currentId = getProductionFloorId(selectedFloor);
   const selectedOption = PRODUCTION_FLOOR_OPTIONS.find(o => o.id === currentId) || PRODUCTION_FLOOR_OPTIONS[0];
 
-  // Close on outside click on desktop
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -512,7 +494,6 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
     };
   }, [isOpen]);
 
-  // Close on ESC key
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') setIsOpen(false);
@@ -527,7 +508,6 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
 
   return (
     <div ref={containerRef} className={`relative inline-block ${className}`}>
-      {/* Header Pill Variant */}
       {variant === 'header' && (
         <button
           type="button"
@@ -554,7 +534,6 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
         </button>
       )}
 
-      {/* Filter Pill Variant (Line Data Page) */}
       {variant === 'filter' && (
         <div className="flex items-center gap-1">
           <button
@@ -589,14 +568,10 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
             />
           </button>
 
-          {/* Quick Clear Reset Button when a floor is active */}
           {currentId !== 'all' && (
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectFloor('all', 'All Production Floors');
-              }}
+              onClick={() => onSelectFloor('all', 'All Production Floors')}
               className="p-1.5 rounded-xl bg-white hover:bg-rose-50 border border-[#d9d2c2] hover:border-rose-200 text-slate-500 hover:text-rose-600 transition-colors cursor-pointer shadow-2xs touch-manipulation active:scale-95"
               title="Clear floor filter (Show all 34 lines)"
               aria-label="Clear floor filter"
@@ -607,7 +582,6 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
         </div>
       )}
 
-      {/* Button Variant */}
       {variant === 'button' && (
         <button
           type="button"
@@ -625,20 +599,14 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
         </button>
       )}
 
-      {/* Responsive Overlay / Popover:
-          - Mobile (< 640px): Fixed bottom sheet with backdrop overlay
-          - Desktop (>= 640px): Absolute anchored dropdown
-      */}
       {isOpen && (
         <>
-          {/* Backdrop on Mobile */}
           <div
             className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs sm:hidden animate-in fade-in duration-200"
             onClick={() => setIsOpen(false)}
             aria-hidden="true"
           />
 
-          {/* Sheet (Mobile) / Popover (Desktop) */}
           <div className="fixed inset-x-0 bottom-0 z-50 sm:absolute sm:inset-auto sm:left-auto sm:right-0 sm:top-full sm:mt-2 w-full sm:w-[370px] animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
             <ProductionFloorCard
               selectedFloor={selectedFloor}
