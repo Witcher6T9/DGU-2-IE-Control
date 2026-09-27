@@ -136,5 +136,17 @@ service cloud.firestore {
       allow update: if false; // Messages are immutable
       allow delete: if isAdmin() || (isVerified() && existing().senderId == request.auth.uid);
     }
+
+    // System Updates & OTA Fleet Broadcasts (Public read for fleet terminals, admin write)
+    match /system_updates/{updateId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // App Page Layout Configurations (Public read for layout sync, admin write)
+    match /layout_configurations/{layoutId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
   }
 }

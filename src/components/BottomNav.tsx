@@ -14,7 +14,7 @@ import {
   Globe,
   Sliders
 } from 'lucide-react';
-import { UserProfile } from '../types';
+import { UserProfile, NavBarStyle } from '../types';
 import { isMasterAdminOrAdmin } from '../utils/rbac';
 
 interface BottomNavProps {
@@ -32,6 +32,7 @@ interface BottomNavProps {
   onOpenAndroidPackage?: () => void;
   onOpenAuth?: () => void;
   profile?: UserProfile;
+  navBarStyle?: NavBarStyle;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
@@ -40,9 +41,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   checklistProgress,
   settingsSection = 'control-center',
   onOpenSettings,
-  profile
+  profile,
+  navBarStyle = 'bottom-cupertino'
 }) => {
   const isMasterAdmin = isMasterAdminOrAdmin(profile);
+  const [kioskUnlocked, setKioskUnlocked] = React.useState(false);
 
   // Primary navigation slots - with Line Data, Checklist, Lean Tools & World organized in Settings
   const primaryTabs = [
@@ -121,13 +124,34 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     onTabChange(tabId);
   };
 
+  if (navBarStyle === 'kiosk-minimal' && !kioskUnlocked) {
+    return (
+      <div className="fixed bottom-3 right-3 z-40">
+        <button
+          type="button"
+          onClick={() => setKioskUnlocked(true)}
+          className="px-3 py-1.5 rounded-full bg-slate-900/80 text-white text-[11px] font-mono flex items-center gap-1.5 shadow-lg backdrop-blur-md hover:bg-slate-800 transition-all cursor-pointer opacity-70 hover:opacity-100"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          <span>Kiosk Nav</span>
+        </button>
+      </div>
+    );
+  }
+
+  const isFloating = navBarStyle === 'floating-dock';
+
   return (
     <nav
       id="bottom-navigation-bar"
       aria-label="Bottom Navigation"
-      className="fixed bottom-0 inset-x-0 z-40 bg-[#fbfaf6]/95 backdrop-blur-md border-t border-[#d9d2c2] shadow-[0_-4px_20px_rgba(12,28,45,0.10)] pb-[env(safe-area-inset-bottom)] cockpit-nav"
+      className={
+        isFloating
+          ? "fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl bg-[#fbfaf6]/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl border border-[#d9d2c2] dark:border-[#2c2c2e] rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.18)] px-2 pb-[env(safe-area-inset-bottom)]"
+          : "fixed bottom-0 inset-x-0 z-40 bg-[#fbfaf6]/95 backdrop-blur-md border-t border-[#d9d2c2] shadow-[0_-4px_20px_rgba(12,28,45,0.10)] pb-[env(safe-area-inset-bottom)] cockpit-nav"
+      }
     >
-      <div className="max-w-[1500px] mx-auto px-2 sm:px-6">
+      <div className={isFloating ? "w-full mx-auto" : "max-w-[1500px] mx-auto px-2 sm:px-6"}>
         {/* Mobile View: 5 Canonical Slots */}
         <div className="grid grid-cols-5 md:hidden items-center h-16 select-none px-1 gap-0.5">
           {primaryTabs.map(tab => {

@@ -11,9 +11,29 @@ import {
   X,
   Building2,
   Factory,
-  ArrowRight
+  Compass,
+  ArrowRight,
+  Filter,
+  SlidersHorizontal,
+  Sparkles
 } from 'lucide-react';
 import { LineEntry } from '../types';
+import {
+  WingBlockLineSelector,
+  WingBlockLineDropdown,
+  CANONICAL_WINGS,
+  CANONICAL_BLOCKS,
+  CANONICAL_LINES,
+  normalizeLineNumber,
+  getWingBlockLineMeta,
+  matchesWingBlockLine,
+  WingId,
+  BlockDefinition,
+  LineDefinition,
+  WingBlockLineSelection
+} from './WingBlockLineSelector';
+
+export * from './WingBlockLineSelector';
 
 export interface ProductionFloorOption {
   id: string;
@@ -171,7 +191,7 @@ export function getProductionFloorId(floorIdOrName: string | undefined | null): 
 }
 
 export interface ProductionFloorCardProps {
-  selectedFloor: string;
+  selectedFloor: string; // floor id ('all', 'padma', etc.) or label
   onSelectFloor: (floorId: string, floorLabel: string) => void;
   className?: string;
   showHeader?: boolean;
@@ -179,251 +199,30 @@ export interface ProductionFloorCardProps {
   lines?: LineEntry[];
 }
 
+/**
+ * Merged (Wings, Blocks, Lines) Production Floor Card:
+ * Replaces the old unmerged floor-only card with the unified 3-tier hierarchy selector.
+ */
 export const ProductionFloorCard: React.FC<ProductionFloorCardProps> = ({
   selectedFloor,
   onSelectFloor,
   className = '',
-  showHeader = true,
-  onClose
+  onClose,
+  lines = []
 }) => {
-  const currentId = getProductionFloorId(selectedFloor);
-  const [wingFilter, setWingFilter] = useState<'all' | 'Blue Wing' | 'Green Wing'>('all');
-
-  const filteredOptions = PRODUCTION_FLOOR_OPTIONS.filter(opt => {
-    if (opt.id === 'all') return true;
-    if (wingFilter === 'all') return true;
-    return opt.wing === wingFilter;
-  });
-
-  const allOption = PRODUCTION_FLOOR_OPTIONS.find(o => o.id === 'all')!;
-  const specificFloors = filteredOptions.filter(o => o.id !== 'all');
-
   return (
-    <div
-      className={`bg-white rounded-t-3xl sm:rounded-2xl border border-[#d9d2c2] shadow-2xl overflow-hidden transition-all select-none w-full max-w-full sm:max-w-md flex flex-col ${className}`}
-      style={{
-        boxShadow: '0 25px 50px -12px rgba(23, 52, 58, 0.25), 0 4px 12px 0 rgba(0, 0, 0, 0.08)'
-      }}
-    >
-      {/* Mobile Top Pull Bar */}
-      <div className="pt-2.5 pb-1 flex justify-center sm:hidden shrink-0 bg-[#faf8f4]">
-        <div className="w-10 h-1.5 rounded-full bg-slate-300" />
-      </div>
-
-      {/* Header */}
-      {showHeader && (
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-[#ece7dc] bg-[#faf8f4] shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#176f78]/10 text-[#176f78] flex items-center justify-center shadow-2xs">
-              <Building2 className="w-4.5 h-4.5" />
-            </div>
-            <div>
-              <div className="text-xs sm:text-sm font-bold text-[#17343a] flex items-center gap-1.5">
-                <span>Select Production Floor</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#176f78]/15 text-[#176f78] font-bold border border-[#176f78]/25">
-                  Unit-02
-                </span>
-              </div>
-              <p className="text-[10.5px] text-[#527078] leading-tight mt-0.5">
-                Filter live sewing lines by floor &amp; section wing
-              </p>
-            </div>
-          </div>
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-[#f1eee6] transition-colors cursor-pointer touch-manipulation active:scale-95"
-              title="Close floor selector"
-              aria-label="Close"
-            >
-              <X className="w-4.5 h-4.5" />
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Wing Segmented Filter Tabs */}
-      <div className="p-2 sm:p-2.5 pb-2 bg-[#fbfaf6] border-b border-[#ece7dc] flex items-center gap-1.5 shrink-0">
-        <button
-          type="button"
-          onClick={() => setWingFilter('all')}
-          className={`flex-1 py-1.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center touch-manipulation active:scale-95 ${
-            wingFilter === 'all'
-              ? 'bg-[#176f78] text-white shadow-xs'
-              : 'text-slate-600 hover:text-[#176f78] hover:bg-[#f1eee6] bg-white border border-[#d9d2c2]'
-          }`}
-        >
-          All Floors (6)
-        </button>
-        <button
-          type="button"
-          onClick={() => setWingFilter('Blue Wing')}
-          className={`flex-1 py-1.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center flex items-center justify-center gap-1 touch-manipulation active:scale-95 ${
-            wingFilter === 'Blue Wing'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-blue-700 hover:bg-blue-50 bg-white border border-blue-200'
-          }`}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-          <span>Blue Wing</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setWingFilter('Green Wing')}
-          className={`flex-1 py-1.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center flex items-center justify-center gap-1 touch-manipulation active:scale-95 ${
-            wingFilter === 'Green Wing'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'text-emerald-700 hover:bg-emerald-50 bg-white border border-emerald-200'
-          }`}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          <span>Green Wing</span>
-        </button>
-      </div>
-
-      {/* Options List Container */}
-      <div className="p-2.5 sm:p-3 space-y-2 overflow-y-auto max-h-[50vh] sm:max-h-[380px] overscroll-contain scrollbar-thin">
-        {wingFilter === 'all' && (
-          <button
-            type="button"
-            onClick={() => onSelectFloor(allOption.id, allOption.label)}
-            className={`w-full text-left p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group touch-manipulation active:scale-[0.99] ${
-              currentId === 'all'
-                ? 'bg-[#176f78]/10 border-[#176f78] shadow-xs'
-                : 'bg-white hover:bg-[#fbfaf6] border-[#d9d2c2]'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                  currentId === 'all'
-                    ? 'bg-[#176f78] text-white shadow-2xs'
-                    : 'bg-[#f1eee6] text-[#527078] group-hover:text-[#176f78]'
-                }`}
-              >
-                <Factory className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-xs sm:text-sm font-bold text-[#17343a]">
-                    {allOption.label}
-                  </span>
-                  <span className="text-[9px] uppercase font-mono px-1.5 py-0.2 rounded font-bold bg-[#176f78]/15 text-[#176f78] border border-[#176f78]/25">
-                    Full Plant
-                  </span>
-                </div>
-                <div className="text-[11px] text-[#527078] mt-0.5 leading-tight">
-                  34 Lines in Layout • All 6 Floors (Lines 01 - 34)
-                </div>
-              </div>
-            </div>
-
-            <div className="shrink-0 ml-2">
-              {currentId === 'all' ? (
-                <div className="w-6 h-6 rounded-full bg-[#176f78] text-white flex items-center justify-center shadow-xs">
-                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                </div>
-              ) : (
-                <div className="w-6 h-6 rounded-full border-2 border-slate-300 group-hover:border-[#176f78] transition-colors" />
-              )}
-            </div>
-          </button>
-        )}
-
-        {specificFloors.map(option => {
-          const isSelected = currentId === option.id;
-
-          return (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => onSelectFloor(option.id, option.label)}
-              className={`w-full text-left p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group touch-manipulation active:scale-[0.99] ${
-                isSelected
-                  ? 'bg-[#176f78]/8 border-[#176f78] shadow-xs'
-                  : 'bg-white hover:bg-[#fbfaf6] border-[#e2dcce]'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center shrink-0 border shadow-2xs ${
-                    isSelected
-                      ? 'bg-[#176f78] text-white border-[#176f78]'
-                      : 'bg-[#f8f6f0] border-[#d9d2c2] text-[#17343a]'
-                  }`}
-                >
-                  <span className="text-[8px] font-bold uppercase leading-none opacity-80">
-                    FL
-                  </span>
-                  <span className="text-xs sm:text-sm font-black font-mono leading-none mt-0.5">
-                    {String(option.floorNo).padStart(2, '0')}
-                  </span>
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-xs sm:text-sm font-bold text-[#17343a]">
-                      {option.label}
-                    </span>
-                    <span
-                      className={`text-[9px] px-1.5 py-0.2 rounded-md font-bold font-mono border ${option.badgeClass}`}
-                    >
-                      {option.lineCount} Lines
-                    </span>
-                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200 font-medium">
-                      {option.wing}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-[#527078] font-mono mt-0.5 flex items-center gap-1.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${option.dotColor}`} />
-                    <span>{option.linesRange}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="shrink-0 ml-2">
-                {isSelected ? (
-                  <div className="w-6 h-6 rounded-full bg-[#176f78] text-white flex items-center justify-center shadow-xs">
-                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                  </div>
-                ) : (
-                  <div className="w-6 h-6 rounded-full border-2 border-slate-300 group-hover:border-[#176f78] transition-colors" />
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Footer */}
-      <div className="px-4 sm:px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] bg-[#faf8f4] border-t border-[#ece7dc] flex items-center justify-between text-xs shrink-0">
-        <div className="text-[11px] sm:text-xs text-[#527078] font-medium">
-          {currentId === 'all' ? (
-            <span>Showing all <strong>34 lines</strong></span>
-          ) : (
-            <span>Filtered: <strong className="text-[#17343a]">{getProductionFloorLabel(currentId)}</strong></span>
-          )}
-        </div>
-        {currentId !== 'all' ? (
-          <button
-            type="button"
-            onClick={() => onSelectFloor('all', 'All Production Floors')}
-            className="text-[11px] sm:text-xs font-bold text-[#176f78] hover:underline cursor-pointer flex items-center gap-1 touch-manipulation active:scale-95"
-          >
-            <span>Reset to All Floors</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        ) : (
-          <span className="text-[10px] text-slate-400 font-mono">
-            6 Floors Active
-          </span>
-        )}
-      </div>
-    </div>
+    <WingBlockLineSelector
+      selectedFloorId={selectedFloor}
+      onSelectFloor={(id, label) => onSelectFloor(id, label)}
+      lines={lines}
+      variant="card"
+      className={className}
+      onClose={onClose}
+    />
   );
 };
 
-export interface ProductionFloorModalProps {
+interface ProductionFloorModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedFloor: string;
@@ -435,21 +234,23 @@ export const ProductionFloorModal: React.FC<ProductionFloorModalProps> = ({
   isOpen,
   onClose,
   selectedFloor,
-  onSelectFloor
+  onSelectFloor,
+  lines = []
 }) => {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="fixed inset-0" onClick={onClose} aria-hidden="true" />
-      <div className="relative z-10 w-full max-w-full sm:max-w-md animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
-        <ProductionFloorCard
-          selectedFloor={selectedFloor}
+      <div className="relative z-10 w-full max-w-full sm:max-w-xl animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200">
+        <WingBlockLineSelector
+          selectedFloorId={selectedFloor}
           onSelectFloor={(id, label) => {
             onSelectFloor(id, label);
             onClose();
           }}
-          showHeader={true}
+          lines={lines}
+          variant="card"
           onClose={onClose}
         />
       </div>
@@ -460,16 +261,34 @@ export const ProductionFloorModal: React.FC<ProductionFloorModalProps> = ({
 export interface ProductionFloorDropdownProps {
   selectedFloor: string;
   onSelectFloor: (floorId: string, floorLabel: string) => void;
+  selectedWing?: WingId;
+  onSelectWing?: (wing: WingId) => void;
+  selectedBlockId?: string;
+  onSelectBlock?: (blockId: string, block?: BlockDefinition) => void;
   selectedLineNo?: string;
   onSelectLineNo?: (lineNo: string) => void;
+  onSelectionChange?: (selection: WingBlockLineSelection) => void;
   lines?: LineEntry[];
   variant?: 'header' | 'filter' | 'button';
   className?: string;
 }
 
+/**
+ * Dropdown trigger button that pops open the unified (Wings, Blocks, Lines) Selector
+ * - On Mobile (< sm): Slides up as an ergonomic native Bottom Sheet with backdrop
+ * - On Tablet/Desktop (>= sm): Appears as an anchored popover dropdown
+ */
 export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = ({
   selectedFloor,
   onSelectFloor,
+  selectedWing = 'all',
+  onSelectWing,
+  selectedBlockId = 'all',
+  onSelectBlock,
+  selectedLineNo = 'all',
+  onSelectLineNo,
+  onSelectionChange,
+  lines = [],
   variant = 'header',
   className = ''
 }) => {
@@ -480,6 +299,28 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
   const currentId = getProductionFloorId(selectedFloor);
   const selectedOption = PRODUCTION_FLOOR_OPTIONS.find(o => o.id === currentId) || PRODUCTION_FLOOR_OPTIONS[0];
 
+  // Dynamic Trigger label reflecting active scope
+  const displayLabel = (() => {
+    if (selectedLineNo && selectedLineNo !== 'all') {
+      const meta = getWingBlockLineMeta(selectedLineNo);
+      return `${meta.lineNo} • ${meta.floorName.replace(' Floor', '')}`;
+    }
+    if (selectedBlockId && selectedBlockId !== 'all') {
+      const b = CANONICAL_BLOCKS.find(b => b.id === selectedBlockId);
+      if (b) return b.shortName;
+    }
+    if (currentId !== 'all') {
+      return variant === 'header' ? selectedOption.shortName : currentLabel;
+    }
+    if (selectedWing && selectedWing !== 'all') {
+      return selectedWing;
+    }
+    return variant === 'header' ? 'All Floors' : 'All Production Floors';
+  })();
+
+  const isScopeActive = currentId !== 'all' || (selectedWing && selectedWing !== 'all') || (selectedBlockId && selectedBlockId !== 'all') || (selectedLineNo && selectedLineNo !== 'all');
+
+  // Close on outside click on desktop
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -494,6 +335,7 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
     };
   }, [isOpen]);
 
+  // Close on ESC key
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') setIsOpen(false);
@@ -508,6 +350,7 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
 
   return (
     <div ref={containerRef} className={`relative inline-block ${className}`}>
+      {/* Header Pill Variant */}
       {variant === 'header' && (
         <button
           type="button"
@@ -515,25 +358,26 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
           aria-haspopup="dialog"
-          title={`Active Floor: ${currentLabel}`}
+          title={`Active Scope: ${displayLabel}`}
           className={`h-8.5 sm:h-9 px-2.5 sm:px-3 rounded-xl border flex items-center gap-1.5 sm:gap-2 transition-all text-xs font-bold cursor-pointer shadow-2xs touch-manipulation active:scale-95 shrink-0 ${
-            currentId !== 'all'
+            isScopeActive
               ? 'bg-[#176f78] text-white border-[#176f78] shadow-xs'
               : 'bg-white hover:bg-[#f1eee6] border-[#d9d2c2] text-[#17343a]'
           }`}
         >
-          <Building2 className={`w-4 h-4 shrink-0 ${currentId !== 'all' ? 'text-white' : 'text-[#176f78]'}`} />
-          <span className="max-w-[110px] sm:max-w-[150px] truncate">
-            {currentId === 'all' ? 'All Floors' : selectedOption.shortName}
+          <Building2 className={`w-4 h-4 shrink-0 ${isScopeActive ? 'text-white' : 'text-[#176f78]'}`} />
+          <span className="max-w-[120px] sm:max-w-[160px] md:max-w-[200px] truncate">
+            {displayLabel}
           </span>
           <ChevronDown
-            className={`w-3.5 h-3.5 transition-transform duration-200 ${
+            className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${
               isOpen ? 'rotate-180' : ''
-            } ${currentId !== 'all' ? 'text-white/80' : 'text-[#527078]'}`}
+            } ${isScopeActive ? 'text-white/80' : 'text-[#527078]'}`}
           />
         </button>
       )}
 
+      {/* Filter Pill Variant (Line Data Page / Reports) */}
       {variant === 'filter' && (
         <div className="flex items-center gap-1">
           <button
@@ -542,39 +386,55 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
             onClick={() => setIsOpen(!isOpen)}
             aria-expanded={isOpen}
             className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs touch-manipulation active:scale-95 ${
-              currentId !== 'all'
+              isScopeActive
                 ? 'bg-[#176f78] text-white border-[#176f78] shadow-xs'
                 : 'bg-[#f1eee6] hover:bg-[#e7e1d5] border-[#d9d2c2] text-[#17343a]'
             }`}
-            title="Filter lines by Production Floor"
+            title="Filter lines by Wing, Block, or Line"
           >
-            <Building2 className={`w-3.5 h-3.5 shrink-0 ${currentId !== 'all' ? 'text-white' : 'text-[#176f78]'}`} />
-            <span className="max-w-[110px] sm:max-w-none truncate">
-              {currentId === 'all' ? 'All Floors' : currentLabel}
+            <Building2 className={`w-3.5 h-3.5 shrink-0 ${isScopeActive ? 'text-white' : 'text-[#176f78]'}`} />
+            <span className="max-w-[130px] sm:max-w-none truncate">
+              {displayLabel}
             </span>
             <span
               className={`text-[9.5px] font-mono px-1.5 py-0.2 rounded font-bold shrink-0 ${
-                currentId !== 'all'
+                isScopeActive
                   ? 'bg-white/20 text-white'
                   : 'bg-[#176f78]/10 text-[#176f78]'
               }`}
             >
-              {selectedOption.lineCount}L
+              {currentId !== 'all' ? `${selectedOption.lineCount}L` : '34L'}
             </span>
             <ChevronDown
               className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${
                 isOpen ? 'rotate-180' : ''
-              } ${currentId !== 'all' ? 'text-white/80' : 'text-[#527078]'}`}
+              } ${isScopeActive ? 'text-white/80' : 'text-[#527078]'}`}
             />
           </button>
 
-          {currentId !== 'all' && (
+          {/* Quick Clear Reset Button when a scope is active */}
+          {isScopeActive && (
             <button
               type="button"
-              onClick={() => onSelectFloor('all', 'All Production Floors')}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectFloor('all', 'All Production Floors');
+                if (onSelectWing) onSelectWing('all');
+                if (onSelectBlock) onSelectBlock('all');
+                if (onSelectLineNo) onSelectLineNo('all');
+                if (onSelectionChange) {
+                  onSelectionChange({
+                    wing: 'all',
+                    blockId: 'all',
+                    floorId: 'all',
+                    floorLabel: 'All Production Floors',
+                    lineNo: 'all'
+                  });
+                }
+              }}
               className="p-1.5 rounded-xl bg-white hover:bg-rose-50 border border-[#d9d2c2] hover:border-rose-200 text-slate-500 hover:text-rose-600 transition-colors cursor-pointer shadow-2xs touch-manipulation active:scale-95"
-              title="Clear floor filter (Show all 34 lines)"
-              aria-label="Clear floor filter"
+              title="Clear filter (Show all 34 lines)"
+              aria-label="Clear filter"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -582,6 +442,7 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
         </div>
       )}
 
+      {/* Button Variant */}
       {variant === 'button' && (
         <button
           type="button"
@@ -590,7 +451,7 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
           className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] hover:bg-slate-50 text-xs font-bold text-[#17343a] transition-all cursor-pointer shadow-2xs touch-manipulation active:scale-95"
         >
           <Building2 className="w-4 h-4 text-[#176f78]" />
-          <span>{currentLabel}</span>
+          <span>{displayLabel}</span>
           <ChevronDown
             className={`w-3.5 h-3.5 text-[#527078] transition-transform duration-200 ${
               isOpen ? 'rotate-180' : ''
@@ -599,22 +460,44 @@ export const ProductionFloorDropdown: React.FC<ProductionFloorDropdownProps> = (
         </button>
       )}
 
+      {/* Responsive Overlay Popover / Mobile Bottom Sheet with Merged WingBlockLineSelector */}
       {isOpen && (
         <>
+          {/* Backdrop on Mobile */}
           <div
             className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs sm:hidden animate-in fade-in duration-200"
             onClick={() => setIsOpen(false)}
             aria-hidden="true"
           />
 
-          <div className="fixed inset-x-0 bottom-0 z-50 sm:absolute sm:inset-auto sm:left-auto sm:right-0 sm:top-full sm:mt-2 w-full sm:w-[370px] animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
-            <ProductionFloorCard
-              selectedFloor={selectedFloor}
+          {/* Sheet (Mobile) / Popover (Desktop) */}
+          <div className="fixed inset-x-0 bottom-0 z-50 sm:absolute sm:inset-auto sm:left-auto sm:right-0 sm:top-full sm:mt-2 w-full sm:w-[580px] max-w-full animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
+            <WingBlockLineSelector
+              selectedWing={selectedWing}
+              onSelectWing={onSelectWing}
+              selectedBlockId={selectedBlockId}
+              onSelectBlock={onSelectBlock}
+              selectedFloorId={selectedFloor}
               onSelectFloor={(id, label) => {
                 onSelectFloor(id, label);
-                setIsOpen(false);
               }}
-              showHeader={true}
+              selectedLineNo={selectedLineNo}
+              onSelectLineNo={(lNo) => {
+                if (onSelectLineNo) onSelectLineNo(lNo);
+              }}
+              onSelectionChange={(sel) => {
+                onSelectFloor(sel.floorId, sel.floorLabel);
+                if (onSelectWing) onSelectWing(sel.wing);
+                if (onSelectBlock) onSelectBlock(sel.blockId);
+                if (onSelectLineNo) onSelectLineNo(sel.lineNo);
+                if (onSelectionChange) onSelectionChange(sel);
+                if (sel.lineNo !== 'all' || sel.blockId !== 'all') {
+                  setIsOpen(false);
+                }
+              }}
+              lines={lines}
+              variant="card"
+              className="max-h-[85vh] sm:max-h-[620px] overflow-y-auto scrollbar-thin shadow-2xl"
               onClose={() => setIsOpen(false)}
             />
           </div>

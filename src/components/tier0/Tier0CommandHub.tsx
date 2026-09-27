@@ -44,7 +44,9 @@ import {
   ExternalLink,
   Code2,
   Building2,
-  Workflow
+  Workflow,
+  Layout,
+  DownloadCloud
 } from 'lucide-react';
 import {
   UserProfile,
@@ -53,12 +55,17 @@ import {
   FactoryIndustryProfile,
   UserDailyBackupSettings,
   DailyBackupRecord,
-  SecurityAuditEntry
+  SecurityAuditEntry,
+  AppPageLayoutConfig
 } from '../../types';
 import { isSystemAdmin, SYSTEM_ADMIN_EMAIL } from '../../utils/rbac';
 import { UnifiedPermissionMatrix } from '../UnifiedPermissionMatrix';
+import { LayoutCustomizerModule } from './LayoutCustomizerModule';
+import { UpdatesPusherModule } from './UpdatesPusherModule';
 
 export type Tier0ModuleId =
+  | 'layout-customizer'
+  | 'updates-pusher'
   | 'schema-forge'
   | 'access-matrix'
   | 'security-loop'
@@ -80,6 +87,26 @@ export interface Tier0ModuleMeta {
 }
 
 export const TIER_0_MODULES: Tier0ModuleMeta[] = [
+  {
+    id: 'layout-customizer',
+    name: 'Layout Customizer',
+    shortDesc: 'App page architecture, navigation dock, widget order & tier views',
+    tagline: 'Custom page layouts, navigation docks, widget sequence & floor card density',
+    icon: Layout,
+    badge: 'PAGE ARCHITECT',
+    color: '#8b5cf6',
+    accentBg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+  },
+  {
+    id: 'updates-pusher',
+    name: 'Updates Pusher',
+    shortDesc: 'Deploy OTA hotfixes, layout pushes, schema migrations & broadcast notices',
+    tagline: 'Live over-the-air firmware updates, cache purges & fleet terminal push broadcasts',
+    icon: DownloadCloud,
+    badge: 'OTA ENGINE',
+    color: '#007aff',
+    accentBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+  },
   {
     id: 'schema-forge',
     name: 'Schema Forge',
@@ -195,6 +222,7 @@ export const Tier0CommandHub: React.FC<Tier0CommandHubProps> = ({
   const [activeModule, setActiveModule] = useState<Tier0ModuleId>(initialModule);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [attachedLayoutForPush, setAttachedLayoutForPush] = useState<Partial<AppPageLayoutConfig> | undefined>(undefined);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -285,8 +313,8 @@ export const Tier0CommandHub: React.FC<Tier0CommandHubProps> = ({
           </div>
         </div>
 
-        {/* 8 Module Navigation Pills */}
-        <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+        {/* 10 Module Navigation Pills */}
+        <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
           {TIER_0_MODULES.map(mod => {
             const Icon = mod.icon;
             const isActive = activeModule === mod.id;
@@ -335,6 +363,26 @@ export const Tier0CommandHub: React.FC<Tier0CommandHubProps> = ({
 
       {/* ACTIVE MODULE CONTAINER */}
       <div className="bg-white dark:bg-[#1c1c1e] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden p-5 sm:p-7">
+        {activeModule === 'layout-customizer' && (
+          <LayoutCustomizerModule
+            profile={profile}
+            lines={lines}
+            showToast={showToast}
+            onNavigateToUpdatesPusher={(payload) => {
+              setAttachedLayoutForPush(payload);
+              setActiveModule('updates-pusher');
+              showToast('Layout blueprint loaded into Updates Pusher. Ready to deploy!');
+            }}
+          />
+        )}
+        {activeModule === 'updates-pusher' && (
+          <UpdatesPusherModule
+            profile={profile}
+            lines={lines}
+            showToast={showToast}
+            initialAttachedLayout={attachedLayoutForPush}
+          />
+        )}
         {activeModule === 'schema-forge' && (
           <SchemaForgeModule lines={lines} showToast={showToast} handleCopy={handleCopy} copiedKey={copiedKey} />
         )}

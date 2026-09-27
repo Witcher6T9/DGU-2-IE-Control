@@ -349,6 +349,100 @@
         }
       },
       "required": ["id", "senderId", "senderName", "text", "channel"]
+    },
+    "system_updates": {
+      "title": "System Update Push",
+      "description": "Over-the-air firmware, layout, or operational shift updates pushed by Tier 0 Root Administrator",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique update ID",
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "version": {
+          "type": "string",
+          "description": "Build version string (e.g. v2.4.1)",
+          "maxLength": 30
+        },
+        "title": {
+          "type": "string",
+          "description": "Update headline or announcement",
+          "maxLength": 200
+        },
+        "category": {
+          "type": "string",
+          "description": "Update classification",
+          "enum": ["layout_push", "ota_hotfix", "operational_directive", "schema_migration", "maintenance_advisory"]
+        },
+        "severity": {
+          "type": "string",
+          "description": "Urgency severity level",
+          "enum": ["normal", "important", "mandatory"]
+        },
+        "targetScope": {
+          "type": "string",
+          "description": "Fleet deployment target",
+          "maxLength": 50
+        },
+        "pushedAt": {
+          "type": "string",
+          "description": "ISO timestamp of transmission"
+        },
+        "pushedByEmail": {
+          "type": "string",
+          "description": "Pusher administrator email",
+          "maxLength": 128
+        },
+        "status": {
+          "type": "string",
+          "description": "Broadcast lifecycle state",
+          "enum": ["active", "rolled_back", "delivered"]
+        }
+      },
+      "required": ["id", "version", "title", "category", "severity", "status"]
+    },
+    "layout_configurations": {
+      "title": "App Page Layout Configuration",
+      "description": "Dynamic layout blueprint, navigation structure, and widget configuration for shop floor terminals",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique layout config ID",
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "presetName": {
+          "type": "string",
+          "description": "Name of the preset template",
+          "maxLength": 100
+        },
+        "targetTier": {
+          "type": "string",
+          "description": "Target tier role or all",
+          "maxLength": 30
+        },
+        "defaultLandingTab": {
+          "type": "string",
+          "description": "Default initial active workspace",
+          "maxLength": 50
+        },
+        "navBarStyle": {
+          "type": "string",
+          "description": "Navigation dock style",
+          "enum": ["bottom-cupertino", "floating-dock", "top-header", "kiosk-minimal"]
+        },
+        "brandColor": {
+          "type": "string",
+          "description": "Primary accent HEX color",
+          "maxLength": 20
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of update"
+        }
+      },
+      "required": ["id", "presetName", "defaultLandingTab", "navBarStyle"]
     }
   },
   "firestore": {
@@ -375,6 +469,14 @@
     "/chat_messages/{messageId}": {
       "schema": "chat_messages",
       "description": "Factory operational dispatch and chatter messages"
+    },
+    "/system_updates/{updateId}": {
+      "schema": "system_updates",
+      "description": "System updates, OTA hotfixes, and shift directives"
+    },
+    "/layout_configurations/{layoutId}": {
+      "schema": "layout_configurations",
+      "description": "App page layout blueprints and presets"
     }
   }
 }

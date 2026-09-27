@@ -4488,17 +4488,35 @@ export const LineData: React.FC<LineDataProps> = ({
           )}
         </div>
 
-        {/* General Remarks & Save Actions */}
-        <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] p-5 shadow-xs space-y-4">
+        {/* Weekly Efficiency Trend — Line {formData.lineNo} */}
+        <div className="rounded-3xl border border-[#d9d2c2] bg-[#fbfaf6] p-4 sm:p-5 shadow-xs">
+          <LineEfficiencySparkline
+            line={formData}
+            allLines={lines}
+            currentEfficiency={metrics.efficiencyPct}
+            targetEfficiency={formData.targetEff || 85}
+            onNavigateHistory={onNavigate ? (lineNo) => onNavigate('line-history', lineNo) : undefined}
+          />
+        </div>
+
+        {/* General Remarks & Save Actions — Positioned at Bottom of Datas Page */}
+        <div id="general-line-remarks-handover" className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] p-5 shadow-xs space-y-4">
           <div>
-            <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">
-              General Line Remarks &amp; IE Lead Handover Summary
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label htmlFor="ie-lead-remarks" className="block text-[11px] font-bold uppercase tracking-wider text-[#527078]">
+                General Line Remarks &amp; IE Lead Handover Summary
+              </label>
+              <span className="text-[10px] text-[#527078] font-mono">
+                Shift End Sign-Off &amp; Handover Notes
+              </span>
+            </div>
             <textarea
-              rows={2}
+              id="ie-lead-remarks"
+              rows={3}
               value={formData.remarks}
               onChange={e => setFormData({ ...formData, remarks: e.target.value })}
-              className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] text-xs text-[#17343a] focus:outline-hidden focus:ring-1 focus:ring-[#176f78]"
+              placeholder="Record operational observations, bottleneck mitigations, style ramp-up notes, or shift handover instructions for the incoming IE team..."
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#d9d2c2] text-xs text-[#17343a] focus:outline-hidden focus:ring-1 focus:ring-[#176f78] placeholder:text-[#8ea4a8]"
             />
           </div>
 
@@ -4528,17 +4546,6 @@ export const LineData: React.FC<LineDataProps> = ({
           </div>
         </div>
       </form>
-
-      {/* Weekly Efficiency Trend — Line {formData.lineNo} */}
-      <div className="rounded-3xl border border-[#d9d2c2] bg-[#fbfaf6] p-4 sm:p-5 shadow-xs">
-        <LineEfficiencySparkline
-          line={formData}
-          allLines={lines}
-          currentEfficiency={metrics.efficiencyPct}
-          targetEfficiency={formData.targetEff || 85}
-          onNavigateHistory={onNavigate ? (lineNo) => onNavigate('line-history', lineNo) : undefined}
-        />
-      </div>
 
       {/* Full 40-Day Style Progression Chart Modal - Lazy Loaded */}
       {showProgressionModal && (

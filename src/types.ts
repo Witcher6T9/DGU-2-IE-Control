@@ -54,6 +54,103 @@ export interface DashboardLayout {
   showUpcoming: boolean;
 }
 
+export type NavBarStyle = 'bottom-cupertino' | 'floating-dock' | 'top-header' | 'kiosk-minimal';
+export type FloorGridColumns = 1 | 2 | 3 | 4;
+export type LayoutDensity = 'compact' | 'comfortable' | 'spacious';
+export type LayoutPresetId =
+  | 'debonair-floor-default'
+  | 'executive-attainment'
+  | 'operator-tablet-kiosk'
+  | 'ie-engineering-focus'
+  | 'auditor-minimalist'
+  | 'custom';
+
+export interface AppPageTabConfig {
+  id: string;
+  label: string;
+  visible: boolean;
+  order: number;
+  badge?: string;
+  iconName?: string;
+  allowedTiers?: string[];
+}
+
+export interface DashboardWidgetConfig {
+  id: string;
+  label: string;
+  visible: boolean;
+  order: number;
+  columnSpan?: 'full' | 'half' | 'third';
+}
+
+export interface AppPageLayoutConfig {
+  version: string;
+  lastUpdated: string;
+  updatedBy: string;
+  presetId?: LayoutPresetId;
+  presetName?: string;
+  targetTier?: string; // 'all' or 'tier_0', 'tier_1', etc.
+  
+  // Navigation & Page Flow
+  defaultLandingTab: string; // 'overview' | 'line-data' | etc.
+  navBarStyle: NavBarStyle;
+  tabs: AppPageTabConfig[];
+  
+  // Dashboard Widget Matrix
+  dashboard: DashboardLayout;
+  dashboardWidgets?: DashboardWidgetConfig[];
+  floorGridColumns: FloorGridColumns;
+  floorCardStyle: 'card' | 'row' | 'compact-chip';
+  
+  // Visual & Ergonomics
+  brandColor: string; // hex color e.g. '#176f78'
+  fontScalePct: number; // 90, 100, 115
+  density: LayoutDensity;
+  showAnnouncementTicker: boolean;
+  tickerText?: string;
+  highContrastMode: boolean;
+  kioskLockEnabled: boolean;
+  kioskAllowedLine?: string;
+}
+
+export type UpdateCategory =
+  | 'layout_push'
+  | 'ota_hotfix'
+  | 'operational_directive'
+  | 'schema_migration'
+  | 'maintenance_advisory';
+
+export type UpdateSeverity = 'normal' | 'important' | 'mandatory';
+
+export type UpdateTargetScope =
+  | 'all_terminals'
+  | 'building_a'
+  | 'building_b'
+  | 'tier_1_2_managers'
+  | 'tier_3_4_operators';
+
+export interface SystemUpdatePush {
+  id: string;
+  version: string;
+  title: string;
+  category: UpdateCategory;
+  severity: UpdateSeverity;
+  targetScope: UpdateTargetScope;
+  releaseNotes: string[];
+  pushedAt: string;
+  pushedByEmail: string;
+  pushedByName: string;
+  status: 'active' | 'rolled_back' | 'delivered';
+  actionLabel?: string;
+  actionPayload?: {
+    layoutConfig?: Partial<AppPageLayoutConfig>;
+    reloadRequired?: boolean;
+    clearCache?: boolean;
+  };
+  acknowledgedCount?: number;
+  totalTerminalsTargeted?: number;
+}
+
 export interface SecurityAuditEntry {
   id: string;
   timestamp: string;

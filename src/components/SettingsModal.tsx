@@ -1836,14 +1836,51 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* SUB-PAGE 5: DASHBOARD WIDGETS */}
           {activeSubPage === 'layout' && (
             <div className="space-y-4">
-              <div className="px-3">
-                <h4 className="text-[13px] font-bold text-[#6e6e73] dark:text-[#8e8e93] uppercase tracking-wider">
-                  Executive Dashboard Widgets &amp; Sections
-                </h4>
-                <p className="text-[12px] text-[#8e8e93] mt-0.5">
-                  Toggle which modules and KPI strips appear on your primary plant dashboard.
-                </p>
+              <div className="px-3 flex items-center justify-between">
+                <div>
+                  <h4 className="text-[13px] font-bold text-[#6e6e73] dark:text-[#8e8e93] uppercase tracking-wider">
+                    Executive Dashboard Widgets &amp; Sections
+                  </h4>
+                  <p className="text-[12px] text-[#8e8e93] mt-0.5">
+                    Toggle which modules and KPI strips appear on your primary plant dashboard.
+                  </p>
+                </div>
               </div>
+
+              {/* Tier_0 Root Upgrade Card */}
+              {isSysAdmin && (
+                <div className="p-4 rounded-2xl bg-linear-to-r from-purple-900/10 via-purple-500/10 to-indigo-900/10 border border-purple-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Layout className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[14px] font-bold text-slate-900 dark:text-white">
+                          App Page Layout Customizer (Tier_0 Root)
+                        </span>
+                        <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-purple-600 text-white">
+                          Root Suite
+                        </span>
+                      </div>
+                      <p className="text-[12px] text-slate-600 dark:text-slate-300 mt-0.5">
+                        Customize primary page order, tactile bottom docks, typography scaling, live announcement marquees, and push layouts to floor terminals.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTier0Module('layout-customizer');
+                      setActiveSubPage('tier_0');
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+                  >
+                    Open Page Customizer
+                  </button>
+                </div>
+              )}
 
               <div className="bg-white dark:bg-[#1c1c1e] rounded-2xl sm:rounded-3xl border border-[#e5e5ea] dark:border-[#2c2c2e] shadow-2xs overflow-hidden divide-y divide-[#e5e5ea] dark:divide-[#2c2c2e]">
                 {layoutToggles.map(item => {
@@ -2114,6 +2151,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Tier_0 System Updates Pusher Launcher Card */}
+              {isSysAdmin && (
+                <div className="p-4 rounded-2xl bg-linear-to-r from-blue-900/10 via-indigo-500/10 to-blue-900/10 border border-blue-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <DownloadCloud className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[14px] font-bold text-slate-900 dark:text-white">
+                          System Updates Pusher (Tier_0 Root Engine)
+                        </span>
+                        <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-blue-600 text-white">
+                          Fleet Dispatcher
+                        </span>
+                      </div>
+                      <p className="text-[12px] text-slate-600 dark:text-slate-300 mt-0.5">
+                        Compose and broadcast live firmware updates, custom layout pushes, cache purges, and operational directives across all 34 line terminals.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTier0Module('updates-pusher');
+                      setActiveSubPage('tier_0');
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+                  >
+                    Launch Updates Pusher
+                  </button>
+                </div>
+              )}
 
               {/* Install & Distribution Channels */}
               <div>

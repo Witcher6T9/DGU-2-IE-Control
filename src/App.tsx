@@ -30,7 +30,8 @@ import {
   SecurityAuditEntry,
   FactoryIndustryProfile,
   UserDailyBackupSettings,
-  DailyBackupRecord
+  DailyBackupRecord,
+  AppPageLayoutConfig
 } from './types';
 import {
   DEFAULT_DAILY_BACKUP_SETTINGS,
@@ -39,6 +40,8 @@ import {
   pruneOldBackups,
   AppBackupState
 } from './utils/indexedDbBackup';
+import { getStoredAppPageLayout, applyLayoutStyling } from './utils/layoutManager';
+import { SystemUpdateReceiver } from './components/SystemUpdateReceiver';
 import {
   getStoredActiveFactory,
   setStoredActiveFactory,
@@ -334,6 +337,22 @@ export default function App() {
       return DEFAULT_DASHBOARD_LAYOUT;
     }
   });
+
+  const [appPageLayout, setAppPageLayout] = useState<AppPageLayoutConfig>(() => getStoredAppPageLayout());
+
+  useEffect(() => {
+    applyLayoutStyling(appPageLayout);
+    const handler = (e: any) => {
+      if (e.detail) {
+        setAppPageLayout(e.detail);
+        if (e.detail.dashboard) {
+          setLayout(e.detail.dashboard);
+        }
+      }
+    };
+    window.addEventListener('debonair:layout_changed', handler);
+    return () => window.removeEventListener('debonair:layout_changed', handler);
+  }, []);
 
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
 
@@ -1827,6 +1846,30 @@ export default function App() {
         transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
         className="flex-1 flex flex-col w-full"
       >
+        {/* System Update Receiver (Live OTA Banner / Mandatory Modal) */}
+        <SystemUpdateReceiver
+          onLayoutApplied={(newLayout) => {
+            setAppPageLayout(newLayout);
+            if (newLayout.dashboard) setLayout(newLayout.dashboard);
+          }}
+        />
+
+        {/* Live Announcement Marquee Ticker if configured in App Page Layout */}
+        {appPageLayout.showAnnouncementTicker && (
+          <div
+            className="w-full px-4 py-1.5 text-xs font-bold text-white flex items-center justify-between shrink-0 shadow-xs"
+            style={{ backgroundColor: appPageLayout.brandColor || '#176f78' }}
+          >
+            <div className="flex items-center gap-2 overflow-hidden truncate">
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
+              <span className="truncate">{appPageLayout.tickerText || 'Debonair Unit-02 • 34 Active Sewing Lines • Standard Shift Running'}</span>
+            </div>
+            <span className="text-[10px] font-mono opacity-80 uppercase shrink-0 pl-2">
+              DISPATCH
+            </span>
+          </div>
+        )}
+
         {/* Top Application Header */}
         <Header
         theme={theme}
@@ -2022,6 +2065,7 @@ export default function App() {
         onOpenAndroidPackage={() => setIsAndroidPackageModalOpen(true)}
         onOpenAuth={() => setIsAuthPageOpen(true)}
         profile={profile}
+        navBarStyle={appPageLayout.navBarStyle}
       />
 
       {/* Modals - Lazy-loaded on-demand for lightning fast boot */}
