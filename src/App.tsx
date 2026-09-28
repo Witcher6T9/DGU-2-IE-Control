@@ -324,7 +324,15 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile>(() => {
     try {
       const saved = localStorage.getItem('ie_user_profile');
-      return saved ? JSON.parse(saved) : DEFAULT_USER_PROFILE;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.email && parsed.email.toLowerCase().includes('realmec85pro231')) {
+          localStorage.removeItem('ie_user_profile');
+          return DEFAULT_USER_PROFILE;
+        }
+        return parsed;
+      }
+      return DEFAULT_USER_PROFILE;
     } catch {
       return DEFAULT_USER_PROFILE;
     }

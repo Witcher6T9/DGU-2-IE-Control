@@ -10,6 +10,7 @@ import {
   Send
 } from 'lucide-react';
 import { ShiftInfo, StationData, HourlyOutput, DowntimeIncident, ActionItem } from '../types/dcs';
+import { ActionStatusBadge } from './ActionTrackerTab';
 
 interface ShiftHandoverModalProps {
   isOpen: boolean;
@@ -197,11 +198,14 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
             Pending Action Items for Next Shift ({openActions.length})
           </h3>
           <div className="space-y-2">
-            {openActions.slice(0, 3).map((a) => (
+            {openActions.slice(0, 5).map((a) => (
               <div key={a.id} className="p-2.5 rounded-lg bg-slate-950/40 border border-slate-800 text-xs">
-                <div className="flex items-center justify-between font-mono">
-                  <span className="font-semibold text-white">{a.title} ({a.stationCode})</span>
-                  <span className="text-amber-400">{a.priority} Priority · Due {a.dueDate}</span>
+                <div className="flex items-center justify-between font-mono gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-white">{a.title} ({a.stationCode})</span>
+                    <ActionStatusBadge status={a.status} />
+                  </div>
+                  <span className="text-amber-400 font-bold">{a.priority} Priority · Due {a.dueDate}</span>
                 </div>
                 <div className="text-slate-400 mt-1 line-clamp-1">{a.countermeasure}</div>
               </div>

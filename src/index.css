@@ -1,5 +1,30 @@
 @import "tailwindcss";
 
+/* Theme Tokens: Daylight Cockpit vs Night Shift Dark Studio */
+:root {
+  --background: 44 26% 96%; /* #fbfaf6 Warm Cream Daylight */
+  --foreground: 189 43% 16%; /* #17343a Dark Teal */
+  --card: 0 0% 100%;
+  --card-foreground: 189 43% 16%;
+  --border: 41 23% 81%; /* #d9d2c2 */
+  --primary: 185 68% 28%; /* #176f78 */
+  --primary-foreground: 0 0% 100%;
+  --muted: 42 20% 92%;
+  --muted-foreground: 188 20% 39%; /* #527078 */
+}
+
+.dark, [data-theme="dark"] {
+  --background: 216 28% 9%; /* #10141a Dark Studio */
+  --foreground: 210 20% 96%; /* #f1f5f9 */
+  --card: 217 24% 13%; /* #19202a */
+  --card-foreground: 210 20% 96%;
+  --border: 217 20% 23%; /* #2e3846 */
+  --primary: 185 68% 35%; /* #1ea2af */
+  --primary-foreground: 0 0% 100%;
+  --muted: 217 24% 18%;
+  --muted-foreground: 215 16% 65%;
+}
+
 /* Safe area inset utilities for iOS Safari & Android PWAs */
 .pb-safe {
   padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
@@ -21,6 +46,12 @@
 /* Fluid touch responsiveness */
 * {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth theme transition */
+.theme-transitioning,
+.theme-transitioning * {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease !important;
 }
 
 @keyframes subtle-breathe {

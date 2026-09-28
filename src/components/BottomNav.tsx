@@ -147,8 +147,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       aria-label="Bottom Navigation"
       className={
         isFloating
-          ? "fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl bg-[#fbfaf6]/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl border border-[#d9d2c2] dark:border-[#2c2c2e] rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.18)] px-2 pb-[env(safe-area-inset-bottom)]"
-          : "fixed bottom-0 inset-x-0 z-40 bg-[#fbfaf6]/95 backdrop-blur-md border-t border-[#d9d2c2] shadow-[0_-4px_20px_rgba(12,28,45,0.10)] pb-[env(safe-area-inset-bottom)] cockpit-nav"
+          ? "fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl bg-[#fbfaf6]/95 dark:bg-[#181d24]/95 backdrop-blur-xl border border-[#d9d2c2] dark:border-[#2e3846] rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.18)] px-2 pb-[env(safe-area-inset-bottom)]"
+          : "fixed bottom-0 inset-x-0 z-40 bg-[#fbfaf6]/95 dark:bg-[#181d24]/95 backdrop-blur-md border-t border-[#d9d2c2] dark:border-[#2e3846] shadow-[0_-4px_20px_rgba(12,28,45,0.10)] pb-[env(safe-area-inset-bottom)] cockpit-nav"
       }
     >
       <div className={isFloating ? "w-full mx-auto" : "max-w-[1500px] mx-auto px-2 sm:px-6"}>
@@ -169,7 +169,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   className={`relative px-3 py-1 rounded-full transition-all duration-200 flex items-center justify-center ${
                     active
                       ? 'bg-[#176f78] text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-[#176f78]'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-[#176f78] dark:hover:text-teal-300'
                   }`}
                 >
                   <Icon
@@ -192,8 +192,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 <span
                   className={`text-[10px] tracking-tight mt-1 leading-none text-center truncate w-full px-0.5 ${
                     active
-                      ? 'font-bold text-[#176f78]'
-                      : 'font-medium text-slate-600'
+                      ? 'font-bold text-[#176f78] dark:text-teal-400'
+                      : 'font-medium text-slate-600 dark:text-slate-400'
                   }`}
                 >
                   {(tab as any).mobileLabel || tab.label}
@@ -206,11 +206,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         {/* Tablet & Desktop View: Cockpit Bottom Navigation Dock */}
         <div className="hidden md:flex items-center justify-between h-14">
           {/* Left status indicator */}
-          <div className="flex items-center gap-2 text-xs text-[#527078]">
+          <div className="flex items-center gap-2 text-xs text-[#527078] dark:text-slate-400">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-bold text-[#17343a]">Debonair Unit-02:</span>
+            <span className="font-bold text-[#17343a] dark:text-slate-200">Debonair Unit-02:</span>
             <span>34 Lines Active</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 font-bold border border-amber-200">
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 font-bold border border-amber-200 dark:border-amber-800">
               WCM Mode
             </span>
           </div>
@@ -218,7 +218,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           {/* Center Primary Navigation Tabs */}
           <div
             id="bottom-nav-desktop-tabs"
-            className="flex items-center gap-1.5 bg-[#f1eee6] p-1 rounded-2xl border border-[#d9d2c2]"
+            className="flex items-center gap-1.5 bg-[#f1eee6] dark:bg-[#1f2630] p-1 rounded-2xl border border-[#d9d2c2] dark:border-[#2e3846]"
           >
             {primaryTabs.map(tab => {
               const Icon = tab.icon;
@@ -233,7 +233,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all relative cursor-pointer touch-manipulation active:scale-95 ${
                     active
                       ? 'bg-[#176f78] text-white shadow-xs'
-                      : 'text-slate-600 hover:text-[#176f78] hover:bg-[#e7e1d5]'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-[#176f78] dark:hover:text-teal-300 hover:bg-[#e7e1d5] dark:hover:bg-[#28323f]'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -243,7 +243,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                       className={`text-[9.5px] px-1.5 py-0.2 rounded-full font-mono font-semibold ${
                         active
                           ? 'bg-white/20 text-white'
-                          : 'bg-[#dceceb] text-[#176f78]'
+                          : 'bg-[#dceceb] dark:bg-teal-900/40 text-[#176f78] dark:text-teal-300'
                       }`}
                     >
                       {tab.badge}
@@ -261,7 +261,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 onTabChange('settings');
               }}
               title="Open Settings"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-[#d9d2c2] text-[11px] font-bold text-[#176f78] hover:bg-gray-50 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white dark:bg-[#1f2630] border border-[#d9d2c2] dark:border-[#2e3846] text-[11px] font-bold text-[#176f78] dark:text-teal-300 hover:bg-gray-50 dark:hover:bg-[#28323f] transition-colors cursor-pointer"
             >
               <Settings className="w-3 h-3" />
               <span>Settings</span>

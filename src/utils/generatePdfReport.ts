@@ -530,3 +530,279 @@ export function getDailyPerformancePDFBlobUrl(params: GeneratePDFParams): string
   const blob = doc.output('blob');
   return URL.createObjectURL(blob);
 }
+
+/**
+ * Builds a dedicated 'Shift End Summary' PDF for factory management
+ * Compiles final WIP status, total achieved output, overall line efficiency averages,
+ * and highlighted Bottle Neck Stage (Names).
+ */
+export function generateShiftEndSummaryPDF({
+  lines,
+  reportDate,
+  profile,
+  options = {}
+}: GeneratePDFParams): jsPDF {
+  const {
+    includeSignatures = true,
+    orientation = 'landscape'
+  } = options;
+
+  const dayLines = lines.filter(l => l.date === reportDate);
+  const activeLines = dayLines.length > 0 ? dayLines : lines;
+  const factory = calculateFactoryOverall(activeLines);
+  const formattedDate = formatDateLabel(reportDate);
+
+  const doc = new jsPDF({
+    orientation: orientation,
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 12;
+
+  const primaryTeal: [number, number, number] = [23, 111, 120];
+  const darkTeal: [number, number, number] = [23, 52, 58];
+  const alertRose: [number, number, number] = [225, 29, 72];
+  const textDark: [number, number, number] = [30, 41, 59];
+  const textMuted: [number, number, number] = [82, 112, 120];
+
+  const drawHeader = () => {
+    doc.setFillColor(darkTeal[0], darkTeal[1], darkTeal[2]);
+    doc.rect(0, 0, pageWidth, 24, 'F');
+    doc.setFillColor(primaryTeal[0], primaryTeal[1], primaryTeal[2]);
+    doc.rect(0, 24, pageWidth, 2, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('DEBONAIR GROUP • UNIT-02 INDUSTRIAL ENGINEERING', margin, 10);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.text('SHIFT END SUMMARY & EXECUTIVE FLOOR DISPATCH REPORT', margin, 16);
+    doc.text('FINAL WIP STATUS • ACHIEVED OUTPUT • OVERALL LINE EFFICIENCIES • BOTTLENECK AUDIT', margin, 21);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.text(`SHIFT DATE: ${reportDate}`, pageWidth - margin, 10, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(`Generated: ${new Date().toLocaleTimeString()} • ${activeLines.length} Lines Active`, pageWidth - margin, 16, { align: 'right' });
+  };
+
+  drawHeader();
+
+  // 1. Executive 4-Box Key Attainment Strip
+  let currentY = 32;
+  const boxWidth = (pageWidth - margin * 2 - 12) / 4;
+  const boxHeight = 16;
+
+  const totalWip = activeLines.reduce((acc, l) => acc + (l.wip || 0), 0);
+  const totalTarget = activeLines.reduce((acc, l) => acc + (l.targetProd || 0), 0);
+  const totalAchieved = activeLines.reduce((acc, l) => acc + (l.achievedProd || 0), 0);
+  const avgEfficiency = activeLines.length > 0
+    ? Math.round((activeLines.reduce((acc, l) => acc + (l.efficiency || 0), 0) / activeLines.length) * 10) / 10
+    : 0;
+
+  const bottleneckCount = activeLines.filter(l => l.bottleneck && l.bottleneck.station && l.bottleneck.station !== 'None').length;
+
+  const summaryBoxes = [
+    { label: 'TOTAL ACHIEVED OUTPUT', value: `${totalAchieved.toLocaleString()} pcs`, sub: `Target: ${totalTarget.toLocaleString()} pcs (${Math.round((totalAchieved / (totalTarget || 1)) * 100)}%)`, color: primaryTeal },
+    { label: 'OVERALL LINE EFFICIENCY', value: `${avgEfficiency}%`, sub: `Factory Benchmark: 80.0%`, color: primaryTeal },
+    { label: 'FINAL WIP ON FLOOR', value: `${totalWip.toLocaleString()} pcs`, sub: `Average ${(totalWip / (activeLines.length || 1)).toFixed(0)} pcs/line`, color: [16, 185, 129] as [number, number, number] },
+    { label: 'BOTTLENECK STAGES ACTIVE', value: `${bottleneckCount} Lines`, sub: `Cycle Time Variance Alerts`, color: alertRose }
+  ];
+
+  summaryBoxes.forEach((box, i) => {
+    const x = margin + i * (boxWidth + 4);
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(217, 210, 194);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(x, currentY, boxWidth, boxHeight, 2, 2, 'FD');
+
+    doc.setFillColor(box.color[0], box.color[1], box.color[2]);
+    doc.rect(x, currentY, 2, boxHeight, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+    doc.text(box.label, x + 4, currentY + 4.5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(box.color[0], box.color[1], box.color[2]);
+    doc.text(box.value, x + 4, currentY + 10);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+    doc.text(box.sub, x + 4, currentY + 14);
+  });
+
+  currentY += boxHeight + 6;
+
+  // 2. Comprehensive Shift-End Table with Bottle Neck Stage (Names)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(darkTeal[0], darkTeal[1], darkTeal[2]);
+  doc.text('SHIFT-END LINE-BY-LINE AUDIT: WIP, OUTPUT, EFFICIENCY & BOTTLENECK STAGES', margin, currentY);
+
+  currentY += 3;
+
+  const rows = activeLines.map(line => {
+    const metrics = calculateLineMetrics(line);
+    const variance = (line.achievedProd || 0) - (line.targetProd || 0);
+    const varianceFormatted = variance >= 0 ? `+${variance}` : `${variance}`;
+    const bottleneckStationName = line.bottleneck?.station && line.bottleneck.station !== 'None'
+      ? line.bottleneck.station
+      : 'Normal Flow';
+    const bottleneckTiming = line.bottleneck?.cycleTime
+      ? `${line.bottleneck.cycleTime}s (Target: ${line.bottleneck.targetCT || 0}s)`
+      : '-';
+
+    return [
+      line.lineNo || '',
+      line.floor || 'Floor 01',
+      line.buyer || '',
+      line.style || '',
+      `${line.targetProd || 0}`,
+      `${line.achievedProd || 0}`,
+      varianceFormatted,
+      `${line.efficiency || 0}%`,
+      `${line.wip || 0} pcs`,
+      bottleneckStationName,
+      bottleneckTiming,
+      line.bottleneck?.action || 'Maintain pace'
+    ];
+  });
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [[
+      'Line',
+      'Floor',
+      'Buyer',
+      'Style',
+      'Target',
+      'Achieved',
+      'Variance',
+      'Efficiency',
+      'Final WIP',
+      'Bottle Neck Stage (Name)',
+      'Cycle vs Target CT',
+      'Immediate Action'
+    ]],
+    body: rows,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    headStyles: {
+      fillColor: primaryTeal,
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 6.8,
+      halign: 'center'
+    },
+    bodyStyles: {
+      fontSize: 6.2,
+      textColor: textDark
+    },
+    columnStyles: {
+      0: { fontStyle: 'bold', halign: 'center', cellWidth: 10 },
+      1: { cellWidth: 18 },
+      2: { cellWidth: 16 },
+      3: { cellWidth: 26 },
+      4: { halign: 'right', cellWidth: 14 },
+      5: { halign: 'right', fontStyle: 'bold', cellWidth: 16 },
+      6: { halign: 'right', cellWidth: 14 },
+      7: { halign: 'center', fontStyle: 'bold', cellWidth: 16 },
+      8: { halign: 'right', fontStyle: 'bold', cellWidth: 16 },
+      9: { fontStyle: 'bold', cellWidth: 32 },
+      10: { halign: 'center', cellWidth: 24 },
+      11: { cellWidth: 'auto' }
+    },
+    didParseCell: (data) => {
+      if (data.section === 'body') {
+        // Highlight bottleneck column
+        if (data.column.index === 9 && data.cell.raw !== 'Normal Flow') {
+          data.cell.styles.textColor = [190, 18, 60];
+        }
+      }
+    },
+    styles: {
+      cellPadding: 1.4,
+      lineColor: [217, 210, 194],
+      lineWidth: 0.15
+    }
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 8;
+
+  // 3. Sign-off block
+  if (includeSignatures) {
+    if (currentY > pageHeight - 32) {
+      doc.addPage();
+      drawHeader();
+      currentY = 32;
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(darkTeal[0], darkTeal[1], darkTeal[2]);
+    doc.text('FACTORY MANAGEMENT VERIFICATION & APPROVAL SIGN-OFF', margin, currentY);
+
+    currentY += 4;
+    const signatureBlockWidth = (pageWidth - margin * 2 - 20) / 3;
+    const signY = currentY + 12;
+
+    const signatures = [
+      { role: 'Shift Supervisor / Line IE Lead', sub: profile?.name || 'Production Incharge' },
+      { role: 'Industrial Engineering Manager', sub: 'Debonair Unit-02 IE Dept.' },
+      { role: 'Factory General Manager / Plant Head', sub: 'Approved for Record' }
+    ];
+
+    signatures.forEach((sig, index) => {
+      const startX = margin + index * (signatureBlockWidth + 10);
+      doc.setDrawColor(180, 180, 180);
+      doc.setLineWidth(0.4);
+      doc.line(startX, signY, startX + signatureBlockWidth, signY);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+      doc.text(sig.role, startX, signY + 4);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+      doc.text(`${sig.sub} • Date: ___/___/2026`, startX, signY + 8);
+    });
+  }
+
+  // Footer page numbers
+  const totalPages = (doc.internal as any).getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(130, 140, 150);
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, pageHeight - 7, pageWidth - margin, pageHeight - 7);
+
+    doc.text(
+      `Debonair Unit-02 Garments Ltd. • Shift End Summary Report • Compiled Date: ${reportDate}`,
+      margin,
+      pageHeight - 3.5
+    );
+    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 3.5, { align: 'right' });
+  }
+
+  return doc;
+}
+
+export function downloadShiftEndSummaryPDF(params: GeneratePDFParams): void {
+  const doc = generateShiftEndSummaryPDF(params);
+  const fileName = `Shift_End_Summary_Report_${params.reportDate}.pdf`;
+  doc.save(fileName);
+}

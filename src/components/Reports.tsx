@@ -26,10 +26,18 @@ import {
   Zap,
   BarChart3,
   Search,
-  Settings
+  Settings,
+  SlidersHorizontal,
+  Flame
 } from 'lucide-react';
 import { LineEntry, UserProfile, ChecklistMap } from '../types';
 import { CustomDateSelector } from './CustomDateSelector';
+import { ShiftEndSummaryView } from './ShiftEndSummaryView';
+import {
+  ReportTemplateConfig,
+  PREBUILT_REPORT_TEMPLATES,
+  ReportTemplateImporterModal
+} from './ReportTemplateImporterModal';
 
 // Code-split PDF & spreadsheet exporter so jspdf is only fetched when user exports
 const ImportPrintExportModal = React.lazy(() =>
@@ -84,8 +92,10 @@ export const Reports: React.FC<ReportsProps> = ({
   const [reportDate, setReportDate] = useState(activeDate || todayDate);
   const [floorFilter, setFloorFilter] = useState(activeFloor || 'all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [reportView, setReportView] = useState<'all' | 'day_wise' | 'summaries' | 'matrix'>('all');
+  const [reportView, setReportView] = useState<'all' | 'shift_end' | 'day_wise' | 'summaries' | 'matrix'>('all');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [activeTemplate, setActiveTemplate] = useState<ReportTemplateConfig>(PREBUILT_REPORT_TEMPLATES[0]);
 
   // Keep reportDate synchronized when activeDate is updated globally
   React.useEffect(() => {
@@ -224,24 +234,34 @@ export const Reports: React.FC<ReportsProps> = ({
   return (
     <div className="space-y-6">
       {/* Header Bar */}
-      <div id="reports-header-card" className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] p-5 sm:p-6 shadow-2xs">
+      <div id="reports-header-card" className="rounded-2xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] p-5 sm:p-6 shadow-2xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase bg-[#dceceb] text-[#176f78] tracking-wider">
+              <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase bg-[#dceceb] dark:bg-teal-950/40 text-[#176f78] dark:text-teal-300 tracking-wider">
                 Consolidated IE Audit Suite
               </span>
-              <span className="text-xs text-[#527078] font-medium">Shift Summarized Analytics &amp; Control Logs</span>
+              <span className="text-xs text-[#527078] dark:text-slate-400 font-medium">Shift Summarized Analytics &amp; Control Logs</span>
             </div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold uppercase text-[#17343a] tracking-tight">
+            <h1 className="font-display text-2xl sm:text-3xl font-bold uppercase text-[#17343a] dark:text-slate-100 tracking-tight">
               Factory IE Summarized Reports
             </h1>
-            <p className="text-xs sm:text-sm text-[#527078] mt-1 max-w-3xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-[#527078] dark:text-slate-400 mt-1 max-w-3xl leading-relaxed">
               Consolidated executive performance summaries, style-level production rollups, calculated WIP buffer compliance, and floor line telemetry.
             </p>
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              id="btn-template-importer"
+              type="button"
+              onClick={() => setIsTemplateModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-[#1f2630] border border-[#176f78]/30 dark:border-[#2e3846] hover:border-[#176f78] text-[#176f78] dark:text-teal-300 hover:bg-[#f1eee6] dark:hover:bg-[#28323f] transition-colors text-xs font-bold cursor-pointer shadow-2xs group"
+              title="Open Template Importer for Reports"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-[#176f78] dark:text-teal-300" />
+              <span>Template Importer</span>
+            </button>
             <button
               id="btn-import-print-export-report"
               type="button"
@@ -255,29 +275,29 @@ export const Reports: React.FC<ReportsProps> = ({
             <button
               id="btn-export-csv"
               onClick={handleExportCSV}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#f1eee6] border border-[#d9d2c2] text-[#17343a] hover:bg-[#e7e1d5] transition-colors text-xs font-bold cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#f1eee6] dark:bg-[#1f2630] border border-[#d9d2c2] dark:border-[#2e3846] text-[#17343a] dark:text-slate-200 hover:bg-[#e7e1d5] dark:hover:bg-[#28323f] transition-colors text-xs font-bold cursor-pointer"
               title="Export CSV data for selected date"
             >
-              <Download className="w-4 h-4 text-[#176f78]" />
+              <Download className="w-4 h-4 text-[#176f78] dark:text-teal-300" />
               <span>Export CSV</span>
             </button>
             <button
               id="btn-print-report"
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#f1eee6] border border-[#d9d2c2] text-[#17343a] hover:bg-[#e7e1d5] transition-colors text-xs font-bold cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#f1eee6] dark:bg-[#1f2630] border border-[#d9d2c2] dark:border-[#2e3846] text-[#17343a] dark:text-slate-200 hover:bg-[#e7e1d5] dark:hover:bg-[#28323f] transition-colors text-xs font-bold cursor-pointer"
               title="Print browser view"
             >
-              <Printer className="w-4 h-4 text-[#176f78]" />
+              <Printer className="w-4 h-4 text-[#176f78] dark:text-teal-300" />
               <span>Print Sheet</span>
             </button>
             {onNavigate && (
               <button
                 type="button"
                 onClick={() => onNavigate('control-center')}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#d9d2c2] text-[#176f78] hover:bg-[#f1eee6] transition-colors text-xs font-bold cursor-pointer shadow-2xs"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-[#1f2630] border border-[#d9d2c2] dark:border-[#2e3846] text-[#176f78] dark:text-teal-300 hover:bg-[#f1eee6] dark:hover:bg-[#28323f] transition-colors text-xs font-bold cursor-pointer shadow-2xs"
                 title="Go to Settings Control Center"
               >
-                <Settings className="w-4 h-4 text-[#176f78]" />
+                <Settings className="w-4 h-4 text-[#176f78] dark:text-teal-300" />
                 <span className="hidden sm:inline">Settings Hub</span>
               </button>
             )}
@@ -285,17 +305,35 @@ export const Reports: React.FC<ReportsProps> = ({
         </div>
 
         {/* View Switcher & Filter Controls */}
-        <div className="mt-5 pt-4 border-t border-[#e7e1d5] flex flex-wrap items-center justify-between gap-4 text-xs">
+        <div className="mt-5 pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846] flex flex-wrap items-center justify-between gap-4 text-xs">
           {/* View Mode Tabs */}
-          <div className="flex items-center p-1 bg-[#f1eee6] rounded-xl border border-[#d9d2c2]">
+          <div className="flex items-center p-1 bg-[#f1eee6] dark:bg-[#1f2630] rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] flex-wrap gap-1">
+            <button
+              id="btn-view-shift-end"
+              type="button"
+              onClick={() => setReportView('shift_end')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
+                reportView === 'shift_end'
+                  ? 'bg-[#176f78] text-white shadow-2xs'
+                  : 'text-[#176f78] dark:text-teal-300 hover:bg-white/80 dark:hover:bg-[#28323f]'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Shift End Summary</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
+                reportView === 'shift_end' ? 'bg-white/20 text-white' : 'bg-rose-500 text-white'
+              }`}>
+                WIP &amp; Bottlenecks
+              </span>
+            </button>
             <button
               id="btn-view-all"
               type="button"
               onClick={() => setReportView('all')}
               className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
                 reportView === 'all'
-                  ? 'bg-white text-[#17343a] shadow-2xs'
-                  : 'text-[#527078] hover:text-[#17343a]'
+                  ? 'bg-white dark:bg-[#28323f] text-[#17343a] dark:text-slate-100 shadow-2xs'
+                  : 'text-[#527078] dark:text-slate-400 hover:text-[#17343a] dark:hover:text-slate-200'
               }`}
             >
               Full Consolidated Report
@@ -306,8 +344,8 @@ export const Reports: React.FC<ReportsProps> = ({
               onClick={() => setReportView('summaries')}
               className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
                 reportView === 'summaries'
-                  ? 'bg-white text-[#17343a] shadow-2xs'
-                  : 'text-[#527078] hover:text-[#17343a]'
+                  ? 'bg-white dark:bg-[#28323f] text-[#17343a] dark:text-slate-100 shadow-2xs'
+                  : 'text-[#527078] dark:text-slate-400 hover:text-[#17343a] dark:hover:text-slate-200'
               }`}
             >
               Executive &amp; Style Summaries
@@ -318,8 +356,8 @@ export const Reports: React.FC<ReportsProps> = ({
               onClick={() => setReportView('matrix')}
               className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
                 reportView === 'matrix'
-                  ? 'bg-white text-[#17343a] shadow-2xs'
-                  : 'text-[#527078] hover:text-[#17343a]'
+                  ? 'bg-white dark:bg-[#28323f] text-[#17343a] dark:text-slate-100 shadow-2xs'
+                  : 'text-[#527078] dark:text-slate-400 hover:text-[#17343a] dark:hover:text-slate-200'
               }`}
             >
               Detailed Line Matrix
@@ -330,8 +368,8 @@ export const Reports: React.FC<ReportsProps> = ({
               onClick={() => setReportView('day_wise')}
               className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
                 reportView === 'day_wise'
-                  ? 'bg-white text-[#17343a] shadow-2xs'
-                  : 'text-[#527078] hover:text-[#17343a]'
+                  ? 'bg-white dark:bg-[#28323f] text-[#17343a] dark:text-slate-100 shadow-2xs'
+                  : 'text-[#527078] dark:text-slate-400 hover:text-[#17343a] dark:hover:text-slate-200'
               }`}
             >
               Day-wise Production Ledger
@@ -374,6 +412,20 @@ export const Reports: React.FC<ReportsProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ========================================================
+          0. SHIFT END SUMMARY & BOTTLE NECK REPORT GENERATOR
+      ======================================================== */}
+      {reportView === 'shift_end' && (
+        <ShiftEndSummaryView
+          lines={lines}
+          reportDate={reportDate}
+          profile={profile}
+          floorFilter={floorFilter}
+          onSelectFloor={onSelectFloor}
+          onNavigate={onNavigate}
+        />
+      )}
 
       {/* ========================================================
           1. EXECUTIVE SUMMARIZED DATA SECTION
@@ -1308,6 +1360,19 @@ export const Reports: React.FC<ReportsProps> = ({
             onOpenDatabase={onOpenDatabase}
           />
         </React.Suspense>
+      )}
+
+      {/* Report Template Importer Modal */}
+      {isTemplateModalOpen && (
+        <ReportTemplateImporterModal
+          isOpen={isTemplateModalOpen}
+          onClose={() => setIsTemplateModalOpen(false)}
+          activeTemplate={activeTemplate}
+          onApplyTemplate={(newTemplate) => {
+            setActiveTemplate(newTemplate);
+            setReportView('shift_end');
+          }}
+        />
       )}
     </div>
   );

@@ -17,6 +17,52 @@ import {
 } from 'lucide-react';
 import { ActionItem, FiveWhyInvestigation } from '../types/dcs';
 
+/**
+ * Visual color-coded badge for Action Items:
+ * - 'Verified Closed' -> Green
+ * - 'In Progress' -> Amber
+ * - 'Open' -> Blue
+ */
+export const ActionStatusBadge: React.FC<{
+  status: 'Open' | 'In Progress' | 'Verified Closed';
+  className?: string;
+}> = ({ status, className = '' }) => {
+  if (status === 'Verified Closed') {
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono tracking-wide bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 shadow-xs whitespace-nowrap ${className}`}
+        title="Status: Verified Closed (Green)"
+      >
+        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        <span>Verified Closed</span>
+      </span>
+    );
+  }
+
+  if (status === 'In Progress') {
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono tracking-wide bg-amber-500/15 text-amber-400 border border-amber-500/40 shadow-xs whitespace-nowrap ${className}`}
+        title="Status: In Progress (Amber)"
+      >
+        <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
+        <span>In Progress</span>
+      </span>
+    );
+  }
+
+  // Default: 'Open' -> Blue
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono tracking-wide bg-blue-500/15 text-blue-400 border border-blue-500/40 shadow-xs whitespace-nowrap ${className}`}
+      title="Status: Open (Blue)"
+    >
+      <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0 animate-pulse" />
+      <span>Open</span>
+    </span>
+  );
+};
+
 interface ActionTrackerTabProps {
   actions: ActionItem[];
   fiveWhys: FiveWhyInvestigation[];
@@ -151,12 +197,19 @@ export const ActionTrackerTab: React.FC<ActionTrackerTabProps> = ({
           </div>
 
           {/* Quick Status Count Badges */}
-          <div className="flex items-center gap-3 text-xs font-mono">
-            <span className="text-amber-400">{openCount} Open</span>
-            <span className="text-slate-600">·</span>
-            <span className="text-blue-400">{inProgressCount} In Progress</span>
-            <span className="text-slate-600">·</span>
-            <span className="text-emerald-400">{closedCount} Verified</span>
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/40 font-bold shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+              {openCount} Open
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/40 font-bold shadow-xs">
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              {inProgressCount} In Progress
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 font-bold shadow-xs">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              {closedCount} Verified Closed
+            </span>
           </div>
         </div>
       </div>
@@ -191,9 +244,9 @@ export const ActionTrackerTab: React.FC<ActionTrackerTabProps> = ({
                 className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-300 focus:outline-none focus:border-blue-500"
               >
                 <option value="ALL">All Statuses</option>
-                <option value="Open">Open</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Verified Closed">Verified Closed</option>
+                <option value="Open">Open (Blue)</option>
+                <option value="In Progress">In Progress (Amber)</option>
+                <option value="Verified Closed">Verified Closed (Green)</option>
               </select>
 
               <select
@@ -216,19 +269,18 @@ export const ActionTrackerTab: React.FC<ActionTrackerTabProps> = ({
                 <tr>
                   <th className="py-3 px-4 font-semibold">Priority</th>
                   <th className="py-3 px-3 font-semibold">Station</th>
+                  <th className="py-3 px-3 font-semibold">Status Badge</th>
                   <th className="py-3 px-3 font-semibold">Category</th>
                   <th className="py-3 px-4 font-semibold">Action Title & Description</th>
                   <th className="py-3 px-4 font-semibold">Owner & Role</th>
                   <th className="py-3 px-3 font-semibold">Due Date</th>
                   <th className="py-3 px-4 font-semibold">Countermeasure / Resolution</th>
-                  <th className="py-3 px-4 font-semibold text-right">Status Toggle</th>
+                  <th className="py-3 px-4 font-semibold text-right">Update Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {filteredActions.map((act) => {
                   const isHigh = act.priority === 'High';
-                  const isClosed = act.status === 'Verified Closed';
-                  const isInProgress = act.status === 'In Progress';
 
                   return (
                     <tr key={act.id} className="hover:bg-slate-800/30 transition-colors font-sans">
@@ -247,6 +299,9 @@ export const ActionTrackerTab: React.FC<ActionTrackerTabProps> = ({
                         <span className="font-mono text-xs font-bold text-blue-400 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">
                           {act.stationCode}
                         </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <ActionStatusBadge status={act.status} />
                       </td>
                       <td className="py-3 px-3 text-slate-400 text-xs">
                         {act.category}
@@ -269,17 +324,17 @@ export const ActionTrackerTab: React.FC<ActionTrackerTabProps> = ({
                         <select
                           value={act.status}
                           onChange={(e) => onUpdateActionStatus(act.id, e.target.value as any)}
-                          className={`text-xs font-mono font-semibold rounded-lg px-2.5 py-1 border transition-colors focus:outline-none ${
-                            isClosed
-                              ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800'
-                              : isInProgress
-                              ? 'bg-blue-950/80 text-blue-400 border-blue-800'
-                              : 'bg-amber-950/80 text-amber-400 border-amber-800'
+                          className={`text-xs font-mono font-bold rounded-lg px-2.5 py-1.5 border transition-all cursor-pointer focus:outline-none ${
+                            act.status === 'Verified Closed'
+                              ? 'bg-emerald-950/90 text-emerald-400 border-emerald-700 hover:border-emerald-500'
+                              : act.status === 'In Progress'
+                              ? 'bg-amber-950/90 text-amber-400 border-amber-700 hover:border-amber-500'
+                              : 'bg-blue-950/90 text-blue-400 border-blue-700 hover:border-blue-500'
                           }`}
                         >
-                          <option value="Open">Open</option>
-                          <option value="In Progress">In Progress</option>
-                          <option value="Verified Closed">Verified Closed</option>
+                          <option value="Open" className="bg-slate-900 text-blue-400">Open</option>
+                          <option value="In Progress" className="bg-slate-900 text-amber-400">In Progress</option>
+                          <option value="Verified Closed" className="bg-slate-900 text-emerald-400">Verified Closed</option>
                         </select>
                       </td>
                     </tr>

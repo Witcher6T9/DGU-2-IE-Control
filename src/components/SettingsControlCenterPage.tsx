@@ -51,8 +51,17 @@ import {
   Sliders,
   Sparkles,
   Grid,
-  List
+  List,
+  ChevronRight,
+  Search,
+  X,
+  MessageSquare,
+  DownloadCloud,
+  Palette,
+  Shield,
+  Award
 } from 'lucide-react';
+import { TIER_0_MODULES } from './tier0/Tier0CommandHub';
 import {
   UserProfile,
   RoleTier,
@@ -110,6 +119,7 @@ export type SettingsPageSection =
   | 'tier_0';
 
 type SettingsCategory =
+  | 'all'
   | 'architecture'
   | 'factory'
   | 'display'
@@ -118,6 +128,26 @@ type SettingsCategory =
   | 'security'
   | 'android'
   | 'hubs';
+
+const SquircleIcon: React.FC<{
+  bgColor: string;
+  children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg';
+}> = ({ bgColor, children, size = 'md' }) => {
+  const sizeClasses = {
+    sm: 'w-6 h-6 rounded-[7px] text-[12px]',
+    md: 'w-7.5 h-7.5 rounded-[9px] text-[14px]',
+    lg: 'w-9 h-9 rounded-[11px] text-[16px]'
+  };
+
+  return (
+    <div
+      className={`${sizeClasses[size]} ${bgColor} text-white flex items-center justify-center shrink-0 shadow-xs`}
+    >
+      {children}
+    </div>
+  );
+};
 
 interface SettingsControlCenterPageProps {
   profile: UserProfile;
@@ -228,6 +258,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   onOpenAndroidPackage,
   onOpenPrivacySecurity,
   onOpenUserModal,
+  onOpenChat,
   roleTiers = [],
   lines = [],
   onNavigate,
@@ -287,6 +318,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   leanToolsSubTab = 'toolkit'
 }) => {
   const isSysAdmin = isSystemAdmin(profile);
+  const isMasterAdmin = isMasterAdminOrAdmin(profile);
 
   const [internalSection, setInternalSection] = useState<SettingsPageSection>('control-center');
   const activeSection = controlledSection || internalSection;
@@ -336,10 +368,13 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
     handleApplyLayoutConfig(defaultConfig, 'Default Architecture "Debonair RMG Floor Standard" Restored!');
   };
 
-  // Unified internal settings category
+  // Search filter query across all settings & modules
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Unified internal settings category - defaults to 'all' (Control Center & Overview)
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(() => {
     if (activeSection === 'preferences') return 'display';
-    return 'architecture';
+    return 'all';
   });
 
   useEffect(() => {
@@ -440,52 +475,76 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   // Categories in the Settings Sidebar
   const categories = [
     {
+      id: 'all' as SettingsCategory,
+      label: 'Control Center & Overview',
+      description: 'Quick actions, user account, sound & plant summary',
+      icon: Settings,
+      color: 'bg-gradient-to-br from-[#176f78] via-[#007aff] to-[#5856d6]',
+      badge: 'Hub'
+    },
+    {
       id: 'architecture' as SettingsCategory,
       label: 'Architecture & Alive Design',
       description: 'Default architecture, layout presets & ergonomics',
-      icon: Layout
+      icon: Layout,
+      color: 'bg-[#5856d6]',
+      badge: appLayout.presetId === 'debonair-floor-default' ? 'Default' : 'Preset'
     },
     {
       id: 'factory' as SettingsCategory,
       label: 'Plant Identity & Floors',
       description: 'Enterprise name, operating floors, shift lines',
-      icon: Factory
+      icon: Factory,
+      color: 'bg-[#176f78]',
+      badge: `${totalActiveLines} Lines`
     },
     {
       id: 'display' as SettingsCategory,
       label: 'Display & Ergonomics',
       description: 'Daylight Cockpit vs Dark Studio themes',
-      icon: Sun
+      icon: Sun,
+      color: 'bg-[#af52de]',
+      badge: currentTheme === 'dark' ? 'Night Shift' : 'Light'
     },
     {
       id: 'alerts' as SettingsCategory,
       label: 'Sound & Floor Alerts',
       description: 'Bottleneck alerts and WIP cycle chimes',
-      icon: Volume2
+      icon: Volume2,
+      color: 'bg-[#ff2d55]',
+      badge: auditoryAlertsEnabled ? 'Sound On' : 'Muted'
     },
     {
       id: 'backup' as SettingsCategory,
       label: 'Data Vault & Storage',
       description: 'IndexedDB snapshots, backups, restore',
-      icon: Database
+      icon: Database,
+      color: 'bg-[#34c759]',
+      badge: 'IndexedDB'
     },
     {
       id: 'security' as SettingsCategory,
       label: 'Security & Access',
       description: 'Terminal lockout, RBAC clearances',
-      icon: Lock
+      icon: Lock,
+      color: 'bg-[#ff3b30]',
+      badge: profile.tierId ? profile.tierId.replace('_', ' ').toUpperCase() : 'RBAC'
     },
     {
       id: 'android' as SettingsCategory,
       label: 'Mobile & PWA App',
       description: 'Offline service worker and APK package',
-      icon: Smartphone
+      icon: Smartphone,
+      color: 'bg-[#ff9500]',
+      badge: 'PWA Ready'
     },
     {
       id: 'hubs' as SettingsCategory,
       label: 'Operational Hubs',
       description: 'Datas, Checklist, Lean, WCM, Reports',
-      icon: Layers
+      icon: Layers,
+      color: 'bg-[#007aff]',
+      badge: '6 Hubs'
     }
   ];
 
@@ -670,7 +729,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   // CORE SETTINGS WORKSPACE (Clean, Apple/Linear-grade 2-column layout)
   return (
     <div className="space-y-6">
-      {/* 1. Header Zone: Clean typography, unboxed metadata */}
+      {/* 1. Header Zone: Clean typography, unboxed metadata, and Spotlight search */}
       <header className="bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-5 sm:p-6 shadow-2xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -679,11 +738,11 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                 <Settings className="w-4 h-4" />
               </div>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#17343a] dark:text-slate-100 font-display">
-                Settings
+                Settings &amp; Control Center
               </h1>
             </div>
             <p className="text-xs text-[#527078] dark:text-slate-400">
-              Plant identity, floor distribution, audio alerts, and industrial data configuration.
+              Plant identity, floor topology, live audio alarms, and industrial workspace parameters.
             </p>
           </div>
 
@@ -700,78 +759,793 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
             </span>
           </div>
         </div>
+
+        {/* Spotlight Search Bar */}
+        <div className="mt-4 pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846]">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#527078] dark:text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search settings, plant parameters, floor alerts, tools & workspaces..."
+              className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] text-xs text-[#17343a] dark:text-slate-100 placeholder:text-[#527078] dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#176f78]"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
       </header>
 
-      {/* 2. Main Two-Column Settings Workspace */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Navigation Rail (Categories) */}
-        <nav
-          aria-label="Settings Categories"
-          className="lg:col-span-4 xl:col-span-3 bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-2 sm:p-3 shadow-2xs flex lg:flex-col overflow-x-auto lg:overflow-visible gap-1.5 scrollbar-none"
-        >
-          {categories.map(cat => {
-            const Icon = cat.icon;
-            const isActive = activeCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setActiveCategory(cat.id)}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all cursor-pointer whitespace-nowrap lg:whitespace-normal w-full group ${
-                  isActive
-                    ? 'bg-[#176f78] text-white shadow-xs'
-                    : 'text-[#17343a] dark:text-slate-300 hover:bg-[#f1eee6] dark:hover:bg-[#252e3a]'
-                }`}
-              >
-                <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                    isActive
-                      ? 'bg-white/20 text-white'
-                      : 'bg-[#f1eee6] dark:bg-[#252e3a] text-[#176f78] dark:text-teal-400 group-hover:bg-[#e7e1d5] dark:group-hover:bg-[#2c3746]'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                </div>
-                <div className="hidden min-[480px]:block">
-                  <div className="text-xs font-bold leading-snug">
-                    {cat.label}
-                  </div>
-                  <div
-                    className={`text-[10px] hidden lg:block leading-tight ${
-                      isActive ? 'text-white/80' : 'text-[#527078] dark:text-slate-400'
-                    }`}
-                  >
-                    {cat.description}
-                  </div>
-                </div>
-                <span className="min-[480px]:hidden text-xs font-bold">
-                  {cat.label.split(' ')[0]}
-                </span>
-              </button>
-            );
-          })}
-
-          {isSysAdmin && (
-            <div className="pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] mt-1">
-              <button
-                type="button"
-                onClick={() => handleSetSection('tier_0')}
-                className="flex items-center gap-3 px-3.5 py-2 rounded-xl text-left transition-all cursor-pointer text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800/60 w-full"
-              >
-                <ShieldCheck className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" />
-                <span className="text-xs font-bold">Tier_0 Root Suite</span>
-              </button>
-            </div>
-          )}
-        </nav>
-
-        {/* Right Settings Content Area */}
-        <main className="lg:col-span-8 xl:col-span-9 bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-5 sm:p-7 shadow-2xs">
+      {/* 2. Main Settings Workspace (Full-Width Card-Style System) */}
+      <div className="w-full max-w-5xl mx-auto">
+        {/* Settings Content Area */}
+        <main className="w-full bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-2xs">
           {/* Layout Change Feedback Notification */}
           {layoutNotice && (
             <div className="mb-5 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold text-emerald-900 dark:text-emerald-200 flex items-center gap-2.5 animate-fadeIn">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>{layoutNotice}</span>
+            </div>
+          )}
+
+          {/* Backup Msg Banner */}
+          {backupMsg && (
+            <div className="mb-5 p-3.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-xs font-semibold text-teal-900 dark:text-teal-200 flex items-center gap-2.5 animate-fadeIn">
+              <CheckCircle2 className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
+              <span>{backupMsg}</span>
+            </div>
+          )}
+
+          {/* ========================================================
+              SEARCH RESULTS VIEW
+          ======================================================== */}
+          {searchQuery.trim().length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs font-semibold text-[#527078] dark:text-slate-400 uppercase tracking-wider">
+                <span>Search Results</span>
+                <span className="font-mono text-[#176f78] dark:text-teal-400">
+                  Matches for &ldquo;{searchQuery}&rdquo;
+                </span>
+              </div>
+
+              {(() => {
+                const query = searchQuery.toLowerCase().trim();
+                const matchedCategories = categories.filter(
+                  c => c.id !== 'all' && (c.label.toLowerCase().includes(query) || c.description.toLowerCase().includes(query))
+                );
+
+                const quickActions = [
+                  { id: 'sound-toggle', title: 'Acoustic Sound Floor Alerts', subtitle: auditoryAlertsEnabled ? 'Active (Click to Mute)' : 'Muted (Click to Activate)', icon: Volume2, color: 'bg-[#ff2d55]', action: () => onToggleAuditoryAlerts(!auditoryAlertsEnabled), badge: auditoryAlertsEnabled ? 'Active' : 'Muted' },
+                  { id: 'theme-toggle', title: 'Night Shift Dark Theme', subtitle: currentTheme === 'dark' ? 'Dark Studio (Click for Daylight)' : 'Daylight Cockpit (Click for Dark)', icon: Sun, color: 'bg-[#af52de]', action: () => onSelectTheme(currentTheme === 'dark' ? 'light' : 'dark'), badge: currentTheme === 'dark' ? 'Night Shift' : 'Light' },
+                  { id: 'capacity-calc', title: 'Line Capacity & Pitch Calculator', subtitle: 'Takt time balancing, pitch time, and SAM allocation', icon: Calculator, color: 'bg-[#10b981]', action: () => handleSetSection('capacity'), badge: 'IE Engine' },
+                  { id: 'reports-hub', title: 'Shift End Summary & Analytics Reports', subtitle: 'Compile final WIP status, total achieved output, and bottleneck stage names', icon: FileSpreadsheet, color: 'bg-[#007aff]', action: () => handleSetSection('reports'), badge: 'PDF Ready' },
+                  { id: 'db-backup', title: 'IndexedDB Vault Snapshot', subtitle: 'Local indexed storage backup and data restore', icon: Database, color: 'bg-[#34c759]', action: handleManualBackupClick, badge: 'IndexedDB' },
+                  { id: 'pwa-android', title: 'Mobile PWA App & Android APK', subtitle: 'Offline service worker and standalone installation package', icon: Smartphone, color: 'bg-[#ff9500]', action: () => setActiveCategory('android'), badge: 'PWA' }
+                ].filter(a => a.title.toLowerCase().includes(query) || a.subtitle.toLowerCase().includes(query));
+
+                const totalMatches = matchedCategories.length + quickActions.length;
+
+                if (totalMatches === 0) {
+                  return (
+                    <div className="p-8 text-center bg-[#fbfaf6] dark:bg-[#181d24] rounded-2xl border border-[#d9d2c2] dark:border-[#2e3846]">
+                      <p className="text-xs text-[#527078] dark:text-slate-400">
+                        No settings, tools, or configurations match &ldquo;{searchQuery}&rdquo;
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="mt-3 text-xs text-[#176f78] dark:text-teal-400 font-semibold hover:underline cursor-pointer"
+                      >
+                        Clear Search
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-4">
+                    {matchedCategories.length > 0 && (
+                      <div className="bg-white dark:bg-[#181d24] rounded-2xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
+                        <div className="px-4 py-2.5 bg-[#fbfaf6] dark:bg-[#1f2630] text-[11px] font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider">
+                          Settings Categories ({matchedCategories.length})
+                        </div>
+                        {matchedCategories.map(cat => {
+                          const Icon = cat.icon;
+                          return (
+                            <div
+                              key={cat.id}
+                              onClick={() => {
+                                setActiveCategory(cat.id);
+                                setSearchQuery('');
+                              }}
+                              className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <SquircleIcon bgColor={cat.color}>
+                                  <Icon className="w-4 h-4 text-white" />
+                                </SquircleIcon>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                                    {cat.label}
+                                  </div>
+                                  <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                                    {cat.description}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-[#176f78]/10 text-[#176f78] dark:text-teal-300">
+                                  {cat.badge}
+                                </span>
+                                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {quickActions.length > 0 && (
+                      <div className="bg-white dark:bg-[#181d24] rounded-2xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
+                        <div className="px-4 py-2.5 bg-[#fbfaf6] dark:bg-[#1f2630] text-[11px] font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider">
+                          Quick Controls &amp; Actions ({quickActions.length})
+                        </div>
+                        {quickActions.map(act => {
+                          const Icon = act.icon;
+                          return (
+                            <div
+                              key={act.id}
+                              onClick={() => {
+                                act.action();
+                                setSearchQuery('');
+                              }}
+                              className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <SquircleIcon bgColor={act.color}>
+                                  <Icon className="w-4 h-4 text-white" />
+                                </SquircleIcon>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                                    {act.title}
+                                  </div>
+                                  <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                                    {act.subtitle}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-[#176f78]/10 text-[#176f78] dark:text-teal-300">
+                                  {act.badge}
+                                </span>
+                                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* ========================================================
+              CARD-STYLE UI DESIGN SYSTEM (Settings Root Overview)
+              Grouped card layout with icons, titles, status badges, & navigation arrows
+              (Guidelines for Flutter / Jetpack Compose / React Native)
+          ======================================================== */}
+          {!searchQuery && activeCategory === 'all' && (
+            <div className="space-y-6">
+              {/* 1. Profile Hero Card (Flutter/Cupertino Card System) */}
+              <div
+                onClick={() => {
+                  if (onOpenUserModal) onOpenUserModal('profile');
+                }}
+                className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-[#d9d2c2] dark:border-[#2e3846] p-4 sm:p-5 shadow-2xs flex items-center justify-between gap-4 cursor-pointer hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors group"
+              >
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="relative shrink-0">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#176f78] via-[#007aff] to-[#5856d6] text-white flex items-center justify-center font-bold text-lg shadow-sm">
+                      {profile?.name
+                        ? profile.name
+                            .split(' ')
+                            .map(n => n[0])
+                            .slice(0, 2)
+                            .join('')
+                            .toUpperCase()
+                        : 'IE'}
+                    </div>
+                    <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#181d24]" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-bold text-[#17343a] dark:text-slate-100 truncate">
+                        {profile?.name || 'Ashikur Rahman'}
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono tracking-wide bg-[#176f78]/15 text-[#176f78] dark:text-teal-300 border border-[#176f78]/30 shrink-0">
+                        {profile?.tierId ? profile.tierId.replace('_', ' ').toUpperCase() : (profile?.role ? profile.role.toUpperCase() : 'IE STAFF')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#527078] dark:text-slate-400 truncate mt-0.5">
+                      {profile?.jobTitle || 'Industrial Engineering Incharge'} • {profile?.email || 'ashikur.rahman.0971@gmail.com'}
+                    </p>
+                    <div className="flex items-center gap-2 text-[11px] text-[#176f78] dark:text-teal-400 mt-1 font-medium">
+                      <span>{factoryProfile?.name || 'Debonair LTD'} ({factoryProfile?.unitName || 'Unit-02'})</span>
+                      <span>•</span>
+                      <span>{totalActiveLines} Active Production Lines</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors shrink-0">
+                  <ChevronRight className="w-5 h-5" />
+                </div>
+              </div>
+
+              {/* 2. Tier_0 Master Suite Banner (System Admin Only) */}
+              {isSysAdmin && (
+                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-slate-950 via-[#0e272c] to-[#09353b] text-white p-4 sm:p-5 border border-teal-500/30 shadow-md space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+                        <h3 className="text-base font-bold text-white flex items-center gap-2 font-display">
+                          <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0" />
+                          <span>Tier_0 Master Console</span>
+                        </h3>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                          ROOT CLEARANCE
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-1">
+                        Schema Forge • Access Matrix • Security Loop • Plant Security • Privacy Vault • Backup Forge • Audit Forensics • Maintenance Hub
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSetSection('tier_0')}
+                      className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-teal-500 text-slate-950 hover:bg-teal-400 cursor-pointer shadow-sm transition-all shrink-0 self-start sm:self-auto"
+                    >
+                      <span>Open Tier_0 Suite</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* 8 Quick Tools Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {TIER_0_MODULES.map(mod => {
+                      const Icon = mod.icon;
+                      return (
+                        <button
+                          key={mod.id}
+                          type="button"
+                          onClick={() => handleSetSection('tier_0')}
+                          className="flex items-center gap-2.5 p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors text-left cursor-pointer group"
+                        >
+                          <div className="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                            <Icon className="w-3 h-3" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-white truncate">
+                              {mod.name}
+                            </div>
+                            <div className="text-[9px] text-slate-400 font-mono truncate">
+                              {mod.badge}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 3. Tactile Quick Controls Grid (iOS Control Center / Android Quick Settings style) */}
+              <div>
+                <div className="mb-2.5 flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider">
+                    Control Center Quick Actions
+                  </span>
+                  <span className="text-[11px] text-[#176f78] dark:text-teal-400 font-medium">
+                    Tactile Floor Controls
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                  {/* Sound Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => onToggleAuditoryAlerts(!auditoryAlertsEnabled)}
+                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${
+                      auditoryAlertsEnabled
+                        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-white dark:bg-[#181d24] border-[#d9d2c2] dark:border-[#2e3846] text-[#527078] dark:text-slate-400'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1.5 ${
+                      auditoryAlertsEnabled ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                    }`}>
+                      {auditoryAlertsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                    </div>
+                    <span className="text-xs font-bold text-center leading-tight">
+                      {auditoryAlertsEnabled ? 'Sound On' : 'Muted'}
+                    </span>
+                    <span className="text-[9px] text-slate-400 mt-0.5">Floor Alerts</span>
+                  </button>
+
+                  {/* Theme Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => onSelectTheme(currentTheme === 'dark' ? 'light' : 'dark')}
+                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${
+                      currentTheme === 'dark'
+                        ? 'bg-amber-400/15 border-amber-400/30 text-amber-600 dark:text-amber-400'
+                        : 'bg-white dark:bg-[#181d24] border-[#d9d2c2] dark:border-[#2e3846] text-[#17343a] dark:text-slate-200'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1.5 ${
+                      currentTheme === 'dark' ? 'bg-amber-400 text-amber-950' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                    }`}>
+                      {currentTheme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                    </div>
+                    <span className="text-xs font-bold text-center leading-tight">
+                      {currentTheme === 'dark' ? 'Night Shift' : 'Warm Cream'}
+                    </span>
+                    <span className="text-[9px] text-slate-400 mt-0.5">Visual Mode</span>
+                  </button>
+
+                  {/* Lock Screen (Admin) */}
+                  {isMasterAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => onLockTerminal && onLockTerminal()}
+                      className="flex flex-col items-center justify-center p-3 rounded-2xl border bg-white dark:bg-[#181d24] border-[#d9d2c2] dark:border-[#2e3846] text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all cursor-pointer"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-1.5">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-bold text-center leading-tight">Lock Screen</span>
+                      <span className="text-[9px] text-slate-400 mt-0.5">PIN Security</span>
+                    </button>
+                  )}
+
+                  {/* Manual Snapshot */}
+                  {isMasterAdmin && (
+                    <button
+                      type="button"
+                      onClick={handleManualBackupClick}
+                      disabled={isBackingUp}
+                      className="flex flex-col items-center justify-center p-3 rounded-2xl border bg-white dark:bg-[#181d24] border-[#d9d2c2] dark:border-[#2e3846] text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-all cursor-pointer disabled:opacity-60"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-1.5">
+                        {isBackingUp ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <HardDrive className="w-4 h-4" />
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-center leading-tight">
+                        {isBackingUp ? 'Backing Up' : 'Snapshot'}
+                      </span>
+                      <span className="text-[9px] text-slate-400 mt-0.5">IndexedDB</span>
+                    </button>
+                  )}
+
+                  {/* Google Chat */}
+                  <button
+                    type="button"
+                    onClick={() => onOpenChat && onOpenChat()}
+                    className="flex flex-col items-center justify-center p-3 rounded-2xl border bg-white dark:bg-[#181d24] border-[#d9d2c2] dark:border-[#2e3846] text-[#1a73e8] hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all cursor-pointer"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 text-[#1a73e8] flex items-center justify-center mb-1.5">
+                      <MessageSquare className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-bold text-center leading-tight">Google Chat</span>
+                    <span className="text-[9px] text-slate-400 mt-0.5">Spaces &bull; IE</span>
+                  </button>
+
+                  {/* Mobile App & Updates */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveCategory('android')}
+                    className="flex flex-col items-center justify-center p-3 rounded-2xl border bg-white dark:bg-[#181d24] border-[#d9d2c2] dark:border-[#2e3846] text-[#ff9500] hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-all cursor-pointer"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/40 text-[#ff9500] flex items-center justify-center mb-1.5">
+                      <Smartphone className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-bold text-center leading-tight">PWA &amp; APK</span>
+                    <span className="text-[9px] text-slate-400 mt-0.5">Offline Ready</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 4. GROUPED CARD SECTIONS (Flutter / Jetpack Compose / React Native Card System) */}
+              <div className="space-y-5">
+                
+                {/* Section 1: Architecture & Design */}
+                <div>
+                  <div className="px-1 mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider font-mono">
+                      System Architecture &amp; Ergonomics
+                    </span>
+                  </div>
+                  <div className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
+                    {/* Row 1: Alive Design Studio */}
+                    <div
+                      onClick={() => setActiveCategory('architecture')}
+                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <SquircleIcon bgColor="bg-[#5856d6]">
+                          <Layout className="w-4 h-4 text-white" />
+                        </SquircleIcon>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                            Architecture &amp; &ldquo;Alive Design&rdquo; Studio
+                          </div>
+                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                            Factory topology, responsive layout presets &amp; live ergonomics
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-[#5856d6]/10 text-[#5856d6] dark:text-indigo-300 border border-[#5856d6]/20">
+                          {appLayout.presetName || 'Default Preset'}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                      </div>
+                    </div>
+
+                    {/* Row 2: Display & Appearance */}
+                    <div
+                      onClick={() => setActiveCategory('display')}
+                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <SquircleIcon bgColor="bg-[#af52de]">
+                          <Palette className="w-4 h-4 text-white" />
+                        </SquircleIcon>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                            Display &amp; Ergonomics
+                          </div>
+                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                            Daylight Cockpit vs Dark Studio visual themes &amp; high-contrast modes
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-[#af52de]/10 text-[#af52de] dark:text-purple-300 border border-[#af52de]/20">
+                          {currentTheme === 'dark' ? 'Night Shift' : 'Warm Cream'}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Factory Operations & Analytics */}
+                <div>
+                  <div className="px-1 mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider font-mono">
+                      Factory Operations &amp; Production Flow
+                    </span>
+                  </div>
+                  <div className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
+                    {/* Row 1: Plant Identity */}
+                    <div
+                      onClick={() => setActiveCategory('factory')}
+                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <SquircleIcon bgColor="bg-[#176f78]">
+                          <Factory className="w-4 h-4 text-white" />
+                        </SquircleIcon>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                            Plant Identity &amp; Operating Floors
+                          </div>
+                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                            Enterprise name, operating unit designation &amp; floor distribution
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-[#176f78]/10 text-[#176f78] dark:text-teal-300 border border-[#176f78]/20">
+                          {totalActiveLines} Lines Active
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                      </div>
+                    </div>
+
+                    {/* Row 2: Pitch Calculator */}
+                    <div
+                      onClick={() => handleSetSection('capacity')}
+                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <SquircleIcon bgColor="bg-[#10b981]">
+                          <Calculator className="w-4 h-4 text-white" />
+                        </SquircleIcon>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                            Line Capacity &amp; Pitch Calculator
+                          </div>
+                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                            Pitch time analysis, takt balancing, and SAM allocation
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          Pitch Engine
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                      </div>
+                    </div>
+
+                    {/* Row 3: Reports & Shift End Summary */}
+                    <div
+                      onClick={() => handleSetSection('reports')}
+                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <SquircleIcon bgColor="bg-[#007aff]">
+                          <FileSpreadsheet className="w-4 h-4 text-white" />
+                        </SquircleIcon>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                            Shift End Summary &amp; Analytics Reports
+                          </div>
+                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                            Compile final WIP status, total achieved output, and bottleneck stage names into PDF
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                          Shift End PDF
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 3: Sound & Acoustic Floor Alerts */}
+                <div>
+                  <div className="px-1 mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider font-mono">
+                      Floor Alarms &amp; Sound Alerts
+                    </span>
+                  </div>
+                  <div className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
+                    <div
+                      onClick={() => setActiveCategory('alerts')}
+                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <SquircleIcon bgColor="bg-[#ff2d55]">
+                          <Volume2 className="w-4 h-4 text-white" />
+                        </SquircleIcon>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                            Acoustic Chimes &amp; Floor Warnings
+                          </div>
+                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                            Bottleneck alert tone and high WIP buffer cycle chimes with audio test
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono border ${
+                          auditoryAlertsEnabled
+                            ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                            : 'bg-slate-200 dark:bg-slate-800 text-slate-500 border-transparent'
+                        }`}>
+                          {auditoryAlertsEnabled ? 'Active' : 'Muted'}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 4: Data Vault & Storage Systems */}
+                <div>
+                  <div className="px-1 mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider font-mono">
+                      Data Vault &amp; Storage Systems
+                    </span>
+                  </div>
+                  <div className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
+                    <div
+                      onClick={() => setActiveCategory('backup')}
+                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <SquircleIcon bgColor="bg-[#34c759]">
+                          <Database className="w-4 h-4 text-white" />
+                        </SquircleIcon>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                            IndexedDB Storage &amp; JSON Snapshots
+                          </div>
+                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                            Local encrypted vault, scheduled snapshots, CSV exports, &amp; zero-loss restore
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          IndexedDB
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 5: Security & Governance */}
+                <div>
+                  <div className="px-1 mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider font-mono">
+                      Security &amp; Governance
+                    </span>
+                  </div>
+                  <div className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
+                    {/* Row 1: Security & RBAC */}
+                    <div
+                      onClick={() => setActiveCategory('security')}
+                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <SquircleIcon bgColor="bg-[#ff3b30]">
+                          <Lock className="w-4 h-4 text-white" />
+                        </SquircleIcon>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                            Security Clearances &amp; Terminal Lockdown
+                          </div>
+                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                            Role-based access controls (RBAC), PIN screen protection, &amp; session timers
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                          {profile.tierId ? profile.tierId.replace('_', ' ').toUpperCase() : 'RBAC'}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                      </div>
+                    </div>
+
+                    {/* Row 2: Tier_0 Root Command (System Admin Only) */}
+                    {isSysAdmin && (
+                      <div
+                        onClick={() => handleSetSection('tier_0')}
+                        className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-teal-500/5 transition-colors cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <SquircleIcon bgColor="bg-[#09353b]">
+                            <ShieldCheck className="w-4 h-4 text-teal-400" />
+                          </SquircleIcon>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-teal-900 dark:text-teal-300 truncate group-hover:text-teal-600 dark:group-hover:text-teal-200 transition-colors">
+                              Tier_0 Root Command Suite
+                            </div>
+                            <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                              Schema Forge, Access Matrix, Plant Security, &amp; Deep System Controls
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
+                            Root Active
+                          </span>
+                          <ChevronRight className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Section 6: Mobile & Frontline Workspaces */}
+                <div>
+                  <div className="px-1 mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider font-mono">
+                      Mobile &amp; Operational Workspaces
+                    </span>
+                  </div>
+                  <div className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
+                    {/* Row 1: Mobile App & PWA */}
+                    <div
+                      onClick={() => setActiveCategory('android')}
+                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <SquircleIcon bgColor="bg-[#ff9500]">
+                          <Smartphone className="w-4 h-4 text-white" />
+                        </SquircleIcon>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                            Mobile PWA App &amp; Android Deployment
+                          </div>
+                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                            Offline service worker cache, manifest, &amp; APK package identifier
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">
+                          PWA Ready
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                      </div>
+                    </div>
+
+                    {/* Row 2: Operational Hubs */}
+                    <div
+                      onClick={() => setActiveCategory('hubs')}
+                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <SquircleIcon bgColor="bg-[#007aff]">
+                          <Layers className="w-4 h-4 text-white" />
+                        </SquircleIcon>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                            IE Operational Workspaces &amp; Launchpad
+                          </div>
+                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                            Direct jump into Line Data, Check List, Lean Tools, WCM, Reports, &amp; Capacity
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                          6 Hubs
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* Return Breadcrumb Bar when drilled into a specific category */}
+          {!searchQuery && activeCategory !== 'all' && (
+            <div className="flex items-center justify-between pb-3.5 mb-5 border-b border-[#e7e1d5] dark:border-[#2e3846]">
+              <button
+                type="button"
+                onClick={() => setActiveCategory('all')}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] text-xs font-semibold text-[#17343a] dark:text-slate-200 hover:text-[#176f78] hover:border-[#176f78] transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Back to Settings Overview</span>
+              </button>
+              <div className="flex items-center gap-2 text-xs font-mono text-[#527078] dark:text-slate-400">
+                <span>Settings</span>
+                <span>/</span>
+                <span className="font-bold text-[#17343a] dark:text-slate-200">
+                  {categories.find(c => c.id === activeCategory)?.label}
+                </span>
+              </div>
             </div>
           )}
 

@@ -38,7 +38,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
       userId: 'local-offline-usr',
-      email: 'realmec85pro231@gmail.com',
+      email: 'applicationhub69@gmail.com',
       emailVerified: true,
       isAnonymous: false,
     },
@@ -53,7 +53,7 @@ export const db = {} as any;
 export const auth = {
   currentUser: {
     uid: 'local-offline-user',
-    email: 'realmec85pro231@gmail.com',
+    email: 'applicationhub69@gmail.com',
     displayName: 'IE Engineer (Local)'
   }
 } as any;
@@ -75,10 +75,13 @@ let currentLocalUser: any = (() => {
     const saved = localStorage.getItem('ie_user_profile');
     if (saved) {
       const parsed = JSON.parse(saved);
+      if (parsed.email && parsed.email.toLowerCase().includes('realmec85pro231')) {
+        parsed.email = 'applicationhub69@gmail.com';
+      }
       return {
         uid: parsed.googleUid || 'local-usr-admin',
         displayName: parsed.name || 'Lead IE Engineer',
-        email: parsed.email || 'realmec85pro231@gmail.com',
+        email: parsed.email || 'applicationhub69@gmail.com',
         photoURL: parsed.photoURL || undefined
       };
     }
@@ -86,7 +89,7 @@ let currentLocalUser: any = (() => {
   return {
     uid: 'local-usr-admin',
     displayName: 'Lead IE Engineer',
-    email: 'realmec85pro231@gmail.com',
+    email: 'applicationhub69@gmail.com',
     photoURL: undefined
   };
 })();
@@ -130,8 +133,8 @@ export function getLocalAvatarSvg(name: string, bg: string = '#176f78'): string 
  * Direct Profile Authentication for 100% Local / Offline operations.
  */
 export const googleSignIn = async (userEmail?: string): Promise<{ user: any; accessToken: string; error?: string } | null> => {
-  const emailToUse = userEmail || 'realmec85pro231@gmail.com';
-  const name = emailToUse === 'realmec85pro231@gmail.com' ? 'Admin / Lead IE' : emailToUse.split('@')[0];
+  const emailToUse = userEmail || 'applicationhub69@gmail.com';
+  const name = emailToUse ? emailToUse.split('@')[0] : 'IE Engineer';
   const simulatedUser = {
     uid: 'local-usr-' + (emailToUse.split('@')[0] || 'local'),
     displayName: name,

@@ -163,9 +163,9 @@ export function getLineBlock(lineNo: string | number): LineBlockDefinition {
 export const SYSTEM_ADMIN_EMAIL = 'ashikur.rahman.0971@gmail.com';
 export const SYSTEM_ADMIN_EMAILS = [
   'ashikur.rahman.0971@gmail.com',
+  'applicationhub69@gmail.com',
   'ashikuregen@gmail.com',
-  'nahidnazrulislam40@gmail.com',
-  'realmec85pro231@gmail.com'
+  'nahidnazrulislam40@gmail.com'
 ];
 export const SYSTEM_ADMIN_PASSCODE = '911999';
 

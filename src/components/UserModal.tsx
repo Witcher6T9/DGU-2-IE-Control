@@ -20,7 +20,6 @@ import {
   Copy,
   ExternalLink,
   Globe,
-  CheckCheck,
   Lock
 } from 'lucide-react';
 import { UserProfile, RoleTier } from '../types';
@@ -132,30 +131,6 @@ export const UserModal: React.FC<UserModalProps> = ({
       setAdminPassError('Invalid System Admin authorization passcode.');
       setTimeout(() => setAdminPassError(null), 3000);
     }
-  };
-
-  const handleQuickLinkVerifiedProfile = (customEmail?: string) => {
-    const verifiedEmail = customEmail || email || 'ashikhossainkr@gmail.com';
-    const isSysAdmin = verifiedEmail.toLowerCase().trim() === SYSTEM_ADMIN_EMAIL.toLowerCase();
-
-    if (isSysAdmin) {
-      setShowAdminPassModal(true);
-      return;
-    }
-
-    const displayName = name && name !== 'Lead IE' ? name : 'Ashik Hossain (IE)';
-    const mockUid = 'goog_' + btoa(verifiedEmail).replace(/=/g, '').slice(0, 16);
-    setName(displayName);
-    setEmail(verifiedEmail);
-    onUpdateProfile({
-      ...profile,
-      name: displayName,
-      email: verifiedEmail,
-      photoURL: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="50" fill="%23176f78"/%3E%3Ctext x="50%25" y="55%25" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-size="36" font-weight="700"%3EIE%3C/text%3E%3C/svg%3E',
-      googleUid: mockUid
-    });
-    setUnauthorizedDomain(false);
-    setGoogleAuthError(null);
   };
 
   const handleGoogleSignIn = async () => {
@@ -496,18 +471,6 @@ export const UserModal: React.FC<UserModalProps> = ({
                     <span>{googleAuthError}</span>
                   </div>
                 )}
-
-                {/* Quick Profile Linker */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLinkVerifiedProfile('realmec85pro231@gmail.com')}
-                    className="flex-1 py-2 px-3 rounded-xl bg-[#176f78] hover:bg-[#135d65] text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer touch-manipulation active:scale-95"
-                  >
-                    <CheckCheck className="w-3.5 h-3.5" />
-                    <span>Quick Link Admin Profile (realmec85pro231@gmail.com)</span>
-                  </button>
-                </div>
 
                 {profile.googleUid ? (
                   <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white border border-[#d9d2c2]">

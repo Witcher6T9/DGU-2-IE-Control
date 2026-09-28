@@ -1038,7 +1038,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </span>
                     </div>
                     <p className="text-[13px] text-[#8e8e93] truncate mt-0.5">
-                      {profile?.jobTitle || 'Industrial Engineering Incharge'} • {profile?.email || 'realmec85pro231@gmail.com'}
+                      {profile?.jobTitle || 'Industrial Engineering Incharge'} • {profile?.email || 'applicationhub69@gmail.com'}
                     </p>
                     <div className="flex items-center gap-2 text-[11px] text-[#176f78] dark:text-teal-400 mt-1 font-medium">
                       <span>{factoryProfile?.name || 'Debonair LTD'} ({factoryProfile?.unitName || 'Unit-02'})</span>
