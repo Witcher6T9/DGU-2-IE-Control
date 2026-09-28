@@ -914,7 +914,7 @@ const PlantSecurityModule: React.FC<{
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-amber-500" />
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Building A (Lines 01 - 18)
+                Building A (Lines 01 - 17)
               </h3>
             </div>
             <button
@@ -932,7 +932,7 @@ const PlantSecurityModule: React.FC<{
             </button>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Floors 1-3 • Men's Outwear &amp; Heavy Padding Lines • 18 active lines
+            Floors 1-3 • Men's Outwear &amp; Heavy Padding Lines • 17 active lines
           </p>
           <div className="mt-3 flex items-center gap-2 text-xs">
             <span className={`w-2 h-2 rounded-full ${buildingAFrozen ? 'bg-rose-500' : 'bg-emerald-500'}`} />
@@ -952,7 +952,7 @@ const PlantSecurityModule: React.FC<{
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-amber-500" />
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Building B (Lines 19 - 34)
+                Building B (Lines 18 - 34)
               </h3>
             </div>
             <button
@@ -970,7 +970,7 @@ const PlantSecurityModule: React.FC<{
             </button>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Floors 1-3 • Seam Sealing, Laser Cutting &amp; Down Fill Lines • 16 active lines
+            Floors 4-6 • Seam Sealing, Laser Cutting &amp; Down Fill Lines • 17 active lines
           </p>
           <div className="mt-3 flex items-center gap-2 text-xs">
             <span className={`w-2 h-2 rounded-full ${buildingBFrozen ? 'bg-rose-500' : 'bg-emerald-500'}`} />

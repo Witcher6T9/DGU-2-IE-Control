@@ -417,8 +417,8 @@ export const UpdatesPusherModule: React.FC<UpdatesPusherModuleProps> = ({
                   className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
                 >
                   <option value="all_terminals">All 34 Floor Terminals (Global Broadcast)</option>
-                  <option value="building_a">Building A (Padma &amp; Meghna: Lines 01 - 18)</option>
-                  <option value="building_b">Building B (Karnophuli to Turag: Lines 19 - 34)</option>
+                  <option value="building_a">Building A (Padma to Karnophuli: Lines 01 - 17)</option>
+                  <option value="building_b">Building B (Korotoya to Turag: Lines 18 - 34)</option>
                   <option value="tier_1_2_managers">Tier 1 &amp; 2 Senior IE &amp; Wing Managers Only</option>
                   <option value="tier_3_4_operators">Tier 3 &amp; 4 Floor Incharges &amp; Workstations</option>
                 </select>

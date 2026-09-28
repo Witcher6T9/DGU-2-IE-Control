@@ -140,3 +140,35 @@ export function playAuditoryAlert(type: 'wip' | 'bottleneck' | 'general' = 'gene
   }
   return playWipAlertSound(force);
 }
+
+/**
+ * Play a delicate, non-intrusive micro-pulse chime for telemetry heartbeat refresh.
+ */
+export function playTelemetryHeartbeatChime(): boolean {
+  const ctx = getAudioContext();
+  if (!ctx) return false;
+
+  try {
+    const startTime = ctx.currentTime + 0.01;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, startTime); // A5 gentle pip
+    osc.frequency.exponentialRampToValueAtTime(1174.66, startTime + 0.04); // D6 brief rise
+
+    gain.gain.setValueAtTime(0.001, startTime);
+    gain.gain.linearRampToValueAtTime(0.08, startTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.07);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + 0.08);
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+

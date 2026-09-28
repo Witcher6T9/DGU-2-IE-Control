@@ -75,9 +75,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     },
     {
       id: 'lean-tools',
-      label: 'Lean & World',
+      label: 'Lean Tools',
       sublabel: 'Settings',
-      fullLabel: 'Lean Tools & World Class Cockpit (In Settings)',
+      fullLabel: 'Lean Tools Cockpit (In Settings)',
       icon: Wrench,
       badge: 'WCM'
     },

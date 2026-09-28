@@ -82,6 +82,7 @@ interface DashboardProps {
   onAddNewLine?: () => void;
   onOpenNewDowntime?: () => void;
   onOpenNewAction?: () => void;
+  onOpenHourlyProduction?: () => void;
   activeTab?: string;
 }
 
@@ -113,6 +114,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onAddNewLine,
   onOpenNewDowntime,
   onOpenNewAction,
+  onOpenHourlyProduction,
   activeTab
 }) => {
   const isMasterAdmin = isMasterAdminOrAdmin(profile);
@@ -2400,9 +2402,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             ? 'lean-tools'
             : activeTab === 'reports'
             ? 'reports'
-            : 'lines'
+            : 'hourly'
         }
-        onAddNewLine={onAddNewLine}
+        onOpenHourlyProduction={onOpenHourlyProduction}
         onOpenNewDowntime={onOpenNewDowntime}
         onOpenNewAction={onOpenNewAction}
         onChecklistAction={handleQuickMorningMeetingDone}

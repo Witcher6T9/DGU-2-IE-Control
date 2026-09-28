@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Plus,
+  Clock,
   AlertTriangle,
   CheckSquare,
   Sparkles,
@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { LineEntry } from '../types';
 import { exportReportToCSV, downloadCSV } from '../utils';
 
-export type FabTabId = 'lines' | 'downtime' | 'checklist' | 'lean-tools' | 'reports';
+export type FabTabId = 'hourly' | 'downtime' | 'checklist' | 'lean-tools' | 'reports';
 
 export interface FabTabOption {
   id: FabTabId;
@@ -37,18 +37,18 @@ export interface FabTabOption {
 }
 
 export const FAB_TAB_CONFIGS: Record<FabTabId, FabTabOption> = {
-  lines: {
-    id: 'lines',
-    tabLabel: 'Line Data',
-    actionLabel: 'Add Line',
-    shortLabel: 'Add Line',
-    description: 'Commission new sewing line',
-    icon: Plus,
-    colorHex: '#176f78',
-    bgGradient: 'from-[#176f78] to-[#0f4e55]',
-    shadowColor: 'shadow-[#176f78]/30',
-    badgeBg: 'bg-[#e0f2f1]',
-    badgeText: 'text-[#176f78]'
+  hourly: {
+    id: 'hourly',
+    tabLabel: 'Hourly Production',
+    actionLabel: 'Hourly Production',
+    shortLabel: 'Hourly Prod',
+    description: "Update sewing line's hourly output & pacing",
+    icon: Clock,
+    colorHex: '#0891b2',
+    bgGradient: 'from-cyan-600 to-teal-700',
+    shadowColor: 'shadow-cyan-600/30',
+    badgeBg: 'bg-cyan-100 dark:bg-cyan-950/60',
+    badgeText: 'text-cyan-800 dark:text-cyan-300'
   },
   downtime: {
     id: 'downtime',
@@ -106,7 +106,7 @@ export const FAB_TAB_CONFIGS: Record<FabTabId, FabTabOption> = {
 
 export interface ContextAwareFabProps {
   initialTab?: FabTabId;
-  onAddNewLine?: () => void;
+  onOpenHourlyProduction?: () => void;
   onOpenNewDowntime?: () => void;
   onOpenNewAction?: () => void;
   onChecklistAction?: () => void;
@@ -118,8 +118,8 @@ export interface ContextAwareFabProps {
 }
 
 export const ContextAwareFab: React.FC<ContextAwareFabProps> = ({
-  initialTab = 'lines',
-  onAddNewLine,
+  initialTab = 'hourly',
+  onOpenHourlyProduction,
   onOpenNewDowntime,
   onOpenNewAction,
   onChecklistAction,
@@ -134,7 +134,7 @@ export const ContextAwareFab: React.FC<ContextAwareFabProps> = ({
       const saved = localStorage.getItem('ie_fab_active_tab');
       if (saved && saved in FAB_TAB_CONFIGS) return saved as FabTabId;
     } catch {}
-    return initialTab;
+    return (initialTab in FAB_TAB_CONFIGS ? initialTab : 'hourly') as FabTabId;
   });
 
   const [isOpen, setIsOpen] = useState(false);
@@ -178,10 +178,9 @@ export const ContextAwareFab: React.FC<ContextAwareFabProps> = ({
   // Execute primary action corresponding to active tab
   const executeActionForTab = (tabId: FabTabId) => {
     switch (tabId) {
-      case 'lines': {
-        if (onAddNewLine) {
-          onAddNewLine();
-          onTriggerToast?.('Line Commissioned', 'New Sewing Line added. Live telemetry attached.', 'success');
+      case 'hourly': {
+        if (onOpenHourlyProduction) {
+          onOpenHourlyProduction();
         } else if (onNavigate) {
           onNavigate('datas');
         }
@@ -235,7 +234,7 @@ export const ContextAwareFab: React.FC<ContextAwareFabProps> = ({
     executeActionForTab(activeTabId);
   };
 
-  const activeConfig = FAB_TAB_CONFIGS[activeTabId] || FAB_TAB_CONFIGS.lines;
+  const activeConfig = FAB_TAB_CONFIGS[activeTabId] || FAB_TAB_CONFIGS.hourly;
   const ActiveIcon = activeConfig.icon;
 
   const tabList = Object.values(FAB_TAB_CONFIGS);

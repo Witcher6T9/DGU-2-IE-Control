@@ -70,7 +70,7 @@ import { WingBlockLineSelector, WingId } from './WingBlockLineSelector';
 /**
  * Fast export of all lines data with IE Org hierarchy metadata as CSV
  */
-function exportLinesDataCSV(lines: LineEntry[], filename: string = 'Debonair_IE_Data.csv') {
+export function exportLinesDataCSV(lines: LineEntry[], filename: string = 'Debonair_IE_Data.csv') {
   const headers = [
     'Line No',
     'Buyer',
@@ -439,179 +439,6 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Top Main Navigation Bar for the Data Page */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#fbfaf6] border border-[#d9d2c2] rounded-2xl p-3 sm:p-4 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#176f78] to-[#0f4e55] text-white flex items-center justify-center shadow-xs shrink-0">
-            <Layers className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-bold text-[#17343a] font-display flex items-center gap-2">
-                <span>Datas</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[#176f78]/10 text-[#176f78] font-bold border border-[#176f78]/25">
-                  Daily Data Collection
-                </span>
-              </h1>
-            </div>
-            <p className="text-xs text-[#527078]">
-              Daily Data Collection • Industrial engineering control, sewing line balancing, bottleneck resolution &amp; multi-tier floor authority.
-            </p>
-          </div>
-        </div>
-
-        {/* Global Quick Action Strip */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => exportLinesDataCSV(lines)}
-            title="Download complete factory line data telemetry as CSV"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#d9d2c2] text-xs font-bold text-[#176f78] hover:bg-[#f1eee6] transition-colors shadow-2xs cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export CSV</span>
-          </button>
-
-          {onAddNewLine && (
-            <button
-              type="button"
-              onClick={() => onAddNewLine()}
-              title="Add a new production line"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#176f78] text-white text-xs font-bold hover:bg-[#135d65] transition-colors shadow-xs cursor-pointer"
-            >
-              <Zap className="w-3.5 h-3.5" />
-              <span>Add Line</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Sub-tab Navigation Bar across all Data workspaces */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-        <button
-          type="button"
-          onClick={() => setSubTab('lines')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
-            subTab === 'lines'
-              ? 'bg-[#176f78] text-white shadow-2xs'
-              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
-          }`}
-        >
-          <Layers className="w-3.5 h-3.5" />
-          <span>Datas (Daily Data Collection)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSubTab('ie-org')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
-            subTab === 'ie-org'
-              ? 'bg-[#176f78] text-white shadow-2xs'
-              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
-          }`}
-        >
-          <Network className="w-3.5 h-3.5 text-blue-600" />
-          <span>IE Organogram &amp; RBAC Matrix</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-blue-100 text-blue-800">
-            6 Tiers
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSubTab('optimizer')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
-            subTab === 'optimizer'
-              ? 'bg-gradient-to-r from-[#176f78] to-[#1a73e8] text-white shadow-2xs ring-2 ring-[#176f78]/30'
-              : 'bg-gradient-to-r from-amber-50 to-teal-50 border border-amber-300/80 text-[#17343a] hover:border-[#176f78]'
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-          <span>AI Optimization Assistant</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-400 text-slate-950">
-            AI
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSubTab('balancing')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
-            subTab === 'balancing'
-              ? 'bg-[#176f78] text-white shadow-2xs'
-              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
-          }`}
-        >
-          <Sliders className="w-3.5 h-3.5" />
-          <span>Line Balancing (Yamazumi)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSubTab('hourly')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
-            subTab === 'hourly'
-              ? 'bg-[#176f78] text-white shadow-2xs'
-              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
-          }`}
-        >
-          <Clock className="w-3.5 h-3.5" />
-          <span>Hourly Pacing</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSubTab('capacity')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
-            subTab === 'capacity'
-              ? 'bg-[#176f78] text-white shadow-2xs'
-              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
-          }`}
-        >
-          <BarChart2 className="w-3.5 h-3.5" />
-          <span>Capacity Calculator</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSubTab('floor-plan')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
-            subTab === 'floor-plan'
-              ? 'bg-[#176f78] text-white shadow-2xs'
-              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
-          }`}
-        >
-          <LayoutGrid className="w-3.5 h-3.5" />
-          <span>Floor Plan</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSubTab('history')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
-            subTab === 'history'
-              ? 'bg-[#176f78] text-white shadow-2xs'
-              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
-          }`}
-        >
-          <History className="w-3.5 h-3.5" />
-          <span>Production History</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSubTab('loss-pareto')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
-            subTab === 'loss-pareto'
-              ? 'bg-[#176f78] text-white shadow-2xs'
-              : 'bg-white border border-[#d9d2c2] text-slate-700 hover:border-[#176f78]'
-          }`}
-        >
-          <PieChart className="w-3.5 h-3.5" />
-          <span>Loss Pareto</span>
-        </button>
-      </div>
-
       {/* Breadcrumb banner when viewing a deep operational workspace */}
       {subTab !== 'lines' && (
         <div className="flex items-center justify-between bg-[#fbfaf6] border border-[#d9d2c2] rounded-xl px-3 py-2 text-xs">
@@ -621,7 +448,7 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
             className="flex items-center gap-1.5 font-bold text-[#176f78] hover:underline cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
-            <span>Back to Datas (Daily Data Collection)</span>
+            <span>Back to Daily Data Collection</span>
           </button>
           <span className="font-semibold text-[#527078] capitalize">{subTab.replace('-', ' ')} Workspace</span>
         </div>
@@ -647,6 +474,7 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
             initialSortBy={initialSortBy}
             initialSortDirection={initialSortDirection}
             onOpenOptimizer={() => setSubTab('optimizer')}
+            onExportCSV={() => exportLinesDataCSV(lines)}
           />
         </div>
       )}

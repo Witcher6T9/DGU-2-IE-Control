@@ -23,6 +23,7 @@ import {
   ArrowRight,
   HardDrive,
   Users,
+  Activity,
   Target,
   Bell,
   Play,
@@ -41,16 +42,16 @@ import {
   AlertCircle,
   ExternalLink,
   Laptop,
-  ChevronRight,
-  Search,
-  X,
-  SlidersHorizontal,
+  Layout,
   LayoutGrid,
-  Columns2,
-  Rows3,
-  ScrollText,
-  Gauge,
-  PanelTop
+  Monitor,
+  Tablet,
+  Radio,
+  Tv,
+  Sliders,
+  Sparkles,
+  Grid,
+  List
 } from 'lucide-react';
 import {
   UserProfile,
@@ -64,8 +65,19 @@ import {
   ChecklistStatus,
   TodoItem,
   ScheduleItem,
-  LeanActionItem
+  LeanActionItem,
+  AppPageLayoutConfig,
+  LayoutPresetId,
+  NavBarStyle,
+  FloorGridColumns
 } from '../types';
+import {
+  getStoredAppPageLayout,
+  saveStoredAppPageLayout,
+  applyLayoutStyling,
+  DEFAULT_APP_PAGE_LAYOUT,
+  BUILT_IN_LAYOUT_PRESETS
+} from '../utils/layoutManager';
 import {
   StationData,
   HourlyOutput,
@@ -78,10 +90,6 @@ import {
 import { isMasterAdminOrAdmin, isSystemAdmin } from '../utils/rbac';
 import { playBottleneckAlertSound, playWipAlertSound } from '../utils/audioAlert';
 import { ActiveOperationalTiers } from './ActiveOperationalTiers';
-import { SettingsBentoOverview } from './SettingsBentoOverview';
-import { SettingsFloorHUD } from './SettingsFloorHUD';
-import { SettingsTabbedDeck } from './SettingsTabbedDeck';
-import { SettingsAuditStream } from './SettingsAuditStream';
 import { Tier0CommandHub } from './tier0/Tier0CommandHub';
 import { LineDataPage, LineDataSubTab } from './LineDataPage';
 import { ChecklistPage, ChecklistSubTab } from './ChecklistPage';
@@ -102,6 +110,7 @@ export type SettingsPageSection =
   | 'tier_0';
 
 type SettingsCategory =
+  | 'architecture'
   | 'factory'
   | 'display'
   | 'alerts'
@@ -191,6 +200,9 @@ interface SettingsControlCenterPageProps {
   onApplySimulationToLine?: (lineNo: string, updates: Partial<LineEntry>) => void;
   onAddNewLineWithSimulation?: (lineData: Partial<LineEntry>) => void;
   leanToolsSubTab?: LeanToolsSubTab;
+
+  // Auto-Refresh Engine
+  onOpenAutoRefreshCustomizer?: () => void;
 }
 
 export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps> = ({
@@ -202,6 +214,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   onUpdateLayout,
   auditoryAlertsEnabled = true,
   onToggleAuditoryAlerts = () => {},
+  onOpenAutoRefreshCustomizer,
   factoryProfile,
   onUpdateFactoryProfile,
   savedFactories,
@@ -291,10 +304,42 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
     }
   }, [controlledSection]);
 
+  // Alive Layout Architecture State
+  const [appLayout, setAppLayout] = useState<AppPageLayoutConfig>(() => getStoredAppPageLayout());
+  const [layoutNotice, setLayoutNotice] = useState<string | null>(null);
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('tablet');
+
+  // Synchronize layout if updated externally
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail) {
+        setAppLayout(e.detail);
+      }
+    };
+    window.addEventListener('debonair:layout_changed', handler);
+    return () => window.removeEventListener('debonair:layout_changed', handler);
+  }, []);
+
+  const handleApplyLayoutConfig = (newConfig: AppPageLayoutConfig, feedbackMessage?: string) => {
+    setAppLayout(newConfig);
+    saveStoredAppPageLayout(newConfig);
+    applyLayoutStyling(newConfig);
+    setLayoutNotice(feedbackMessage || `Applied ${newConfig.presetName || 'custom architecture'} live!`);
+    setTimeout(() => setLayoutNotice(null), 3500);
+  };
+
+  const handleRestoreDefaultArchitecture = () => {
+    const defaultConfig: AppPageLayoutConfig = {
+      ...DEFAULT_APP_PAGE_LAYOUT,
+      lastUpdated: new Date().toISOString()
+    };
+    handleApplyLayoutConfig(defaultConfig, 'Default Architecture "Debonair RMG Floor Standard" Restored!');
+  };
+
   // Unified internal settings category
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(() => {
     if (activeSection === 'preferences') return 'display';
-    return 'factory';
+    return 'architecture';
   });
 
   useEffect(() => {
@@ -302,35 +347,6 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
       setActiveCategory('display');
     }
   }, [activeSection]);
-
-  const [categoryQuery, setCategoryQuery] = useState('');
-  type SettingsLayoutMode = 'bento' | 'split' | 'deck' | 'hud' | 'stream';
-  const [settingsLayoutMode, setSettingsLayoutMode] = useState<SettingsLayoutMode>(() => {
-    try {
-      const saved = localStorage.getItem('debonair_settings_layout_mode');
-      if (
-        saved === 'bento' ||
-        saved === 'split' ||
-        saved === 'deck' ||
-        saved === 'hud' ||
-        saved === 'stream'
-      ) {
-        return saved;
-      }
-    } catch {
-      // fallback
-    }
-    return 'bento';
-  });
-
-  const handleSelectLayoutMode = (mode: SettingsLayoutMode) => {
-    setSettingsLayoutMode(mode);
-    try {
-      localStorage.setItem('debonair_settings_layout_mode', mode);
-    } catch {
-      // ignore
-    }
-  };
 
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [backupMsg, setBackupMsg] = useState<string | null>(null);
@@ -421,121 +437,99 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
     setTimeout(() => setTestingSound(null), 1200);
   };
 
-  // Categories in the Settings Sidebar with industrial metadata and section groupings
-  const categories = useMemo(() => [
+  // Categories in the Settings Sidebar
+  const categories = [
+    {
+      id: 'architecture' as SettingsCategory,
+      label: 'Architecture & Alive Design',
+      description: 'Default architecture, layout presets & ergonomics',
+      icon: Layout
+    },
     {
       id: 'factory' as SettingsCategory,
-      section: 'Plant Operations',
-      index: '01',
       label: 'Plant Identity & Floors',
-      description: 'Enterprise facility, complex unit, active floors',
-      badge: factoryProfile?.name ? factoryProfile.name.split(' ')[0] : 'Debonair',
+      description: 'Enterprise name, operating floors, shift lines',
       icon: Factory
     },
     {
       id: 'display' as SettingsCategory,
-      section: 'Environment',
-      index: '02',
       label: 'Display & Ergonomics',
-      description: 'Daylight Cockpit vs Dark Studio visual themes',
-      badge: currentTheme === 'dark' ? 'Dark' : 'Daylight',
+      description: 'Daylight Cockpit vs Dark Studio themes',
       icon: Sun
     },
     {
       id: 'alerts' as SettingsCategory,
-      section: 'Environment',
-      index: '03',
       label: 'Sound & Floor Alerts',
       description: 'Bottleneck alerts and WIP cycle chimes',
-      badge: auditoryAlertsEnabled ? 'Audio On' : 'Muted',
       icon: Volume2
     },
     {
       id: 'backup' as SettingsCategory,
-      section: 'Storage & System',
-      index: '04',
       label: 'Data Vault & Storage',
-      description: 'IndexedDB snapshots, backups, restore points',
-      badge: 'Local Vault',
+      description: 'IndexedDB snapshots, backups, restore',
       icon: Database
     },
     {
       id: 'security' as SettingsCategory,
-      section: 'Storage & System',
-      index: '05',
       label: 'Security & Access',
-      description: 'Terminal lockout, RBAC tier clearances',
-      badge: profile?.role || 'Operator',
+      description: 'Terminal lockout, RBAC clearances',
       icon: Lock
     },
     {
       id: 'android' as SettingsCategory,
-      section: 'Storage & System',
-      index: '06',
       label: 'Mobile & PWA App',
       description: 'Offline service worker and APK package',
-      badge: 'PWA v2.4',
       icon: Smartphone
     },
     {
       id: 'hubs' as SettingsCategory,
-      section: 'Plant Operations',
-      index: '07',
       label: 'Operational Hubs',
       description: 'Datas, Checklist, Lean, WCM, Reports',
-      badge: '5 Hubs',
       icon: Layers
     }
-  ], [factoryProfile?.name, currentTheme, auditoryAlertsEnabled, profile?.role]);
-
-  const filteredCategories = useMemo(() => {
-    if (!categoryQuery.trim()) return categories;
-    const q = categoryQuery.toLowerCase().trim();
-    return categories.filter(
-      c =>
-        c.label.toLowerCase().includes(q) ||
-        c.description.toLowerCase().includes(q) ||
-        c.section.toLowerCase().includes(q) ||
-        c.badge.toLowerCase().includes(q)
-    );
-  }, [categories, categoryQuery]);
+  ];
 
   // If viewing a full sub-workspace component, show the sub-workspace with a clean header
   const isFullWorkspace =
     activeSection !== 'control-center' &&
     activeSection !== 'preferences';
 
+  // Do not show "Back to Settings" return bar on primary standalone pages (Datas, Check List, Lean Tools)
+  const hideBackToSettings =
+    activeSection === 'line-data' ||
+    activeSection === 'checklist' ||
+    activeSection === 'lean-tools' ||
+    activeSection === 'world';
+
   if (isFullWorkspace) {
     return (
       <div className="space-y-4">
-        {/* Workspace Return Bar */}
-        <div className="bg-[#fbfaf6] dark:bg-[#1a1f26] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-3 sm:p-4 shadow-2xs flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleSetSection('control-center')}
-              className="px-3 py-1.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-white dark:bg-[#232a34] text-xs font-semibold text-[#17343a] dark:text-slate-200 hover:text-[#176f78] hover:border-[#176f78] transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              <span>Back to Settings</span>
-            </button>
-            <span className="text-slate-400 dark:text-slate-600">/</span>
-            <span className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider">
-              {activeSection === 'line-data' && 'Line Data Operations Hub'}
-              {activeSection === 'checklist' && 'Check List & Floor Compliance Hub'}
-              {activeSection === 'lean-tools' && 'Lean Tools & Industrial Engineering Cockpit'}
-              {activeSection === 'capacity' && 'Line Capacity & Pitch Calculator'}
-              {activeSection === 'reports' && 'Reports & Production Analytics Hub'}
-              {activeSection === 'world' && 'World Class Manufacturing (WCM)'}
-              {activeSection === 'tier_0' && 'Tier_0 Root Command Suite'}
-            </span>
-          </div>
+        {/* Workspace Return Bar - Omitted on Datas, Check List, and Lean Tools pages */}
+        {!hideBackToSettings && (
+          <div className="bg-[#fbfaf6] dark:bg-[#1a1f26] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-3 sm:p-4 shadow-2xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleSetSection('control-center')}
+                className="px-3 py-1.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-white dark:bg-[#232a34] text-xs font-semibold text-[#17343a] dark:text-slate-200 hover:text-[#176f78] hover:border-[#176f78] transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Back to Settings</span>
+              </button>
+              <span className="text-slate-400 dark:text-slate-600">/</span>
+              <span className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider">
+                {activeSection === 'capacity' && 'Line Capacity & Pitch Calculator'}
+                {activeSection === 'reports' && 'Reports & Production Analytics Hub'}
+                {activeSection === 'tier_0' && 'Tier_0 Root Command Suite'}
+              </span>
+            </div>
 
-          <div className="hidden sm:flex items-center gap-2 text-xs text-[#527078] dark:text-slate-400">
-            <span>{factoryProfile?.name || 'Debonair LTD'}</span>
-            <span aria-hidden="true">·</span>
-            <span>{totalActiveLines} Lines</span>
+            <div className="hidden sm:flex items-center gap-2 text-xs text-[#527078] dark:text-slate-400">
+              <span>{factoryProfile?.name || 'Debonair LTD'}</span>
+              <span aria-hidden="true">·</span>
+              <span>{totalActiveLines} Lines</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Render Workspace Content */}
         {activeSection === 'line-data' && (
@@ -676,16 +670,16 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   // CORE SETTINGS WORKSPACE (Clean, Apple/Linear-grade 2-column layout)
   return (
     <div className="space-y-6">
-      {/* 1. Header Zone: Clean typography, layout mode selector, unboxed metadata */}
+      {/* 1. Header Zone: Clean typography, unboxed metadata */}
       <header className="bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-5 sm:p-6 shadow-2xs">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-[#176f78] text-white flex items-center justify-center shadow-2xs shrink-0">
                 <Settings className="w-4 h-4" />
               </div>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#17343a] dark:text-slate-100 font-display">
-                Quick Settings / Control Center
+                Settings
               </h1>
             </div>
             <p className="text-xs text-[#527078] dark:text-slate-400">
@@ -693,276 +687,636 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
             </p>
           </div>
 
-          {/* Plant Metadata & Layout Mode Selector */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Unboxed Metadata */}
-            <div className="hidden sm:flex items-center gap-2 text-xs text-[#527078] dark:text-slate-400 font-mono">
-              <span className="font-semibold text-[#17343a] dark:text-slate-200">
-                {factoryProfile?.name || 'Debonair LTD'}
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>{factoryProfile?.unitName || 'Unit-02'}</span>
-              <span aria-hidden="true">·</span>
-              <span className="text-emerald-700 dark:text-emerald-400 font-bold">
-                {totalActiveLines} Lines Active
-              </span>
-            </div>
-
-            {/* Layout Mode Segmented Selector */}
-            <div className="flex items-center gap-1 p-1 bg-[#f0eae0] dark:bg-[#151a22] border border-[#d9d2c2] dark:border-[#2e3846] rounded-xl">
-              <button
-                type="button"
-                onClick={() => handleSelectLayoutMode('bento')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  settingsLayoutMode === 'bento'
-                    ? 'bg-[#176f78] text-white shadow-xs'
-                    : 'text-[#527078] dark:text-slate-400 hover:text-[#17343a] dark:hover:text-slate-200'
-                }`}
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span>Bento Matrix</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectLayoutMode('split')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  settingsLayoutMode === 'split'
-                    ? 'bg-[#176f78] text-white shadow-xs'
-                    : 'text-[#527078] dark:text-slate-400 hover:text-[#17343a] dark:hover:text-slate-200'
-                }`}
-              >
-                <Columns2 className="w-3.5 h-3.5" />
-                <span>Split Rail</span>
-              </button>
-            </div>
+          {/* Plant Metadata */}
+          <div className="flex items-center gap-2 text-xs text-[#527078] dark:text-slate-400 font-mono">
+            <span className="font-semibold text-[#17343a] dark:text-slate-200">
+              {factoryProfile?.name || 'Debonair LTD'}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>{factoryProfile?.unitName || 'Unit-02'}</span>
+            <span aria-hidden="true">·</span>
+            <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+              {totalActiveLines} Lines Active
+            </span>
           </div>
         </div>
       </header>
 
-      {/* 2. Bento Matrix Mode (Panoramic Overview of all Settings UI components) */}
-      {settingsLayoutMode === 'bento' ? (
-        <SettingsBentoOverview
-          factoryProfile={factoryProfile}
-          factoryName={factoryName}
-          unitName={unitName}
-          totalActiveLines={totalActiveLines}
-          currentTheme={currentTheme}
-          onSelectTheme={onSelectTheme}
-          auditoryAlertsEnabled={auditoryAlertsEnabled}
-          onToggleAuditoryAlerts={onToggleAuditoryAlerts}
-          testingSound={testingSound}
-          onTestBottleneck={handleTestBottleneck}
-          onTestWip={handleTestWip}
-          isBackingUp={isBackingUp}
-          backupMsg={backupMsg}
-          onTriggerBackup={handleManualBackupClick}
-          profile={profile}
-          onLockTerminal={onLockTerminal}
-          onOpenAndroidPackage={onOpenAndroidPackage}
-          onOpenDatabase={onOpenDatabase}
-          onOpenUserModal={onOpenUserModal}
-          onNavigateToSection={handleSetSection}
-          onSwitchToInspector={cat => {
-            setActiveCategory(cat as SettingsCategory);
-            handleSelectLayoutMode('split');
-          }}
-          isSysAdmin={isSysAdmin}
-        />
-      ) : (
-        /* 3. Split Rail Mode (Classic Inspector 2-Column Layout) */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* 2. Main Two-Column Settings Workspace */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Navigation Rail (Categories) */}
         <nav
           aria-label="Settings Categories"
-          className="lg:col-span-4 xl:col-span-3 bg-white/95 dark:bg-[#1c222b]/95 backdrop-blur-sm border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-2.5 sm:p-3.5 shadow-2xs flex flex-col gap-2 transition-all duration-200"
+          className="lg:col-span-4 xl:col-span-3 bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-2 sm:p-3 shadow-2xs flex lg:flex-col overflow-x-auto lg:overflow-visible gap-1.5 scrollbar-none"
         >
-          {/* Rail Header on Desktop */}
-          <div className="hidden lg:flex items-center justify-between pb-2.5 mb-0.5 border-b border-[#ece6d9] dark:border-[#2a3442]">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-[#176f78] dark:bg-teal-400 animate-pulse" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#527078] dark:text-slate-400 font-mono">
-                Control Rail
-              </span>
-            </div>
-            <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-[#f4efe4] dark:bg-[#252e3b] text-[#527078] dark:text-slate-400">
-              {filteredCategories.length}/{categories.length}
-            </span>
-          </div>
-
-          {/* Quick Search Filter on Desktop */}
-          <div className="hidden lg:block mb-1">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#527078] dark:text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                value={categoryQuery}
-                onChange={e => setCategoryQuery(e.target.value)}
-                placeholder="Filter settings..."
-                className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl bg-[#f8f6f0] dark:bg-[#141920] border border-[#d9d2c2] dark:border-[#2e3846] text-[#17343a] dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-[#176f78] transition-all"
-              />
-              {categoryQuery && (
-                <button
-                  type="button"
-                  onClick={() => setCategoryQuery('')}
-                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                  aria-label="Clear filter"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Mobile Horizontal Scroll Strip */}
-          <div className="lg:hidden flex overflow-x-auto gap-2 py-1 scrollbar-none snap-x -mx-1 px-1">
-            {categories.map(cat => {
-              const Icon = cat.icon;
-              const isActive = activeCategory === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setActiveCategory(cat.id)}
-                  className={`snap-start shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none whitespace-nowrap min-h-[44px] ${
+          {categories.map(cat => {
+            const Icon = cat.icon;
+            const isActive = activeCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setActiveCategory(cat.id)}
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all cursor-pointer whitespace-nowrap lg:whitespace-normal w-full group ${
+                  isActive
+                    ? 'bg-[#176f78] text-white shadow-xs'
+                    : 'text-[#17343a] dark:text-slate-300 hover:bg-[#f1eee6] dark:hover:bg-[#252e3a]'
+                }`}
+              >
+                <div
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                     isActive
-                      ? 'bg-[#176f78] text-white shadow-xs'
-                      : 'bg-[#f4efe4] dark:bg-[#222934] text-[#17343a] dark:text-slate-300 hover:bg-[#eae3d5] dark:hover:bg-[#2b3543]'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-[#f1eee6] dark:bg-[#252e3a] text-[#176f78] dark:text-teal-400 group-hover:bg-[#e7e1d5] dark:group-hover:bg-[#2c3746]'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#176f78] dark:text-teal-400'}`} />
-                  <span>{cat.label}</span>
-                  {isActive && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-white ml-0.5" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Desktop Categories List */}
-          <div className="hidden lg:flex flex-col gap-1.5">
-            {filteredCategories.length === 0 ? (
-              <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500 space-y-2">
-                <SlidersHorizontal className="w-5 h-5 mx-auto opacity-50" />
-                <p>No modules match &quot;{categoryQuery}&quot;</p>
-                <button
-                  type="button"
-                  onClick={() => setCategoryQuery('')}
-                  className="text-xs text-[#176f78] dark:text-teal-400 font-semibold underline cursor-pointer"
-                >
-                  Reset filter
-                </button>
-              </div>
-            ) : (
-              filteredCategories.map(cat => {
-                const Icon = cat.icon;
-                const isActive = activeCategory === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setActiveCategory(cat.id)}
-                    className={`relative group flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-150 cursor-pointer w-full select-none ${
-                      isActive
-                        ? 'bg-gradient-to-r from-[#176f78] to-[#125860] text-white shadow-xs ring-1 ring-[#176f78]/30 dark:from-[#176f78] dark:to-[#0f464d]'
-                        : 'text-[#17343a] dark:text-slate-300 hover:bg-[#f6f2e8] dark:hover:bg-[#232c38] border border-transparent hover:border-[#dfd8cb] dark:hover:border-[#333e4e]'
+                  <Icon className="w-4 h-4" />
+                </div>
+                <div className="hidden min-[480px]:block">
+                  <div className="text-xs font-bold leading-snug">
+                    {cat.label}
+                  </div>
+                  <div
+                    className={`text-[10px] hidden lg:block leading-tight ${
+                      isActive ? 'text-white/80' : 'text-[#527078] dark:text-slate-400'
                     }`}
                   >
-                    {/* Active Accent Bar on Left */}
-                    {isActive && (
-                      <span className="absolute left-1 top-2.5 bottom-2.5 w-1 rounded-full bg-white/90 shadow-2xs" />
-                    )}
+                    {cat.description}
+                  </div>
+                </div>
+                <span className="min-[480px]:hidden text-xs font-bold">
+                  {cat.label.split(' ')[0]}
+                </span>
+              </button>
+            );
+          })}
 
-                    {/* Icon Container with Dual-Tone State */}
-                    <div
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
-                        isActive
-                          ? 'bg-white/20 text-white shadow-2xs'
-                          : 'bg-[#f0eae0] dark:bg-[#252e3b] text-[#176f78] dark:text-teal-400 group-hover:bg-[#e6dfd3] dark:group-hover:bg-[#2c3746]'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                    </div>
-
-                    {/* Module Title & Description */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1.5">
-                        <span className="text-xs font-bold truncate">
-                          {cat.label}
-                        </span>
-                        <span
-                          className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded-md shrink-0 tabular-nums ${
-                            isActive
-                              ? 'bg-white/20 text-white font-medium'
-                              : 'bg-[#eae4d7] dark:bg-[#283240] text-[#527078] dark:text-slate-400'
-                          }`}
-                        >
-                          {cat.badge}
-                        </span>
-                      </div>
-                      <p
-                        className={`text-[10px] leading-tight truncate mt-0.5 ${
-                          isActive
-                            ? 'text-teal-100/85'
-                            : 'text-[#527078] dark:text-slate-400'
-                        }`}
-                      >
-                        {cat.description}
-                      </p>
-                    </div>
-
-                    {/* Interactive Right Chevron Indicator */}
-                    <ChevronRight
-                      className={`w-3.5 h-3.5 shrink-0 transition-transform ${
-                        isActive
-                          ? 'text-white/90 translate-x-0'
-                          : 'text-slate-400/40 dark:text-slate-600 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5'
-                      }`}
-                    />
-                  </button>
-                );
-              })
-            )}
-          </div>
-
-          {/* Super Admin Tier_0 Root Suite */}
           {isSysAdmin && (
-            <div className="pt-2 border-t border-[#ece6d9] dark:border-[#2a3442] mt-1 hidden lg:block">
+            <div className="pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] mt-1">
               <button
                 type="button"
                 onClick={() => handleSetSection('tier_0')}
-                className="group flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer text-amber-950 dark:text-amber-100 bg-gradient-to-r from-amber-50 to-amber-100/60 dark:from-amber-950/40 dark:to-amber-900/30 hover:from-amber-100 hover:to-amber-200/60 dark:hover:from-amber-900/50 dark:hover:to-amber-800/40 border border-amber-300/80 dark:border-amber-700/60 shadow-2xs w-full"
+                className="flex items-center gap-3 px-3.5 py-2 rounded-xl text-left transition-all cursor-pointer text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800/60 w-full"
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-amber-200/80 dark:bg-amber-800/60 flex items-center justify-center shrink-0 text-amber-800 dark:text-amber-200">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold leading-tight flex items-center gap-1.5">
-                      <span>Tier_0 Root Suite</span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
-                    </div>
-                    <div className="text-[10px] text-amber-800/80 dark:text-amber-300/80 truncate">
-                      Full privileged infrastructure
-                    </div>
-                  </div>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                <ShieldCheck className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" />
+                <span className="text-xs font-bold">Tier_0 Root Suite</span>
               </button>
             </div>
           )}
-
-          {/* Desktop Telemetry Strip at Bottom of Rail */}
-          <div className="hidden lg:flex items-center justify-between pt-2.5 mt-auto border-t border-[#ece6d9] dark:border-[#2a3442] text-[10px] text-[#527078] dark:text-slate-400 font-mono">
-            <span className="truncate">IndexedDB Vault</span>
-            <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold">
-              Ready
-            </span>
-          </div>
         </nav>
 
         {/* Right Settings Content Area */}
         <main className="lg:col-span-8 xl:col-span-9 bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-5 sm:p-7 shadow-2xs">
+          {/* Layout Change Feedback Notification */}
+          {layoutNotice && (
+            <div className="mb-5 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold text-emerald-900 dark:text-emerald-200 flex items-center gap-2.5 animate-fadeIn">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span>{layoutNotice}</span>
+            </div>
+          )}
+
+          {/* ========================================================
+              CATEGORY 0: ARCHITECTURE & ALIVE DESIGN
+          ======================================================== */}
+          {activeCategory === 'architecture' && (
+            <section className="space-y-6">
+              {/* Header Zone */}
+              <div className="border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
+                      <Layout className="w-4 h-4 text-[#176f78]" />
+                      <span>Default Architecture &amp; &ldquo;Alive Design&rdquo; Studio</span>
+                    </h2>
+                    <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
+                      Configure factory layout topology, responsive navigation geometry, and real-time floor ergonomics for Debonair Unit-02.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-[#527078] dark:text-slate-400 font-mono shrink-0">
+                    <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-bold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Alive Engine Active
+                    </span>
+                  </div>
+                </div>
+
+                {/* Clean Unboxed Metadata (Zero-Pill Discipline) */}
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#527078] dark:text-slate-400 font-mono mt-3">
+                  <span className="font-semibold text-[#17343a] dark:text-slate-200">
+                    {appLayout.presetName || 'Debonair RMG Floor Standard'}
+                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span>Nav: {appLayout.navBarStyle}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>Grid: {appLayout.floorGridColumns} Cols</span>
+                  <span aria-hidden="true">·</span>
+                  <span>Density: {appLayout.density}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>Font: {appLayout.fontScalePct}%</span>
+                </div>
+              </div>
+
+              {/* 1. Official Default Architecture Spotlight */}
+              <div className="p-5 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] relative overflow-hidden">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1.5 max-w-xl">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#176f78] dark:text-teal-400">
+                        Factory Baseline Architecture
+                      </span>
+                      {appLayout.presetId === 'debonair-floor-default' && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                          <Check className="w-3 h-3" /> Default Active
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-sm sm:text-base font-bold text-[#17343a] dark:text-slate-100">
+                      Debonair RMG Floor Standard (Unit-02)
+                    </h3>
+                    <p className="text-xs text-[#527078] dark:text-slate-400 leading-relaxed">
+                      The certified industrial baseline configured for Debonair Unit-02: 2-column card view, Cupertino navigation dock, balanced 34-line telemetry, comfortable ergonomic spacing, and high-legibility tabular figures.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRestoreDefaultArchitecture}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#176f78] hover:bg-[#135c64] text-white text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 self-start md:self-center"
+                    title="Reset all viewport geometry, navigation dock, and density settings to factory standard"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Restore Default Architecture</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Alive Presets Gallery */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#17343a] dark:text-slate-200">
+                    Architectural Layout Presets
+                  </h3>
+                  <span className="text-[11px] text-[#527078] dark:text-slate-400">
+                    Click any preset to apply live across the plant
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {BUILT_IN_LAYOUT_PRESETS.map(preset => {
+                    const isActive = appLayout.presetId === preset.id;
+                    const isDefault = preset.id === 'debonair-floor-default';
+                    return (
+                      <div
+                        key={preset.id}
+                        onClick={() =>
+                          handleApplyLayoutConfig(
+                            {
+                              ...appLayout,
+                              ...preset.config,
+                              presetId: preset.id,
+                              presetName: preset.name,
+                              lastUpdated: new Date().toISOString()
+                            } as AppPageLayoutConfig,
+                            `Applied "${preset.name}" architecture live!`
+                          )
+                        }
+                        className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between relative group ${
+                          isActive
+                            ? 'border-[#176f78] bg-white dark:bg-[#1c222b] shadow-xs ring-2 ring-[#176f78]/25'
+                            : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white dark:hover:bg-[#1f2732]'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <div className="font-bold text-xs text-[#17343a] dark:text-slate-100 flex items-center gap-1.5">
+                              <span>{preset.name}</span>
+                              {isDefault && (
+                                <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-[#176f78]/10 text-[#176f78] dark:text-teal-300">
+                                  Default
+                                </span>
+                              )}
+                            </div>
+                            {isActive && (
+                              <CheckCircle2 className="w-4 h-4 text-[#176f78] shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-[11px] text-[#527078] dark:text-slate-400 line-clamp-2 leading-relaxed">
+                            {preset.desc}
+                          </p>
+                        </div>
+
+                        {/* Quiet unboxed metadata */}
+                        <div className="mt-3 pt-2.5 border-t border-[#e7e1d5] dark:border-[#2e3846] flex items-center justify-between text-[10px] font-mono text-[#527078] dark:text-slate-400">
+                          <span>{preset.config.floorGridColumns || 2} Cols</span>
+                          <span aria-hidden="true">·</span>
+                          <span>{preset.config.navBarStyle || 'cupertino'}</span>
+                          <span aria-hidden="true">·</span>
+                          <span>{preset.config.floorCardStyle === 'row' ? 'Rows' : 'Cards'}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Alive Ergonomics & Custom Viewport Controls */}
+              <div className="space-y-4 pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846]">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#17343a] dark:text-slate-200">
+                  Ergonomics &amp; Viewport Geometry
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Navigation Architecture */}
+                  <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] space-y-2">
+                    <label className="block text-xs font-bold text-[#17343a] dark:text-slate-200">
+                      Navigation Architecture
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {[
+                        { id: 'bottom-cupertino' as NavBarStyle, label: 'Cupertino Dock', sub: 'Bottom standard' },
+                        { id: 'floating-dock' as NavBarStyle, label: 'Floating Dock', sub: 'Tablet pill' },
+                        { id: 'top-header' as NavBarStyle, label: 'Top Header', sub: 'Overhead TVs' },
+                        { id: 'kiosk-minimal' as NavBarStyle, label: 'Kiosk Minimal', sub: 'Floor terminal' }
+                      ].map(item => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() =>
+                            handleApplyLayoutConfig({
+                              ...appLayout,
+                              navBarStyle: item.id,
+                              presetId: 'custom',
+                              presetName: 'Custom Architecture'
+                            })
+                          }
+                          className={`p-2 rounded-lg text-left transition-all border cursor-pointer ${
+                            appLayout.navBarStyle === item.id
+                              ? 'bg-white dark:bg-[#252e3a] border-[#176f78] shadow-2xs text-[#17343a] dark:text-white ring-1 ring-[#176f78]'
+                              : 'bg-transparent border-transparent hover:bg-white/60 dark:hover:bg-[#202732] text-[#527078] dark:text-slate-400'
+                          }`}
+                        >
+                          <div className="text-xs font-bold">{item.label}</div>
+                          <div className="text-[10px] text-[#527078] dark:text-slate-400">{item.sub}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Shop Floor Grid Columns */}
+                  <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] space-y-2">
+                    <label className="block text-xs font-bold text-[#17343a] dark:text-slate-200">
+                      Shop Floor Grid Geometry
+                    </label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {([1, 2, 3, 4] as FloorGridColumns[]).map(cols => (
+                        <button
+                          key={cols}
+                          type="button"
+                          onClick={() =>
+                            handleApplyLayoutConfig({
+                              ...appLayout,
+                              floorGridColumns: cols,
+                              presetId: 'custom',
+                              presetName: 'Custom Architecture'
+                            })
+                          }
+                          className={`py-2 px-1 text-center rounded-lg border transition-all cursor-pointer ${
+                            appLayout.floorGridColumns === cols
+                              ? 'bg-[#176f78] border-[#176f78] text-white shadow-2xs font-bold'
+                              : 'bg-white dark:bg-[#252e3a] border-[#d9d2c2] dark:border-[#2e3846] text-[#17343a] dark:text-slate-300 hover:bg-[#f1eee6]'
+                          }`}
+                        >
+                          <div className="text-xs">{cols} Col{cols > 1 ? 's' : ''}</div>
+                          <div className="text-[9px] opacity-80 font-mono">
+                            {cols === 1 ? 'Focus' : cols === 2 ? 'Default' : cols === 3 ? 'Dense' : 'Wide'}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Floor Card Representation Style */}
+                  <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] space-y-2">
+                    <label className="block text-xs font-bold text-[#17343a] dark:text-slate-200">
+                      Floor Card Presentation
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleApplyLayoutConfig({
+                            ...appLayout,
+                            floorCardStyle: 'card',
+                            presetId: 'custom',
+                            presetName: 'Custom Architecture'
+                          })
+                        }
+                        className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                          appLayout.floorCardStyle === 'card'
+                            ? 'bg-white dark:bg-[#252e3a] border-[#176f78] text-[#17343a] dark:text-white ring-1 ring-[#176f78]'
+                            : 'bg-transparent border-transparent hover:bg-white/60 dark:hover:bg-[#202732] text-[#527078] dark:text-slate-400'
+                        }`}
+                      >
+                        <div className="text-xs font-bold flex items-center gap-1.5">
+                          <Grid className="w-3.5 h-3.5" /> Visual Cards (Default)
+                        </div>
+                        <div className="text-[10px] text-[#527078] dark:text-slate-400 mt-0.5">
+                          Tactile gauges, sparklines &amp; DHU meters
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleApplyLayoutConfig({
+                            ...appLayout,
+                            floorCardStyle: 'row',
+                            presetId: 'custom',
+                            presetName: 'Custom Architecture'
+                          })
+                        }
+                        className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                          appLayout.floorCardStyle === 'row'
+                            ? 'bg-white dark:bg-[#252e3a] border-[#176f78] text-[#17343a] dark:text-white ring-1 ring-[#176f78]'
+                            : 'bg-transparent border-transparent hover:bg-white/60 dark:hover:bg-[#202732] text-[#527078] dark:text-slate-400'
+                        }`}
+                      >
+                        <div className="text-xs font-bold flex items-center gap-1.5">
+                          <List className="w-3.5 h-3.5" /> Compact Rows
+                        </div>
+                        <div className="text-[10px] text-[#527078] dark:text-slate-400 mt-0.5">
+                          Dense high-throughput tabular strips
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* UI Density & Tactile Scale */}
+                  <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] space-y-2">
+                    <label className="block text-xs font-bold text-[#17343a] dark:text-slate-200">
+                      Shop Floor Density
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[
+                        { id: 'compact' as const, label: 'Compact', sub: 'Max density' },
+                        { id: 'comfortable' as const, label: 'Comfortable', sub: 'Default' },
+                        { id: 'spacious' as const, label: 'Spacious', sub: 'Tablet touch' }
+                      ].map(d => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() =>
+                            handleApplyLayoutConfig({
+                              ...appLayout,
+                              density: d.id,
+                              presetId: 'custom',
+                              presetName: 'Custom Architecture'
+                            })
+                          }
+                          className={`p-2 rounded-lg text-center border transition-all cursor-pointer ${
+                            appLayout.density === d.id
+                              ? 'bg-[#176f78] border-[#176f78] text-white shadow-2xs font-bold'
+                              : 'bg-white dark:bg-[#252e3a] border-[#d9d2c2] dark:border-[#2e3846] text-[#17343a] dark:text-slate-300 hover:bg-[#f1eee6]'
+                          }`}
+                        >
+                          <div className="text-xs">{d.label}</div>
+                          <div className="text-[9px] opacity-80">{d.sub}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Announcement Ribbon & Broadcast Ticker */}
+                <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-[#17343a] dark:text-slate-200 flex items-center gap-1.5">
+                        <Radio className="w-3.5 h-3.5 text-[#176f78]" />
+                        <span>Floor Announcement Ticker Ribbon</span>
+                      </div>
+                      <div className="text-[11px] text-[#527078] dark:text-slate-400">
+                        Broadcast shift directives, quality alerts, or targets at the top of the floor
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={appLayout.showAnnouncementTicker !== false}
+                        onChange={e =>
+                          handleApplyLayoutConfig({
+                            ...appLayout,
+                            showAnnouncementTicker: e.target.checked
+                          })
+                        }
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#176f78]" />
+                    </label>
+                  </div>
+
+                  {appLayout.showAnnouncementTicker !== false && (
+                    <div className="space-y-2 pt-1">
+                      <input
+                        type="text"
+                        value={appLayout.tickerText || ''}
+                        onChange={e =>
+                          handleApplyLayoutConfig({
+                            ...appLayout,
+                            tickerText: e.target.value
+                          })
+                        }
+                        placeholder="Enter floor announcement..."
+                        className="w-full text-xs px-3 py-2 rounded-xl bg-white dark:bg-[#252e3a] border border-[#d9d2c2] dark:border-[#2e3846] text-[#17343a] dark:text-slate-100 font-medium"
+                      />
+
+                      {/* Quick preset suggestions */}
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                        <span className="text-[#527078] dark:text-slate-400">Quick Directives:</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleApplyLayoutConfig({
+                              ...appLayout,
+                              tickerText: 'Debonair LTD Unit-02 • 34 Active Sewing Lines • Standard Shift Running'
+                            })
+                          }
+                          className="px-2 py-0.5 rounded-md bg-white dark:bg-[#252e3a] border border-[#d9d2c2] dark:border-[#2e3846] hover:border-[#176f78] text-[#17343a] dark:text-slate-300 cursor-pointer"
+                        >
+                          Standard Shift
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleApplyLayoutConfig({
+                              ...appLayout,
+                              tickerText: '★ SHIFT TARGET: Green Wing 86.5% Eff • Benchmark Line 18 in Stability'
+                            })
+                          }
+                          className="px-2 py-0.5 rounded-md bg-white dark:bg-[#252e3a] border border-[#d9d2c2] dark:border-[#2e3846] hover:border-[#176f78] text-[#17343a] dark:text-slate-300 cursor-pointer"
+                        >
+                          Green Wing Target
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleApplyLayoutConfig({
+                              ...appLayout,
+                              tickerText: 'AUDIT ALERT: 7/0 Traffic Light System active across All 6 Floors'
+                            })
+                          }
+                          className="px-2 py-0.5 rounded-md bg-white dark:bg-[#252e3a] border border-[#d9d2c2] dark:border-[#2e3846] hover:border-[#176f78] text-[#17343a] dark:text-slate-300 cursor-pointer"
+                        >
+                          Quality Audit
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 4. Alive Interactive Architectural Blueprint Preview */}
+              <div className="p-5 rounded-2xl bg-slate-900 text-white border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-teal-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                      Alive Architectural Blueprint (Interactive Live Wireframe)
+                    </span>
+                  </div>
+
+                  {/* Device Preview Switcher */}
+                  <div className="flex items-center gap-1 p-0.5 bg-slate-800 rounded-lg border border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDevice('desktop')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold transition-colors cursor-pointer ${
+                        previewDevice === 'desktop' ? 'bg-[#176f78] text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Monitor className="w-3 h-3" />
+                      <span>Desktop</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDevice('tablet')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold transition-colors cursor-pointer ${
+                        previewDevice === 'tablet' ? 'bg-[#176f78] text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Tablet className="w-3 h-3" />
+                      <span>Tablet</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDevice('mobile')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold transition-colors cursor-pointer ${
+                        previewDevice === 'mobile' ? 'bg-[#176f78] text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Smartphone className="w-3 h-3" />
+                      <span>Mobile</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Wireframe Box */}
+                <div className="flex justify-center p-3 bg-slate-950 rounded-xl border border-slate-800">
+                  <div
+                    className={`transition-all duration-300 bg-slate-900 border border-slate-700 rounded-lg overflow-hidden flex flex-col ${
+                      previewDevice === 'desktop'
+                        ? 'w-full max-w-xl h-52'
+                        : previewDevice === 'tablet'
+                        ? 'w-80 h-52'
+                        : 'w-48 h-56'
+                    }`}
+                  >
+                    {/* Top Ticker wireframe */}
+                    {appLayout.showAnnouncementTicker !== false && (
+                      <div className="bg-[#176f78] text-[9px] px-2 py-0.5 text-white flex items-center justify-between font-mono shrink-0">
+                        <span className="truncate">{appLayout.tickerText || 'Debonair Unit-02'}</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                      </div>
+                    )}
+
+                    {/* Top Header wireframe if top-header */}
+                    {appLayout.navBarStyle === 'top-header' && (
+                      <div className="bg-slate-800 border-b border-slate-700 px-2 py-1 flex items-center justify-between shrink-0">
+                        <span className="text-[9px] font-bold text-teal-300">DGU-02</span>
+                        <div className="flex gap-1 text-[8px] text-slate-300">
+                          <span className="px-1 bg-slate-700 rounded">Dash</span>
+                          <span className="px-1">Lines</span>
+                          <span className="px-1">Lean</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Center area with optional sidebar */}
+                    <div className="flex-1 flex overflow-hidden">
+                      {appLayout.navBarStyle === 'kiosk-minimal' && (
+                        <div className="w-10 bg-slate-800 border-r border-slate-700 p-1 flex flex-col items-center gap-1 shrink-0">
+                          <div className="w-3 h-3 rounded bg-teal-500/40" />
+                          <div className="w-4 h-1.5 rounded bg-slate-700" />
+                          <div className="w-4 h-1.5 rounded bg-slate-700" />
+                        </div>
+                      )}
+
+                      {/* Content grid */}
+                      <div className="flex-1 p-2 overflow-y-auto space-y-1.5">
+                        <div className="h-3 rounded bg-slate-800 border border-slate-700/50 flex items-center px-1">
+                          <div className="w-1/3 h-1.5 bg-slate-600 rounded" />
+                        </div>
+
+                        {/* Columns simulation */}
+                        <div
+                          className="grid gap-1"
+                          style={{
+                            gridTemplateColumns: `repeat(${appLayout.floorGridColumns}, minmax(0, 1fr))`
+                          }}
+                        >
+                          {Array.from({ length: appLayout.floorGridColumns * 2 }, (_, i) => (
+                            <div
+                              key={i}
+                              className={`rounded border border-slate-700/60 p-1 bg-slate-800/80 ${
+                                appLayout.floorCardStyle === 'row' ? 'h-4 flex items-center justify-between' : 'h-10 flex flex-col justify-between'
+                              }`}
+                            >
+                              <div className="w-10 h-1.5 bg-slate-600 rounded" />
+                              <div className="w-5 h-1.5 bg-teal-500/60 rounded" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom Nav wireframe if cupertino or floating */}
+                    {appLayout.navBarStyle === 'bottom-cupertino' && (
+                      <div className="bg-slate-800/90 border-t border-slate-700 px-3 py-1 flex items-center justify-around shrink-0">
+                        <div className="w-3 h-3 rounded bg-teal-500" />
+                        <div className="w-3 h-3 rounded bg-slate-600" />
+                        <div className="w-3 h-3 rounded bg-slate-600" />
+                        <div className="w-3 h-3 rounded bg-slate-600" />
+                      </div>
+                    )}
+                    {appLayout.navBarStyle === 'floating-dock' && (
+                      <div className="p-1 flex justify-center shrink-0">
+                        <div className="bg-slate-800 border border-slate-700 px-3 py-1 rounded-full flex items-center gap-2 shadow-md">
+                          <div className="w-2.5 h-2.5 rounded-full bg-teal-500" />
+                          <div className="w-2.5 h-2.5 rounded-full bg-slate-600" />
+                          <div className="w-2.5 h-2.5 rounded-full bg-slate-600" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-400 text-center font-mono">
+                  Alive Architecture Engine • Instant live updates dispatched to all plant clients
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* ========================================================
               CATEGORY 1: PLANT IDENTITY & OPERATING FLOORS
           ======================================================== */}
@@ -1309,6 +1663,33 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                     }`}
                   />
                 </button>
+              </div>
+
+              {/* Real-Time Auto-Refresh Engine Customizer */}
+              <div className="p-4 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <div className="text-sm font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-[#176f78]" />
+                    <span>Real-Time Auto-Refresh Engine</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 uppercase">
+                      Telemetry Heartbeat
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#527078] dark:text-slate-400">
+                    Tune telemetry refresh intervals (3s–60s), pacing simulation intensity, countdown badges, and auditory ticks.
+                  </p>
+                </div>
+
+                {onOpenAutoRefreshCustomizer && (
+                  <button
+                    type="button"
+                    onClick={onOpenAutoRefreshCustomizer}
+                    className="px-4 py-2 rounded-xl bg-[#176f78] hover:bg-[#12555c] text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <Sliders className="w-3.5 h-3.5" />
+                    <span>Customize Engine</span>
+                  </button>
+                )}
               </div>
 
               {/* Specific Alert Channels */}
@@ -1688,7 +2069,6 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
           )}
         </main>
       </div>
-      )}
     </div>
   );
 };

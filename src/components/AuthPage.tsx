@@ -529,8 +529,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       onChange={e => setSelectedWing(e.target.value as any)}
                       className="w-full px-3 py-2 rounded-xl border border-[#d9d2c2] bg-white text-xs font-semibold text-[#17343a]"
                     >
-                      <option value="Blue Wing">Blue Wing (Lines 01–18)</option>
-                      <option value="Green Wing">Green Wing (Lines 19–34)</option>
+                      <option value="Blue Wing">Blue Wing (Lines 01–17)</option>
+                      <option value="Green Wing">Green Wing (Lines 18–34)</option>
                       <option value="All">All Factory Wings (Dept Admin)</option>
                     </select>
                   </div>
@@ -686,8 +686,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         onChange={e => setSelectedWing(e.target.value as any)}
                         className="w-full px-2.5 py-1.5 rounded-xl border border-[#d9d2c2] bg-[#fbfaf6] text-xs font-semibold text-slate-800"
                       >
-                        <option value="Blue Wing">Blue Wing (Lines 01–18)</option>
-                        <option value="Green Wing">Green Wing (Lines 19–34)</option>
+                        <option value="Blue Wing">Blue Wing (Lines 01–17)</option>
+                        <option value="Green Wing">Green Wing (Lines 18–34)</option>
                       </select>
                     </div>
 

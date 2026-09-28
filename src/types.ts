@@ -953,3 +953,107 @@ export interface DailyBackupRecord {
     metadata?: any;
   };
 }
+
+export interface PlantFloorConfig {
+  id: string;
+  name: string;
+  linesCount: number;
+  assignedLinesRange?: string;
+  floorColor?: string;
+  floorManager?: string;
+}
+
+export interface EnterprisePlant {
+  id: string;
+  name: string;
+  unitName: string;
+  plantCode: string;
+  enterpriseGroup?: string;
+  industrySector: string;
+  department: string;
+  addressLocation: string;
+  shortTag: string;
+  brandColor?: string;
+  establishedYear?: string;
+  totalLinesCount: number;
+  contactEmail?: string;
+  plantHead?: {
+    name: string;
+    designation: string;
+    email: string;
+    phone: string;
+  };
+  shiftHours?: number;
+  targetEfficiencyBenchmark?: number;
+  status: 'active' | 'maintenance' | 'standby';
+  isCustom?: boolean;
+  floors?: PlantFloorConfig[];
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ManagementMember {
+  id: string;
+  name: string;
+  role: string;
+  lineOrFloor: string;
+  contact: string;
+  status: 'active' | 'on_floor' | 'in_standup' | 'leave';
+  avatarColor?: string;
+}
+
+export interface ManagementDivision {
+  id: string;
+  name: string;
+  divisionCode: string;
+  plantId: string;
+  plantName: string;
+  lead: {
+    name: string;
+    designation: string;
+    email: string;
+    phone: string;
+    tierLevel?: string;
+    avatarColor?: string;
+  };
+  deputyLead?: {
+    name: string;
+    designation: string;
+  };
+  assignedLines: string[];
+  assignedFloors: string[];
+  cadreCount: number;
+  targetEfficiency: number;
+  operatingBudgetMonthly?: string;
+  kpiFocus: string[];
+  status: 'active' | 'restructuring' | 'standby';
+  reportingTo?: string;
+  colorTheme?: string;
+  members: ManagementMember[];
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PlantLeadershipMember {
+  id: string;
+  plantId: string;
+  plantName: string;
+  name: string;
+  designation: string;
+  leadershipTier: 'plant_executive' | 'departmental_head' | 'divisional_lead' | 'floor_commander';
+  email: string;
+  phone: string;
+  avatarColor?: string;
+  yearsInLeadership: number;
+  directReportsCount: number;
+  delegatedAuthorities: string[];
+  managedLinesRange: string;
+  managedFloors: string[];
+  kpiCommitment: string;
+  status: 'active' | 'on_floor' | 'in_standup' | 'leave';
+  isPlantHead?: boolean;
+  notes?: string;
+  createdAt?: string;
+}

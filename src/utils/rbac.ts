@@ -22,16 +22,16 @@ export interface LineScopeCheckResult {
 /**
  * Wing mappings for Debonair LTD (Unit-02)
  * Total 34 Production Lines:
- * - Blue Wing (Mgr 1): Lines 01 to 18
- * - Green Wing (Mgr 2): Lines 19 to 34
+ * - Blue Wing (Mgr 1): Lines 01 to 17 (17 Lines, Floors 1–3)
+ * - Green Wing (Mgr 2): Lines 18 to 34 (17 Lines, Floors 4–6)
  */
-export const BLUE_WING_LINES = Array.from({ length: 18 }, (_, i) => {
+export const BLUE_WING_LINES = Array.from({ length: 17 }, (_, i) => {
   const num = i + 1;
   return num < 10 ? `Line 0${num}` : `Line ${num}`;
 });
 
-export const GREEN_WING_LINES = Array.from({ length: 16 }, (_, i) => {
-  const num = i + 19;
+export const GREEN_WING_LINES = Array.from({ length: 17 }, (_, i) => {
+  const num = i + 18;
   return `Line ${num}`;
 });
 
@@ -135,7 +135,7 @@ export function normalizeLineNo(lineNo: string | number): string {
 export function getLineWing(lineNo: string | number): 'Blue Wing' | 'Green Wing' {
   const norm = normalizeLineNo(lineNo);
   const digits = parseInt(norm.replace(/[^0-9]/g, ''), 10);
-  if (isNaN(digits) || digits <= 18) {
+  if (isNaN(digits) || digits <= 17) {
     return 'Blue Wing';
   }
   return 'Green Wing';
@@ -152,8 +152,8 @@ export function getLineBlock(lineNo: string | number): LineBlockDefinition {
   if (!isNaN(digits)) {
     if (digits <= 6) return FACTORY_BLOCKS[0];
     if (digits <= 12) return FACTORY_BLOCKS[1];
-    if (digits <= 18) return FACTORY_BLOCKS[2];
-    if (digits <= 24) return FACTORY_BLOCKS[3];
+    if (digits <= 17) return FACTORY_BLOCKS[2];
+    if (digits <= 23) return FACTORY_BLOCKS[3];
     if (digits <= 29) return FACTORY_BLOCKS[4];
     return FACTORY_BLOCKS[5];
   }

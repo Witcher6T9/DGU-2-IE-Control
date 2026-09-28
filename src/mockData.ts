@@ -111,7 +111,7 @@ export const ROLE_TIERS: RoleTier[] = [
     color: '#2563eb',
     reportingScope: 'Assigned Wing - Lines',
     accessControlLevel: 'Wing Super-User (Assigned Wing Control Write & Approve)',
-    description: 'Divisional Wing Manager supervising assigned production wing (Blue Wing: Lines 01–18 or Green Wing: Lines 19–34). Write & Approve control across assigned wing lines.',
+    description: 'Divisional Wing Manager supervising assigned production wing (Blue Wing: Lines 01–17 or Green Wing: Lines 18–34). Write & Approve control across assigned wing lines.',
     systemRole: 'MANAGER',
     systemEdit: 'Assigned Wing Control (Write & Approve)',
     deletionReset: 'Restricted',

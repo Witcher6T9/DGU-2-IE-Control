@@ -719,8 +719,8 @@ export const UserModal: React.FC<UserModalProps> = ({
                       onChange={e => setAssignedWing(e.target.value as any)}
                       className="w-full px-3 py-1.5 rounded-xl border border-blue-300 text-xs font-bold text-blue-950 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="Blue Wing">Blue Wing (Lines 01–18 • Manager 1)</option>
-                      <option value="Green Wing">Green Wing (Lines 19–34 • Manager 2)</option>
+                      <option value="Blue Wing">Blue Wing (Lines 01–17 • Manager 1)</option>
+                      <option value="Green Wing">Green Wing (Lines 18–34 • Manager 2)</option>
                       <option value="All">All Factory Wings (Executive Oversight)</option>
                     </select>
                     <p className="text-[11px] text-blue-700">

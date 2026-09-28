@@ -47,7 +47,8 @@ import {
   checkLineAccess,
   getLineWing,
   getLineBlock,
-  isSystemAdmin
+  isSystemAdmin,
+  FACTORY_BLOCKS
 } from '../utils/rbac';
 
 export interface UnifiedPermissionMatrixProps {
@@ -78,6 +79,9 @@ export const UnifiedPermissionMatrix: React.FC<UnifiedPermissionMatrixProps> = (
   const [simulatedTierId, setSimulatedTierId] = useState<string>(activeTierId);
   const [simulatedActionId, setSimulatedActionId] = useState<string>('override_target_midshift');
   const [simulatedLineNo, setSimulatedLineNo] = useState<string>('Line 04');
+  const [simulatedWing, setSimulatedWing] = useState<'Blue Wing' | 'Green Wing'>(() => {
+    return profile?.assignedWing === 'Green Wing' ? 'Green Wing' : 'Blue Wing';
+  });
 
   // Break Glass Emergency Token State
   const [breakGlassRecord, setBreakGlassRecord] = useState<BreakGlassKeyRecord | null>(null);
@@ -157,17 +161,19 @@ export const UnifiedPermissionMatrix: React.FC<UnifiedPermissionMatrixProps> = (
 
   // Live Simulator Evaluation
   const simulatedProfile: UserProfile = useMemo(() => {
+    const isRoot = simulatedTierId === 'tier_0';
+    const targetBlock = FACTORY_BLOCKS.find(b => b.wing === simulatedWing) || FACTORY_BLOCKS[3];
     return {
       name: profile?.name || 'Simulated User',
       jobTitle: roleTiers.find(t => t.id === simulatedTierId)?.name || 'IE Engineer',
-      role: 'ie_incharge',
+      role: isRoot ? 'admin' : simulatedTierId === 'tier_2' ? 'manager' : 'ie_incharge',
       tierId: simulatedTierId,
-      email: profile?.email || 'engineer@debonair.com',
-      assignedWing: profile?.assignedWing || 'Blue Wing',
-      assignedBlock: profile?.assignedBlock || 'Block 2 (Floor 2 / Lines 07–12)',
+      email: isRoot ? 'ashikur.rahman.0971@gmail.com' : (profile?.email || 'engineer@debonair.com'),
+      assignedWing: simulatedWing,
+      assignedBlock: profile?.assignedBlock || targetBlock.label,
       assignedLines: profile?.assignedLines || ['Line 01', 'Line 02', 'Line 03', 'Line 04']
     };
-  }, [profile, simulatedTierId, roleTiers]);
+  }, [profile, simulatedTierId, roleTiers, simulatedWing]);
 
   const simulationResult = useMemo(() => {
     return canPerformAction(simulatedProfile, simulatedActionId, { lineNo: simulatedLineNo });
@@ -742,6 +748,39 @@ export const UnifiedPermissionMatrix: React.FC<UnifiedPermissionMatrixProps> = (
               </select>
             </div>
 
+            {/* If testing Tier 2 Manager, allow choosing assigned wing */}
+            {simulatedTierId === 'tier_2' && (
+              <div>
+                <label className="block text-xs font-bold text-[#17343a] mb-1">
+                  Manager Assigned Wing Authority:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSimulatedWing('Blue Wing')}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
+                      simulatedWing === 'Blue Wing'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                        : 'bg-[#f1eee6]/60 text-slate-700 border-[#d9d2c2] hover:bg-white'
+                    }`}
+                  >
+                    Blue Wing (01–17)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSimulatedWing('Green Wing')}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
+                      simulatedWing === 'Green Wing'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                        : 'bg-[#f1eee6]/60 text-slate-700 border-[#d9d2c2] hover:bg-white'
+                    }`}
+                  >
+                    Green Wing (18–34)
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Select Production Line */}
             <div>
               <label className="block text-xs font-bold text-[#17343a] mb-1">
@@ -755,7 +794,7 @@ export const UnifiedPermissionMatrix: React.FC<UnifiedPermissionMatrixProps> = (
                 {Array.from({ length: 34 }, (_, i) => {
                   const num = i + 1;
                   const lineStr = num < 10 ? `Line 0${num}` : `Line ${num}`;
-                  const wing = num <= 18 ? 'Blue Wing' : 'Green Wing';
+                  const wing = getLineWing(lineStr);
                   return (
                     <option key={lineStr} value={lineStr}>
                       {lineStr} ({wing})

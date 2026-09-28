@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, Suspense, lazy, useRef, useMemo } from 'react';
+import React, { useState, useEffect, Suspense, lazy, useRef, useMemo, useCallback } from 'react';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { BottomNav } from './components/BottomNav';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { FloorWipSparkline } from './components/FloorWipSparkline';
 import { initAuth } from './lib/firebaseAuth';
-import { Sparkles, Bot, MessageSquare, Activity, AlertTriangle, Flame, X, Video } from 'lucide-react';
+import { Sparkles, Bot, MessageSquare, Activity, AlertTriangle, Flame, X, Video, Copy, Check, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { motion } from 'motion/react';
 import {
   LineEntry,
@@ -99,6 +99,14 @@ const LeanToolsPage = lazyWithRetry(() => import('./components/LeanToolsPage').t
 const SettingsControlCenterPage = lazyWithRetry(() => import('./components/SettingsControlCenterPage').then(m => ({ default: m.SettingsControlCenterPage })));
 const NewDowntimeModal = lazyWithRetry(() => import('./components/NewDowntimeModal').then(m => ({ default: m.NewDowntimeModal })));
 const NewActionModal = lazyWithRetry(() => import('./components/NewActionModal').then(m => ({ default: m.NewActionModal })));
+import {
+  AutoRefreshEngineConfig,
+  getStoredAutoRefreshConfig,
+  saveStoredAutoRefreshConfig
+} from './utils/autoRefreshConfig';
+import { playTelemetryHeartbeatChime } from './utils/audioAlert';
+import { AutoRefreshEngineCustomizerModal } from './components/AutoRefreshEngineCustomizerModal';
+import { QuickHourlyProductionModal, HourlyProductionUpdatePayload } from './components/QuickHourlyProductionModal';
 
 import {
   INITIAL_STATIONS,
@@ -394,6 +402,13 @@ export default function App() {
   const [isScorecardOpen, setIsScorecardOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isFloorSnapshotOpen, setIsFloorSnapshotOpen] = useState(false);
+  const [isSnapshotCopied, setIsSnapshotCopied] = useState(false);
+  const [snapshotLastRefreshed, setSnapshotLastRefreshed] = useState<Date>(() => new Date());
+  const [snapshotCountdown, setSnapshotCountdown] = useState<number>(10);
+  const [isSnapshotRefreshing, setIsSnapshotRefreshing] = useState<boolean>(false);
+  const [autoRefreshConfig, setAutoRefreshConfig] = useState<AutoRefreshEngineConfig>(() => getStoredAutoRefreshConfig());
+  const [isAutoRefreshCustomizerOpen, setIsAutoRefreshCustomizerOpen] = useState(false);
+  const [isHourlyProductionModalOpen, setIsHourlyProductionModalOpen] = useState(false);
   const longPressTimerRef = useRef<any>(null);
   const isLongPressTriggeredRef = useRef<boolean>(false);
   const [isPrivacySecurityOpen, setIsPrivacySecurityOpen] = useState(false);
@@ -412,6 +427,23 @@ export default function App() {
   useEffect(() => {
     setStoredSavedFactories(savedFactories);
   }, [savedFactories]);
+
+  // Synchronize Auto-Refresh Engine config across components
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail) {
+        setAutoRefreshConfig(e.detail);
+      }
+    };
+    window.addEventListener('debonair:autorefresh_config_changed', handler);
+    return () => window.removeEventListener('debonair:autorefresh_config_changed', handler);
+  }, []);
+
+  const handleUpdateAutoRefreshConfig = (newConfig: AutoRefreshEngineConfig) => {
+    setAutoRefreshConfig(newConfig);
+    saveStoredAutoRefreshConfig(newConfig);
+    setSnapshotCountdown(newConfig.intervalSeconds);
+  };
 
   const handleUpdateFactoryProfile = (updated: FactoryIndustryProfile) => {
     setFactoryProfile(updated);
@@ -1104,6 +1136,206 @@ export default function App() {
     }
   };
 
+  // Real-time metric refresh for Floor Status Snapshot
+  const triggerSnapshotMetricsRefresh = useCallback(() => {
+    setIsSnapshotRefreshing(true);
+    setSnapshotLastRefreshed(new Date());
+
+    if (autoRefreshConfig.playAudioChime) {
+      playTelemetryHeartbeatChime();
+    }
+    if (autoRefreshConfig.enableHaptics && typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(25);
+      } catch {}
+    }
+
+    if (!autoRefreshConfig.enabled) {
+      setTimeout(() => setIsSnapshotRefreshing(false), 300);
+      return;
+    }
+
+    setLines(prevLines => {
+      // Pick active lines for the active date
+      const dayIndices = prevLines
+        .map((l, idx) => (l.date === activeDate ? idx : -1))
+        .filter(idx => idx !== -1);
+
+      if (dayIndices.length === 0) return prevLines;
+
+      // Realistic shop-floor variation: pick active lines based on configured intensity
+      const countToPace = autoRefreshConfig.intensity === 'dynamic' ? Math.min(4, dayIndices.length) : autoRefreshConfig.intensity === 'subtle' ? 1 : 2;
+      const targetIndices = [...dayIndices].sort(() => 0.5 - Math.random()).slice(0, countToPace);
+
+      return prevLines.map((line, idx) => {
+        if (targetIndices.includes(idx)) {
+          let currentOutput = line.dailyOutput ?? line.achievedProd ?? 0;
+          let newOutput = currentOutput;
+          if (autoRefreshConfig.simulateOutputPace) {
+            const target = line.targetProd || 600;
+            newOutput = currentOutput < target ? currentOutput + 1 : currentOutput;
+          }
+
+          // Dynamically recalculate efficiency
+          const newEff = line.workingHours && line.smv && line.plannedMP
+            ? Math.min(100, Math.round(((newOutput * line.smv) / ((line.plannedMP || 40) * (line.workingHours || 8) * 60)) * 100))
+            : line.efficiency;
+
+          // Micro cycle time variation around target
+          let newCT = line.bottleneck?.cycleTime || 45;
+          if (autoRefreshConfig.simulateCycleJitter && line.bottleneck) {
+            const jitter = (Math.random() - 0.5) * 0.4;
+            newCT = Math.round((newCT + jitter) * 10) / 10;
+          }
+
+          return {
+            ...line,
+            dailyOutput: newOutput,
+            achievedProd: newOutput,
+            efficiency: newEff > 0 ? newEff : line.efficiency,
+            bottleneck: line.bottleneck ? {
+              ...line.bottleneck,
+              cycleTime: newCT
+            } : line.bottleneck,
+            liveTelemetry: line.liveTelemetry ? {
+              ...line.liveTelemetry,
+              lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            } : line.liveTelemetry
+          };
+        }
+        return line;
+      });
+    });
+
+    setTimeout(() => {
+      setIsSnapshotRefreshing(false);
+    }, 400);
+  }, [activeDate, autoRefreshConfig]);
+
+  // Auto-refresh mechanism for Floor Status Snapshot overlay: updates displayed metrics according to customizer configuration
+  useEffect(() => {
+    if (!isFloorSnapshotOpen || !autoRefreshConfig.enabled) {
+      setSnapshotCountdown(autoRefreshConfig.intervalSeconds);
+      setIsSnapshotRefreshing(false);
+      return;
+    }
+
+    // Set initial timestamp on open
+    setSnapshotLastRefreshed(new Date());
+    setSnapshotCountdown(autoRefreshConfig.intervalSeconds);
+
+    const intervalId = setInterval(() => {
+      // Pause if tab is blurred and autoPauseOnTabBlur is enabled
+      if (autoRefreshConfig.autoPauseOnTabBlur && typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
+
+      setSnapshotCountdown(prev => {
+        if (prev <= 1) {
+          triggerSnapshotMetricsRefresh();
+          return autoRefreshConfig.intervalSeconds;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [isFloorSnapshotOpen, autoRefreshConfig.enabled, autoRefreshConfig.intervalSeconds, autoRefreshConfig.autoPauseOnTabBlur, triggerSnapshotMetricsRefresh]);
+
+  // Convert current critical telemetry metrics into a text-based summary for clipboard copying
+  const handleCopyFloorSnapshot = async () => {
+    const totalLinesCount = currentDayLines.length;
+    const avgEfficiency = totalLinesCount > 0
+      ? Math.round(currentDayLines.reduce((acc, l) => acc + (l.efficiency || 0), 0) / totalLinesCount)
+      : 0;
+    const totalWip = currentDayLines.reduce((acc, l) => acc + (l.wip || 0), 0);
+    const totalProduced = currentDayLines.reduce((acc, l) => acc + (l.dailyOutput || l.achievedProd || 0), 0);
+    const totalTarget = currentDayLines.reduce((acc, l) => acc + (l.targetProd || 0), 0);
+    const totalManpower = currentDayLines.reduce((acc, l) => acc + (l.mp ? ((l.mp.Operator?.present || 0) + (l.mp.Helper?.present || 0)) : (l.plannedMP || 0)), 0);
+    const nowFormatted = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    let summaryText = `📊 DEBONAIR LTD (UNIT-02) — FLOOR STATUS SNAPSHOT\n`;
+    summaryText += `════════════════════════════════════════════════\n`;
+    summaryText += `📅 Production Date: ${activeDate} | Captured: ${nowFormatted}\n`;
+    summaryText += `🏭 Monitored Lines: ${totalLinesCount} Sewing Lines Active\n`;
+    summaryText += `⚡ Average Efficiency: ${avgEfficiency}%\n`;
+    summaryText += `📦 Total Floor WIP: ${totalWip.toLocaleString()} pcs\n`;
+    summaryText += `🎯 Output / Target: ${totalProduced.toLocaleString()} / ${totalTarget.toLocaleString()} pcs (${totalTarget > 0 ? Math.round((totalProduced / totalTarget) * 100) : 0}%)\n`;
+    summaryText += `👥 Active Floor Manpower: ${totalManpower} Operators & Helpers\n`;
+    summaryText += `════════════════════════════════════════════════\n\n`;
+
+    // Critical Bottleneck Stations
+    summaryText += `🚨 CRITICAL BOTTLENECK STATIONS (${activeBottleneckLines.length}):\n`;
+    if (activeBottleneckLines.length === 0) {
+      summaryText += `  ✓ All stations balanced. No active bottleneck cycle overruns.\n`;
+    } else {
+      activeBottleneckLines.forEach((line) => {
+        const bn = line.bottleneck;
+        summaryText += `  • Line ${line.lineNo} [${line.style || line.buyer || 'Debonair'}]: `;
+        if (bn) {
+          summaryText += `Station ${bn.station || 'Critical'} | Actual CT: ${bn.cycleTime}s vs Target ${bn.targetCT}s (${bn.status.toUpperCase()})\n`;
+        } else {
+          summaryText += `Critical bottleneck flagged\n`;
+        }
+      });
+    }
+    summaryText += `\n`;
+
+    // WIP Buffer Breaches
+    summaryText += `📦 WIP BUFFER BREACHES & OVERLOADS (${activeWipBreachedLines.length}):\n`;
+    if (activeWipBreachedLines.length === 0) {
+      summaryText += `  ✓ WIP levels within standard buffer thresholds.\n`;
+    } else {
+      activeWipBreachedLines.forEach((line) => {
+        const thresh = calculateStyleWipThreshold(line);
+        summaryText += `  • Line ${line.lineNo} [${line.style || 'Standard'}]: Current WIP ${line.wip} pcs (Exceeds buffer limit of ${thresh.threshold} pcs by +${thresh.overloadPcs} pcs)\n`;
+      });
+    }
+    summaryText += `\n`;
+
+    // High Priority Floor Action Lines
+    const criticalActionLines = currentDayLines.filter(
+      l => (l.bottleneck?.status === 'critical') || (l.efficiency !== undefined && l.efficiency < 50)
+    );
+    if (criticalActionLines.length > 0) {
+      summaryText += `⚠️ TOP IE ACTION PRIORITIES:\n`;
+      criticalActionLines.slice(0, 5).forEach(line => {
+        summaryText += `  ⚡ Line ${line.lineNo}: Efficiency ${line.efficiency || 0}% | WIP: ${line.wip} pcs | Station: ${line.bottleneck?.station || 'General'}\n`;
+      });
+      summaryText += `\n`;
+    }
+
+    summaryText += `— Generated from IE Daily Control Live Telemetry Gateway`;
+
+    let success = false;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(summaryText);
+        success = true;
+      }
+    } catch {}
+
+    if (!success) {
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = summaryText;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(textArea);
+      } catch {}
+    }
+
+    setIsSnapshotCopied(true);
+    setTimeout(() => {
+      setIsSnapshotCopied(false);
+    }, 2500);
+  };
+
   // Handlers
   const handleUpdateChecklistTask = (date: string, idx: number, status: ChecklistStatus) => {
     const current = normalizeChecklistStatuses(checklists[date]);
@@ -1620,6 +1852,93 @@ export default function App() {
     );
   };
 
+  const handleSaveHourlyProduction = (payload: HourlyProductionUpdatePayload) => {
+    // 1. Update hourlyData
+    setHourlyData(prev => {
+      const exists = prev.some(h => h.hourIndex === payload.hourIndex);
+      if (exists) {
+        return prev.map(h => {
+          if (h.hourIndex === payload.hourIndex) {
+            const delta = payload.actualUnits - payload.targetUnits;
+            const status = delta >= 0 ? 'above' : delta >= -20 ? 'on_track' : 'below';
+            return {
+              ...h,
+              actualUnits: payload.actualUnits,
+              scrapUnits: payload.scrapUnits,
+              downtimeMinutes: payload.downtimeMinutes,
+              notes: payload.notes || h.notes,
+              delta,
+              status
+            };
+          }
+          return h;
+        });
+      } else {
+        const delta = payload.actualUnits - payload.targetUnits;
+        const status = delta >= 0 ? 'above' : delta >= -20 ? 'on_track' : 'below';
+        return [
+          ...prev,
+          {
+            hourIndex: payload.hourIndex,
+            timeSlot: payload.timeSlot,
+            targetUnits: payload.targetUnits,
+            actualUnits: payload.actualUnits,
+            scrapUnits: payload.scrapUnits,
+            downtimeMinutes: payload.downtimeMinutes,
+            cumulativeTarget: payload.targetUnits * payload.hourIndex,
+            cumulativeActual: payload.actualUnits * payload.hourIndex,
+            delta,
+            status,
+            notes: payload.notes
+          }
+        ];
+      }
+    });
+
+    // 2. Update line dailyOutput and efficiency in lines
+    setLines(prev =>
+      prev.map(l => {
+        if (l.lineNo === payload.lineNo && l.date === activeDate) {
+          const prevOutput = l.dailyOutput ?? l.achievedProd ?? 0;
+          const newOutput = Math.max(prevOutput, payload.actualUnits > 0 ? prevOutput + payload.actualUnits : prevOutput);
+          const newEff = l.workingHours && l.smv && l.plannedMP
+            ? Math.min(100, Math.round(((newOutput * l.smv) / ((l.plannedMP || 40) * (l.workingHours || 8) * 60)) * 100))
+            : l.efficiency;
+
+          return {
+            ...l,
+            dailyOutput: newOutput,
+            achievedProd: newOutput,
+            efficiency: newEff > 0 ? newEff : l.efficiency,
+            bottleneck: l.bottleneck ? {
+              ...l.bottleneck,
+              station: payload.bottleneckStation || l.bottleneck.station,
+            } : l.bottleneck,
+            liveTelemetry: l.liveTelemetry ? {
+              ...l.liveTelemetry,
+              lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            } : l.liveTelemetry
+          };
+        }
+        return l;
+      })
+    );
+
+    setNotifications(prev => [
+      {
+        id: `notif-${Date.now()}`,
+        type: 'line',
+        title: 'Hourly Production Logged (BN, Assembly, Output)',
+        message: `Line ${payload.lineNo} (${payload.timeSlot}): Bottle Neck ${payload.bottleneckUnits} pcs, Assembly ${payload.assemblyUnits} pcs, Output ${payload.outputUnits} pcs`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        read: false,
+        priority: 'low'
+      },
+      ...prev
+    ]);
+    notifySave();
+  };
+
   const handleAddDowntimeIncident = (incident: DowntimeIncident) => {
     setDowntimeLog(prev => [incident, ...prev]);
     setIsNewDowntimeModalOpen(false);
@@ -1940,6 +2259,7 @@ export default function App() {
               onBatchUpdateChecklist={handleBatchUpdateChecklist}
               onSaveMultipleLines={handleSaveMultipleLines}
               factoryProfile={factoryProfile}
+              onOpenHourlyProduction={() => setIsHourlyProductionModalOpen(true)}
             />
           )}
 
@@ -1954,6 +2274,7 @@ export default function App() {
               onUpdateLayout={setLayout}
               auditoryAlertsEnabled={auditoryAlertsEnabled}
               onToggleAuditoryAlerts={setAuditoryAlertsEnabled}
+              onOpenAutoRefreshCustomizer={() => setIsAutoRefreshCustomizerOpen(true)}
               factoryProfile={factoryProfile}
               onUpdateFactoryProfile={handleUpdateFactoryProfile}
               savedFactories={savedFactories}
@@ -2215,6 +2536,17 @@ export default function App() {
             onAddAction={handleAddNewAction}
           />
         )}
+
+        {isHourlyProductionModalOpen && (
+          <QuickHourlyProductionModal
+            isOpen={isHourlyProductionModalOpen}
+            onClose={() => setIsHourlyProductionModalOpen(false)}
+            lines={currentDayLines}
+            hourlyData={hourlyData}
+            selectedLineNo={selectedLineNo}
+            onSaveHourlyUpdate={handleSaveHourlyProduction}
+          />
+        )}
       </Suspense>
 
       {/* Miniature 'Floor Status Snapshot' Overlay (Activated by long-press on floating chat button or quick trigger) */}
@@ -2224,30 +2556,89 @@ export default function App() {
           className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-3.5 sm:bottom-24 sm:right-6 z-40 w-[330px] sm:w-[380px] max-h-[85vh] overflow-y-auto scrollbar-none rounded-3xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-[#d9d2c2] dark:border-slate-700 shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200 select-none text-slate-800 dark:text-slate-100"
         >
           {/* Header */}
-          <div className="flex items-center justify-between pb-2.5 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
             <div className="flex items-center gap-2">
               <div className="relative">
-                <Activity className="w-4 h-4 text-[#1a73e8]" />
+                <Activity className={`w-4 h-4 ${isSnapshotRefreshing ? 'text-emerald-500 animate-spin' : 'text-[#1a73e8]'}`} />
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                  Floor Status Snapshot
-                </h4>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                  Unit-02 Live Telemetry • {currentDayLines.length} Lines Monitored
-                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    Floor Status Snapshot
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setIsAutoRefreshCustomizerOpen(true)}
+                    className={`inline-flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded-full font-bold border transition-colors cursor-pointer ${
+                      autoRefreshConfig.enabled
+                        ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300/60 hover:bg-emerald-200'
+                        : 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300/60 hover:bg-amber-200'
+                    }`}
+                    title="Click to open Auto-Refresh Engine Customizer"
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${autoRefreshConfig.enabled ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                    {autoRefreshConfig.enabled ? `LIVE ${autoRefreshConfig.intervalSeconds}s` : 'PAUSED'}
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400">
+                  <span>Unit-02 • {currentDayLines.length} Lines</span>
+                  {autoRefreshConfig.showCountdown && (
+                    <>
+                      <span>•</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-medium">
+                        {isSnapshotRefreshing
+                          ? 'Refreshing...'
+                          : autoRefreshConfig.enabled
+                          ? `Auto-refreshes in ${snapshotCountdown}s`
+                          : 'Refresh paused'}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsFloorSnapshotOpen(false)}
-              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Dismiss snapshot"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setIsAutoRefreshCustomizerOpen(true)}
+                className="text-slate-400 hover:text-[#176f78] dark:hover:text-teal-400 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Customize Auto-Refresh Engine (Cadence, Intensity, Alerts)"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  triggerSnapshotMetricsRefresh();
+                  setSnapshotCountdown(autoRefreshConfig.intervalSeconds);
+                }}
+                disabled={isSnapshotRefreshing}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Refresh metrics now"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSnapshotRefreshing ? 'animate-spin text-emerald-500' : ''}`} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsFloorSnapshotOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Dismiss snapshot"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
+
+          {/* Auto-Refresh Countdown Progress Bar */}
+          {autoRefreshConfig.showProgressBar && autoRefreshConfig.enabled && (
+            <div className="h-0.5 w-full bg-slate-100 dark:bg-slate-800 overflow-hidden my-1 rounded-full">
+              <div
+                className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 transition-all duration-1000 ease-linear rounded-full"
+                style={{ width: `${Math.min(100, Math.max(0, ((autoRefreshConfig.intervalSeconds - snapshotCountdown) / autoRefreshConfig.intervalSeconds) * 100))}%` }}
+              />
+            </div>
+          )}
 
           {/* Metrics Row */}
           <div className="grid grid-cols-2 gap-2.5 py-2.5">
@@ -2332,27 +2723,68 @@ export default function App() {
             </div>
           )}
 
-          {/* Snapshot Footer & Commit to Open Chat */}
-          <div className="pt-2.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
-            <span className="text-[10px] text-slate-400 font-mono">
-              Live floor telemetry
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setIsFloorSnapshotOpen(false);
-                setIsChatOpen(true);
-              }}
-              className="px-3 py-1.5 rounded-xl bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>Open Google Chat</span>
-            </button>
+          {/* Snapshot Footer & Quick Export Actions */}
+          <div className="pt-2.5 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCopyFloorSnapshot}
+                className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation active:scale-95 ${
+                  isSnapshotCopied
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
+                    : 'bg-[#176f78] hover:bg-[#12555c] text-white shadow-[#176f78]/20'
+                }`}
+                title="Convert current critical telemetry metrics into a text summary and copy to clipboard"
+              >
+                {isSnapshotCopied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-200" />
+                    <span>Snapshot Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Quick Export Snapshot</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFloorSnapshotOpen(false);
+                  setIsChatOpen(true);
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                title="Open Shop Floor Google Chat"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-[#1a73e8]" />
+                <span className="hidden sm:inline">Google Chat</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono px-0.5">
+              <span>{isSnapshotCopied ? '✓ Telemetry summary on clipboard' : 'Click to copy text summary for chat / email'}</span>
+              <span>Updated {snapshotLastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Floating Floor Snapshot Quick Trigger Button (Single Click) */}
+      {/* Auto-Refresh Engine Customizer Modal */}
+      {isAutoRefreshCustomizerOpen && (
+        <AutoRefreshEngineCustomizerModal
+          isOpen={isAutoRefreshCustomizerOpen}
+          onClose={() => setIsAutoRefreshCustomizerOpen(false)}
+          config={autoRefreshConfig}
+          onUpdateConfig={handleUpdateAutoRefreshConfig}
+          onTriggerTestRefresh={() => {
+            triggerSnapshotMetricsRefresh();
+            setSnapshotCountdown(autoRefreshConfig.intervalSeconds);
+          }}
+          countdown={snapshotCountdown}
+        />
+      )}
       <button
         id="floating-floor-snapshot-quick-btn"
         type="button"
