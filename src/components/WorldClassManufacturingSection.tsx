@@ -258,10 +258,10 @@ export const WorldClassManufacturingSection: React.FC<WorldClassManufacturingSec
                 type="button"
                 onClick={() => onNavigateToTool('control-center')}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap text-slate-600 hover:text-[#176f78] bg-white hover:bg-slate-50 border border-[#d9d2c2]"
-                title="Go to Control Center & Preferences"
+                title="Go to Settings"
               >
                 <Settings className="w-3.5 h-3.5 text-[#176f78]" />
-                <span className="hidden sm:inline">Control Center &amp; Preferences</span>
+                <span className="hidden sm:inline">Settings</span>
               </button>
             )}
           </div>

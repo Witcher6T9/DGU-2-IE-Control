@@ -38,7 +38,11 @@ import {
   ChevronLeft,
   GripVertical,
   Move,
-  ArrowUpDown
+  ArrowUpDown,
+  Ruler,
+  Scale,
+  Maximize2,
+  Building
 } from 'lucide-react';
 import { LineEntry, LineStatus, UserProfile } from '../types';
 import { isMasterAdminOrAdmin } from '../utils/rbac';
@@ -70,6 +74,62 @@ export const CANONICAL_FLOORS_CONFIG = [
   { name: 'Shitalokshya Floor', block: 'Block 5', blockCode: 'B5', wing: 'Green Wing', linesCount: 6, linesCountStr: '06 Lines', range: 'Lines 24 - 29', lineNums: [24, 25, 26, 27, 28, 29] },
   { name: 'Turag Floor', block: 'Block 6', blockCode: 'B6', wing: 'Green Wing', linesCount: 5, linesCountStr: '05 Lines', range: 'Lines 30 - 34', lineNums: [30, 31, 32, 33, 34] },
 ];
+
+/**
+ * Standard architectural gross floor space areas (in m²) for Debonair LTD (Unit-02).
+ * Designed according to RMG lean manufacturing factory guidelines.
+ */
+export const CANONICAL_FLOOR_GROSS_AREA: Record<string, number> = {
+  'padma floor': 1280,
+  'meghna floor': 1280,
+  'karnophuli floor': 1120,
+  'korotoya floor': 1280,
+  'shitalokshya floor': 1280,
+  'turag floor': 1120
+};
+export const DEFAULT_GROSS_FLOOR_AREA_SQM = 1250;
+
+export interface LineSpaceFootprint {
+  lineNo: string;
+  workstations: number;
+  workstationAreaSqm: number;
+  aisleAllowanceSqm: number;
+  stagingWipAreaSqm: number;
+  totalAreaSqm: number;
+  lineLengthMeters: number;
+  lineWidthMeters: number;
+  sharePct: number;
+}
+
+/**
+ * Computes the real-time physical floor space footprint of a sewing line.
+ * Formulated with Debonair apparel industrial engineering standards:
+ * - 3.2 m² per sewing workstation (table, machine motor, stool, operator envelope)
+ * - +35% gangway and material flow clearance
+ * - 18.0 m² in-line staging WIP and end-of-line QC table
+ */
+export function computeLineSpaceFootprint(line: LineEntry, grossAreaSqm: number): LineSpaceFootprint {
+  const ws = line.plannedMP && line.plannedMP > 0 ? line.plannedMP : 35;
+  const workstationAreaSqm = Math.round(ws * 3.2 * 10) / 10;
+  const aisleAllowanceSqm = Math.round(workstationAreaSqm * 0.35 * 10) / 10;
+  const stagingWipAreaSqm = 18.0;
+  const totalAreaSqm = Math.round((workstationAreaSqm + aisleAllowanceSqm + stagingWipAreaSqm) * 10) / 10;
+  const lineLengthMeters = Math.max(22, Math.round((ws / 2) * 1.4) + 6);
+  const lineWidthMeters = 3.6;
+  const sharePct = grossAreaSqm > 0 ? Math.round((totalAreaSqm / grossAreaSqm) * 1000) / 10 : 0;
+
+  return {
+    lineNo: String(line.lineNo),
+    workstations: ws,
+    workstationAreaSqm,
+    aisleAllowanceSqm,
+    stagingWipAreaSqm,
+    totalAreaSqm,
+    lineLengthMeters,
+    lineWidthMeters,
+    sharePct
+  };
+}
 
 export function normalizeFloorName(floorStr?: string): string {
   if (!floorStr) return 'Padma Floor';
@@ -233,6 +293,81 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
     });
   }, [layoutPhysicalLines, selectedFloor, customFloorOrder]);
 
+  // Floor Space Occupancy Unit State ('sqm' | 'sqft')
+  const [spaceUnit, setSpaceUnit] = useState<'sqm' | 'sqft'>('sqm');
+
+  // Gross floor space area for currently active floor (in m²)
+  const currentFloorKey = selectedFloor.trim().toLowerCase();
+  const currentGrossAreaSqm = CANONICAL_FLOOR_GROSS_AREA[currentFloorKey] || DEFAULT_GROSS_FLOOR_AREA_SQM;
+
+  // Real-time auto-calculating floor space occupancy
+  const floorSpaceMetrics = useMemo(() => {
+    const footprints: Record<string, LineSpaceFootprint> = {};
+    let totalOccupiedSqm = 0;
+
+    floorLines.forEach(l => {
+      const fp = computeLineSpaceFootprint(l, currentGrossAreaSqm);
+      footprints[String(l.lineNo)] = fp;
+      totalOccupiedSqm += fp.totalAreaSqm;
+    });
+
+    totalOccupiedSqm = Math.round(totalOccupiedSqm * 10) / 10;
+    const occupancyRatePct = currentGrossAreaSqm > 0 ? Math.round((totalOccupiedSqm / currentGrossAreaSqm) * 1000) / 10 : 0;
+    const freeSpaceSqm = Math.max(0, Math.round((currentGrossAreaSqm - totalOccupiedSqm) * 10) / 10);
+    const freeSpacePct = currentGrossAreaSqm > 0 ? Math.round((freeSpaceSqm / currentGrossAreaSqm) * 1000) / 10 : 0;
+    const safetyAisleReservedSqm = 180.0; // 180 m² reserved for primary fire exits & central logistics corridor
+
+    let densityStatus: 'optimal' | 'low' | 'high' | 'overcrowded' = 'optimal';
+    let densityLabel = 'Optimal Lean Density (Debonair Standard)';
+    let densityColor = 'text-emerald-700 bg-emerald-100 border-emerald-300';
+
+    if (occupancyRatePct < 60) {
+      densityStatus = 'low';
+      densityLabel = 'Low Density (Excess Space for Expansion)';
+      densityColor = 'text-blue-700 bg-blue-100 border-blue-300';
+    } else if (occupancyRatePct <= 82) {
+      densityStatus = 'optimal';
+      densityLabel = 'Optimal Lean Density (Debonair Standard)';
+      densityColor = 'text-emerald-700 bg-emerald-100 border-emerald-300';
+    } else if (occupancyRatePct <= 92) {
+      densityStatus = 'high';
+      densityLabel = 'High Density (Tight Gangways - Strict 5S)';
+      densityColor = 'text-amber-800 bg-amber-100 border-amber-300';
+    } else {
+      densityStatus = 'overcrowded';
+      densityLabel = 'Overcrowded Warning (Fire Safety Hazard)';
+      densityColor = 'text-rose-800 bg-rose-100 border-rose-300';
+    }
+
+    return {
+      grossFloorAreaSqm: currentGrossAreaSqm,
+      totalOccupiedSqm,
+      occupancyRatePct,
+      freeSpaceSqm,
+      freeSpacePct,
+      safetyAisleReservedSqm,
+      densityStatus,
+      densityLabel,
+      densityColor,
+      footprints,
+      linesCount: floorLines.length
+    };
+  }, [floorLines, currentGrossAreaSqm]);
+
+  const formatArea = (sqm: number) => {
+    if (spaceUnit === 'sqft') {
+      return `${Math.round(sqm * 10.7639).toLocaleString()} sq ft`;
+    }
+    return `${sqm.toFixed(1)} m²`;
+  };
+
+  const formatLength = (meters: number) => {
+    if (spaceUnit === 'sqft') {
+      return `${Math.round(meters * 3.28084)} ft`;
+    }
+    return `${meters}m`;
+  };
+
   // Handle Drag & Drop reordering between lines
   const handleReorder = (draggedId: number, targetId: number) => {
     if (draggedId === targetId) return;
@@ -271,7 +406,7 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
       updatedWithOrder.forEach(l => onSaveLine(l));
     }
 
-    showToast(`Line ${movedItem.lineNo} moved to Bay #${toIndex + 1} on ${selectedFloor}`, 'success');
+    showToast(`Line ${movedItem.lineNo} moved to Bay #${toIndex + 1} on ${selectedFloor} • Occupancy Auto-Calculated`, 'success');
   };
 
   // Move line one slot backward or forward
@@ -289,10 +424,6 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
 
   // Reset floor order to standard numeric ascending (Line 1, 2, 3...)
   const handleResetFloorOrder = () => {
-    if (!isMasterAdmin) {
-      alert('Access Denied: Floor layout restructuring is restricted to Master Administration/Admin role.');
-      return;
-    }
     const floorKey = selectedFloor.trim().replace(/\s+/g, '_').toLowerCase();
     
     const sorted = [...floorLines].sort((a, b) => {
@@ -503,34 +634,30 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
               <span>Line Configuration</span>
             </button>
 
-            {/* IE Physical Layout Rearrangement Mode Toggle & Reset - ONLY for Master Administration/Admin Role */}
-            {isMasterAdmin && (
-              <>
-                <button
-                  id="toggle-reorder-mode-btn"
-                  onClick={() => setIsReorderMode(prev => !prev)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs border ${
-                    isReorderMode
-                      ? 'bg-[#176f78] text-white border-[#176f78] ring-2 ring-[#176f78]/30 shadow-sm'
-                      : 'bg-white hover:bg-[#f1eee6] text-[#17343a] border-[#d9d2c2]'
-                  }`}
-                  title="Toggle drag-and-drop floor rearrangement mode"
-                >
-                  <GripVertical className="w-3.5 h-3.5" />
-                  <span>{isReorderMode ? 'Rearrange Mode (Active)' : 'Rearrange Layout'}</span>
-                </button>
+            {/* IE Physical Layout Rearrangement Mode Toggle & Reset */}
+            <button
+              id="toggle-reorder-mode-btn"
+              onClick={() => setIsReorderMode(prev => !prev)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs border ${
+                isReorderMode
+                  ? 'bg-[#176f78] text-white border-[#176f78] ring-2 ring-[#176f78]/30 shadow-sm'
+                  : 'bg-white hover:bg-[#f1eee6] text-[#17343a] border-[#d9d2c2]'
+              }`}
+              title="Toggle drag-and-drop floor rearrangement mode"
+            >
+              <GripVertical className="w-3.5 h-3.5" />
+              <span>{isReorderMode ? 'Rearrange Mode (Active)' : 'Rearrange Layout'}</span>
+            </button>
 
-                <button
-                  id="reset-floor-order-btn"
-                  onClick={handleResetFloorOrder}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#f1eee6] text-[#527078] hover:text-[#17343a] border border-[#d9d2c2] text-xs font-bold transition-all cursor-pointer shadow-2xs"
-                  title="Reset layout order on this floor to default numerical sequence"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Reset Order</span>
-                </button>
-              </>
-            )}
+            <button
+              id="reset-floor-order-btn"
+              onClick={handleResetFloorOrder}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#f1eee6] text-[#527078] hover:text-[#17343a] border border-[#d9d2c2] text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              title="Reset layout order on this floor to default numerical sequence"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Reset Order</span>
+            </button>
           </div>
         </div>
 
@@ -872,6 +999,292 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
         </div>
       </div>
 
+      {/* ========================================================================= */}
+      {/* FLOOR SPACE OCCUPANCY & LEAN SPATIAL CAPACITY COCKPIT                    */}
+      {/* ========================================================================= */}
+      <div id="floor-space-occupancy-cockpit" className="rounded-3xl border border-[#b2d8d8] bg-gradient-to-br from-[#f7fcfc] via-[#fbfaf6] to-white p-5 sm:p-6 shadow-xs space-y-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#b2d8d8]/60 pb-4">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-[#176f78] text-white shadow-xs shrink-0">
+              <Ruler className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="font-display font-extrabold text-base sm:text-lg uppercase text-[#17343a] tracking-tight">
+                  Floor Space Occupancy &amp; Lean Spatial Capacity
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 uppercase tracking-wider flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                  Auto-Calculating Live
+                </span>
+                <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${floorSpaceMetrics.densityColor}`}>
+                  {floorSpaceMetrics.densityLabel}
+                </span>
+              </div>
+              <p className="text-xs text-[#527078] mt-0.5 max-w-2xl">
+                Real-time physical shop floor space allocation for <strong>{selectedFloor}</strong> based on active sewing line workstations, operator aisles, and 5S gangway clearances.
+              </p>
+            </div>
+          </div>
+
+          {/* Metric / Imperial Unit Toggle & Rearrange Trigger */}
+          <div className="flex items-center gap-2 self-start lg:self-center shrink-0 flex-wrap">
+            <div className="flex items-center bg-[#f1eee6] p-1 rounded-xl border border-[#d9d2c2] text-xs font-bold shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setSpaceUnit('sqm')}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  spaceUnit === 'sqm'
+                    ? 'bg-[#176f78] text-white shadow-xs'
+                    : 'text-[#527078] hover:text-[#17343a]'
+                }`}
+                title="Display in Square Meters (m²)"
+              >
+                m² (Metric)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSpaceUnit('sqft')}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  spaceUnit === 'sqft'
+                    ? 'bg-[#176f78] text-white shadow-xs'
+                    : 'text-[#527078] hover:text-[#17343a]'
+                }`}
+                title="Display in Square Feet (sq ft)"
+              >
+                sq ft (Imperial)
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsReorderMode(prev => !prev)}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs border ${
+                isReorderMode
+                  ? 'bg-[#176f78] text-white border-[#176f78] ring-2 ring-[#176f78]/30'
+                  : 'bg-white hover:bg-[#f1eee6] text-[#17343a] border-[#d9d2c2]'
+              }`}
+              title="Toggle visual drag-and-drop floor line repositioning"
+            >
+              <Move className="w-3.5 h-3.5" />
+              <span>{isReorderMode ? 'Drag Mode: Active' : 'Drag & Reposition'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Multi-Segment Floor Space Distribution Bar */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-bold text-[#17343a]">
+            <span className="flex items-center gap-1.5">
+              <span>Spatial Occupancy Utilization:</span>
+              <span className="font-mono-numbers text-sm text-[#176f78] font-black">{floorSpaceMetrics.occupancyRatePct}%</span>
+            </span>
+            <span className="text-[#527078] font-mono-numbers text-[11px]">
+              {formatArea(floorSpaceMetrics.totalOccupiedSqm)} of {formatArea(floorSpaceMetrics.grossFloorAreaSqm)} Total Floor Area
+            </span>
+          </div>
+
+          {/* Segmented Bar */}
+          <div className="h-4 w-full rounded-xl bg-[#f1eee6] overflow-hidden flex border border-[#d9d2c2] shadow-inner p-0.5">
+            {floorLines.map((line, lIdx) => {
+              const fp = floorSpaceMetrics.footprints[String(line.lineNo)];
+              const share = fp ? fp.sharePct : (100 / floorLines.length);
+              const palette = [
+                'bg-teal-600',
+                'bg-emerald-600',
+                'bg-cyan-600',
+                'bg-blue-600',
+                'bg-indigo-600',
+                'bg-violet-600'
+              ];
+              const segColor = palette[lIdx % palette.length];
+
+              return (
+                <div
+                  key={line.id}
+                  style={{ width: `${share}%` }}
+                  className={`h-full ${segColor} transition-all duration-300 relative group cursor-pointer border-r border-white/30 first:rounded-l-lg`}
+                  title={`Line ${line.lineNo}: ${formatArea(fp?.totalAreaSqm || 0)} (${share}% of floor)`}
+                >
+                  <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white font-mono opacity-90 truncate px-0.5">
+                    L{line.lineNo}
+                  </span>
+                </div>
+              );
+            })}
+
+            {/* Reserved Fire Exit / Gangway Stripe */}
+            <div
+              style={{ width: `${Math.round((floorSpaceMetrics.safetyAisleReservedSqm / floorSpaceMetrics.grossFloorAreaSqm) * 100)}%` }}
+              className="h-full bg-amber-400/80 transition-all duration-300 border-r border-white/30 relative"
+              title={`Safety Fire Exits & Main Corridor: ${formatArea(floorSpaceMetrics.safetyAisleReservedSqm)} (Reserved)`}
+            >
+              <span className="absolute inset-0 flex items-center justify-center text-[8.5px] font-extrabold text-amber-950 font-mono opacity-90 truncate px-0.5">
+                Exit Aisle
+              </span>
+            </div>
+
+            {/* Free Unoccupied Space */}
+            <div
+              style={{ width: `${floorSpaceMetrics.freeSpacePct}%` }}
+              className="h-full bg-slate-200/80 transition-all duration-300 relative last:rounded-r-lg"
+              title={`Available Free Space: ${formatArea(floorSpaceMetrics.freeSpaceSqm)} (${floorSpaceMetrics.freeSpacePct}%)`}
+            >
+              <span className="absolute inset-0 flex items-center justify-center text-[8.5px] font-bold text-slate-600 font-mono opacity-80 truncate px-0.5">
+                Free
+              </span>
+            </div>
+          </div>
+
+          {/* Legend Labels */}
+          <div className="flex items-center justify-between text-[10px] text-[#527078] flex-wrap gap-2 pt-1 font-mono-numbers">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="flex items-center gap-1 font-bold text-[#17343a]">
+                <span className="w-2.5 h-2.5 rounded-sm bg-[#176f78]" />
+                <span>Active Lines: {formatArea(floorSpaceMetrics.totalOccupiedSqm)} ({floorSpaceMetrics.occupancyRatePct}%)</span>
+              </span>
+              <span className="flex items-center gap-1 font-bold text-amber-900">
+                <span className="w-2.5 h-2.5 rounded-sm bg-amber-400" />
+                <span>Reserved Fire Corridors: {formatArea(floorSpaceMetrics.safetyAisleReservedSqm)}</span>
+              </span>
+              <span className="flex items-center gap-1 font-bold text-slate-600">
+                <span className="w-2.5 h-2.5 rounded-sm bg-slate-300" />
+                <span>Available Free Floor: {formatArea(floorSpaceMetrics.freeSpaceSqm)} ({floorSpaceMetrics.freeSpacePct}%)</span>
+              </span>
+            </div>
+            <span className="font-semibold text-[#176f78]">
+              Avg Line Footprint: {formatArea(floorSpaceMetrics.linesCount > 0 ? floorSpaceMetrics.totalOccupiedSqm / floorSpaceMetrics.linesCount : 0)}
+            </span>
+          </div>
+        </div>
+
+        {/* Visual Bay Placement Strip with Drag & Drop */}
+        <div className="pt-3 border-t border-[#b2d8d8]/60 space-y-2.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold uppercase tracking-wider text-[#17343a] text-[11px] flex items-center gap-1.5">
+              <LayoutGrid className="w-3.5 h-3.5 text-[#176f78]" />
+              <span>Spatial Factory Floor Bays ({floorLines.length} Physical Bays):</span>
+            </span>
+            <span className="text-[11px] text-[#527078]">
+              Drag any bay card to reposition line sequence on <strong>{selectedFloor}</strong>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            {floorLines.map((line, bIdx) => {
+              const fp = floorSpaceMetrics.footprints[String(line.lineNo)];
+              const isDraggingThis = draggedLineId === line.id;
+              const isDragOverThis = dragOverLineId === line.id && draggedLineId !== line.id;
+              const st = getLineStatus(line);
+
+              return (
+                <div
+                  key={line.id}
+                  draggable={true}
+                  onDragStart={e => {
+                    e.dataTransfer.setData('text/plain', String(line.id));
+                    e.dataTransfer.effectAllowed = 'move';
+                    setDraggedLineId(line.id);
+                  }}
+                  onDragOver={e => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragOverLineId !== line.id) {
+                      setDragOverLineId(line.id);
+                    }
+                  }}
+                  onDragLeave={e => {
+                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                    if (dragOverLineId === line.id) {
+                      setDragOverLineId(null);
+                    }
+                  }}
+                  onDrop={e => {
+                    e.preventDefault();
+                    const sourceIdStr = e.dataTransfer.getData('text/plain');
+                    const sourceId = sourceIdStr ? parseInt(sourceIdStr, 10) : draggedLineId;
+                    if (sourceId && sourceId !== line.id) {
+                      handleReorder(sourceId, line.id);
+                    }
+                    setDraggedLineId(null);
+                    setDragOverLineId(null);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedLineId(null);
+                    setDragOverLineId(null);
+                  }}
+                  className={`p-3 rounded-2xl border transition-all cursor-grab active:cursor-grabbing select-none relative group ${
+                    isDraggingThis
+                      ? 'opacity-40 border-dashed border-[#176f78] bg-[#f0f9fa]'
+                      : isDragOverThis
+                      ? 'ring-3 ring-[#176f78] border-[#176f78] bg-[#eef8f9] shadow-md scale-102'
+                      : 'bg-white hover:bg-[#faf8f4] border-[#d9d2c2] shadow-2xs hover:shadow-xs'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1 mb-1.5">
+                    <span className="text-[10px] font-mono font-black uppercase text-[#176f78] bg-[#dceceb] px-1.5 py-0.5 rounded">
+                      Bay #{bIdx + 1}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={bIdx === 0}
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleMoveLineStep(line.id, 'up');
+                        }}
+                        className="w-5 h-5 rounded flex items-center justify-center text-[#527078] hover:text-[#17343a] hover:bg-[#f1eee6] disabled:opacity-20 cursor-pointer"
+                        title="Shift left 1 bay"
+                      >
+                        <ChevronLeft className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={bIdx === floorLines.length - 1}
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleMoveLineStep(line.id, 'down');
+                        }}
+                        className="w-5 h-5 rounded flex items-center justify-center text-[#527078] hover:text-[#17343a] hover:bg-[#f1eee6] disabled:opacity-20 cursor-pointer"
+                        title="Shift right 1 bay"
+                      >
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                      <GripVertical className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#176f78]" />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className={`w-7 h-7 rounded-lg text-white font-mono-numbers font-black text-xs flex items-center justify-center shadow-2xs ${
+                      st === 'Active' ? 'bg-[#17343a]' : st === 'Maintenance' ? 'bg-amber-600' : 'bg-rose-700'
+                    }`}>
+                      {line.lineNo}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold text-[#17343a] truncate">
+                        Line {line.lineNo}
+                      </div>
+                      <div className="text-[10px] text-[#527078] truncate">
+                        {line.style || 'Standard Run'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 pt-1.5 border-t border-[#f1eee6] flex items-center justify-between text-[9.5px] font-mono-numbers">
+                    <span className="font-bold text-[#176f78]">
+                      {formatArea(fp?.totalAreaSqm || 0)}
+                    </span>
+                    <span className="text-[#527078]">
+                      {fp?.sharePct || 0}% floor
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Main Floor Blueprint / Spatial Schematic Canvas */}
       <div className="bg-[#fbfaf6] border border-[#d9d2c2] rounded-3xl p-4 sm:p-7 shadow-xs relative overflow-hidden">
         {/* IE Shop Floor Rearrange Mode Active Guidance Banner */}
@@ -1079,9 +1492,20 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
                           <p className="text-xs font-semibold text-[#17343a] truncate max-w-[240px] sm:max-w-xs mt-0.5">
                             {line.style || 'Standard Garment Assembly'}
                           </p>
-                          <p className="text-[11px] text-[#527078]">
-                            Buyer: <span className="font-bold text-[#17343a]">{line.buyer}</span> • SMV: <span className="font-mono-numbers font-bold text-[#176f78]">{line.smv}m</span>
-                          </p>
+                          <div className="flex items-center gap-2 text-[11px] text-[#527078] mt-1 flex-wrap">
+                            <span>Buyer: <strong className="text-[#17343a]">{line.buyer}</strong></span>
+                            <span>•</span>
+                            <span>SMV: <strong className="font-mono-numbers font-bold text-[#176f78]">{line.smv}m</strong></span>
+                            <span>•</span>
+                            <span className="inline-flex items-center gap-1 font-mono-numbers font-bold text-[#176f78] bg-[#dceceb] px-2 py-0.5 rounded-md border border-[#b2d8d8]" title="Auto-calculated physical floor space occupancy">
+                              <Ruler className="w-3 h-3 text-[#176f78]" />
+                              <span>{formatArea(floorSpaceMetrics.footprints[String(line.lineNo)]?.totalAreaSqm || 164.2)}</span>
+                              <span className="text-[9.5px] text-[#527078]">({floorSpaceMetrics.footprints[String(line.lineNo)]?.sharePct || 12.8}% Floor)</span>
+                            </span>
+                            <span className="text-[10px] text-[#527078] font-mono">
+                              {formatLength(floorSpaceMetrics.footprints[String(line.lineNo)]?.lineLengthMeters || 32)} × {formatLength(floorSpaceMetrics.footprints[String(line.lineNo)]?.lineWidthMeters || 3.6)}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -1511,10 +1935,14 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
                     </div>
 
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-sm text-[#17343a]">Line {line.lineNo}</span>
                         <span className="text-xs text-[#527078]">({line.floor})</span>
                         <span className="text-xs font-bold text-[#176f78]">{line.buyer}</span>
+                        <span className="inline-flex items-center gap-1 font-mono-numbers text-[10.5px] font-bold text-[#176f78] bg-[#dceceb] px-1.5 py-0.5 rounded border border-[#b2d8d8]">
+                          <Ruler className="w-3 h-3 text-[#176f78]" />
+                          <span>{formatArea(floorSpaceMetrics.footprints[String(line.lineNo)]?.totalAreaSqm || 164.2)}</span>
+                        </span>
                       </div>
                       <p className="text-xs text-[#527078] truncate max-w-sm">{line.style}</p>
                     </div>

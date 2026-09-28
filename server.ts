@@ -23,8 +23,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 async function startServer() {
   const app = express();
-  // Port 3000 is the entry point for AI Studio environment
-  const PORT = 3000;
+  // Support Cloud Run / dynamic container PORT or fallback to 3000 for local dev
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   // Offline-First Mode: zero external online connectivity (Firebase removed, external APIs disabled)
   const OFFLINE_MODE = true;
@@ -70,8 +70,8 @@ async function startServer() {
     };
   }
 
-  // Health check endpoint
-  app.get('/health', (req, res) => {
+  // Health check endpoints for Cloud Run and monitoring probes
+  app.get(['/health', '/api/health', '/healthz', '/_health'], (req, res) => {
     res.json({
       status: 'ok',
       time: new Date().toISOString(),
@@ -762,22 +762,47 @@ Return ONLY valid JSON matching this exact structure:
   });
 
   // Vite middleware in dev or static files in production
-  if (process.env.NODE_ENV !== 'production') {
+  const distPath = path.join(process.cwd(), 'dist');
+  const isDev = process.env.NODE_ENV === 'development' || process.env.npm_lifecycle_event === 'dev';
+  const isProduction = !isDev && (process.env.NODE_ENV === 'production' || (!process.execPath.includes('tsx') && fs.existsSync(path.join(distPath, 'index.html'))));
+
+  if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
+    // Non-existent asset chunks should 404 instead of falling back to index.html
+    // This allows the client browser and Vite preloadError handlers to detect stale chunks and reload cleanly
+    app.use('/assets', (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.status(404).send('Asset chunk not found');
+    });
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT} (mode: ${isProduction ? 'production' : 'development'})`);
+  });
+
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    server.close(() => {
+      console.log('HTTP server closed');
+      process.exit(0);
+    });
+  });
+
+  process.on('SIGINT', () => {
+    console.log('SIGINT signal received: closing HTTP server');
+    server.close(() => {
+      console.log('HTTP server closed');
+      process.exit(0);
+    });
   });
 }
 

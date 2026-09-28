@@ -6,9 +6,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Settings,
-  Sliders,
   Factory,
-  Network,
   Database,
   Lock,
   Sun,
@@ -21,7 +19,6 @@ import {
   CheckCircle2,
   RefreshCw,
   Clock,
-  Sparkles,
   Layers,
   ArrowRight,
   HardDrive,
@@ -34,7 +31,16 @@ import {
   Wrench,
   Globe,
   Calculator,
-  ArrowUpRight
+  ArrowUpRight,
+  ChevronLeft,
+  Save,
+  Check,
+  Building,
+  MapPin,
+  Briefcase,
+  AlertCircle,
+  ExternalLink,
+  Laptop
 } from 'lucide-react';
 import {
   UserProfile,
@@ -80,6 +86,15 @@ export type SettingsPageSection =
   | 'world'
   | 'preferences'
   | 'tier_0';
+
+type SettingsCategory =
+  | 'factory'
+  | 'display'
+  | 'alerts'
+  | 'backup'
+  | 'security'
+  | 'android'
+  | 'hubs';
 
 interface SettingsControlCenterPageProps {
   profile: UserProfile;
@@ -244,7 +259,6 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   onAddNewLineWithSimulation = () => {},
   leanToolsSubTab = 'toolkit'
 }) => {
-  const isMasterAdmin = isMasterAdminOrAdmin(profile);
   const isSysAdmin = isSystemAdmin(profile);
 
   const [internalSection, setInternalSection] = useState<SettingsPageSection>('control-center');
@@ -263,9 +277,56 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
     }
   }, [controlledSection]);
 
-  const [activeSubTab, setActiveSubTab] = useState<string>('factory');
+  // Unified internal settings category
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>(() => {
+    if (activeSection === 'preferences') return 'display';
+    return 'factory';
+  });
+
+  useEffect(() => {
+    if (activeSection === 'preferences') {
+      setActiveCategory('display');
+    }
+  }, [activeSection]);
+
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [backupMsg, setBackupMsg] = useState<string | null>(null);
+
+  // Editable Factory Profile State
+  const [factoryName, setFactoryName] = useState(factoryProfile?.name || 'Debonair LTD');
+  const [unitName, setUnitName] = useState(factoryProfile?.unitName || 'Unit-02');
+  const [sector, setSector] = useState(factoryProfile?.industrySector || 'Apparel & Garment Manufacturing (RMG)');
+  const [location, setLocation] = useState(factoryProfile?.addressLocation || 'Gorai, Mirzapur, Tangail, Bangladesh');
+  const [factoryCode, setFactoryCode] = useState(factoryProfile?.factoryCode || 'DBN-U02');
+  const [isSavedPlant, setIsSavedPlant] = useState(false);
+
+  useEffect(() => {
+    if (factoryProfile) {
+      setFactoryName(factoryProfile.name || 'Debonair LTD');
+      setUnitName(factoryProfile.unitName || 'Unit-02');
+      setSector(factoryProfile.industrySector || 'Apparel & Garment Manufacturing (RMG)');
+      setLocation(factoryProfile.addressLocation || 'Gorai, Mirzapur, Tangail, Bangladesh');
+      setFactoryCode(factoryProfile.factoryCode || 'DBN-U02');
+    }
+  }, [factoryProfile]);
+
+  const handleSavePlantIdentity = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onUpdateFactoryProfile) {
+      onUpdateFactoryProfile({
+        id: factoryProfile?.id || 'debonair-unit-02',
+        name: factoryName.trim(),
+        unitName: unitName.trim(),
+        industrySector: sector.trim(),
+        department: factoryProfile?.department || 'Industrial Engineering (IE) Dept.',
+        factoryCode: factoryCode.trim(),
+        addressLocation: location.trim(),
+        shortTag: factoryCode.trim() || 'DBN-02'
+      });
+    }
+    setIsSavedPlant(true);
+    setTimeout(() => setIsSavedPlant(false), 2500);
+  };
 
   // Compute checklist completion percentage
   const checklistProgress = useMemo(() => {
@@ -302,785 +363,932 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
     }
   };
 
-  const masterSections = [
+  // Sound test states
+  const [testingSound, setTestingSound] = useState<'bottleneck' | 'wip' | null>(null);
+
+  const handleTestBottleneck = () => {
+    setTestingSound('bottleneck');
+    playBottleneckAlertSound();
+    setTimeout(() => setTestingSound(null), 1200);
+  };
+
+  const handleTestWip = () => {
+    setTestingSound('wip');
+    playWipAlertSound();
+    setTimeout(() => setTestingSound(null), 1200);
+  };
+
+  // Categories in the Settings Sidebar
+  const categories = [
     {
-      id: 'control-center' as SettingsPageSection,
-      label: 'Control Center & Plant',
-      shortLabel: 'Control Center',
-      icon: Sliders,
-      badge: 'Core'
+      id: 'factory' as SettingsCategory,
+      label: 'Plant Identity & Floors',
+      description: 'Enterprise name, operating floors, shift lines',
+      icon: Factory
     },
     {
-      id: 'line-data' as SettingsPageSection,
-      label: 'Datas (Daily Data Collection)',
-      shortLabel: 'Datas',
-      icon: Layers,
-      badge: `${totalActiveLines} Lines`
+      id: 'display' as SettingsCategory,
+      label: 'Display & Ergonomics',
+      description: 'Daylight Cockpit vs Dark Studio themes',
+      icon: Sun
     },
     {
-      id: 'checklist' as SettingsPageSection,
-      label: 'Check List & Floor Compliance Hub',
-      shortLabel: 'Check List Hub',
-      icon: CheckSquare,
-      badge: `${checklistProgress}%`
+      id: 'alerts' as SettingsCategory,
+      label: 'Sound & Floor Alerts',
+      description: 'Bottleneck alerts and WIP cycle chimes',
+      icon: Volume2
     },
     {
-      id: 'lean-tools' as SettingsPageSection,
-      label: 'Lean Tools & Industrial Engineering Cockpit',
-      shortLabel: 'Lean Tools & IE',
-      icon: Wrench,
-      badge: '13 WCM'
+      id: 'backup' as SettingsCategory,
+      label: 'Data Vault & Storage',
+      description: 'IndexedDB snapshots, backups, restore',
+      icon: Database
     },
     {
-      id: 'capacity' as SettingsPageSection,
-      label: 'Line Capacity & Pitch Calculator',
-      shortLabel: 'Capacity Calc',
-      icon: Calculator,
-      badge: 'IE Tool'
+      id: 'security' as SettingsCategory,
+      label: 'Security & Access',
+      description: 'Terminal lockout, RBAC clearances',
+      icon: Lock
     },
     {
-      id: 'reports' as SettingsPageSection,
-      label: 'Reports & Production Analytics',
-      shortLabel: 'Reports Hub',
-      icon: FileSpreadsheet,
-      badge: 'CSV/PDF'
+      id: 'android' as SettingsCategory,
+      label: 'Mobile & PWA App',
+      description: 'Offline service worker and APK package',
+      icon: Smartphone
     },
     {
-      id: 'world' as SettingsPageSection,
-      label: 'World Class Manufacturing (WCM)',
-      shortLabel: 'World (WCM)',
-      icon: Globe,
-      badge: 'Global'
-    },
-    {
-      id: 'preferences' as SettingsPageSection,
-      label: 'Preferences & Display',
-      shortLabel: 'Preferences',
-      icon: Settings,
-      badge: undefined
-    },
-    ...(isSysAdmin
-      ? [
-          {
-            id: 'tier_0' as SettingsPageSection,
-            label: 'Tier_0 Root Command',
-            shortLabel: 'Tier_0 Only',
-            icon: ShieldCheck,
-            badge: 'Root'
-          }
-        ]
-      : [])
+      id: 'hubs' as SettingsCategory,
+      label: 'Operational Hubs',
+      description: 'Datas, Checklist, Lean, WCM, Reports',
+      icon: Layers
+    }
   ];
 
-  return (
-    <div className="space-y-4">
-      {/* Top Page Header with Settings & Tools Hub Navigation - Shown for Control Center, Preferences & Tier 0, clean full-screen for operational workspaces */}
-      {(activeSection === 'control-center' || activeSection === 'preferences' || activeSection === 'tier_0') && (
-        <div className="bg-[#fbfaf6] border border-[#d9d2c2] rounded-2xl p-3 sm:p-4 shadow-2xs">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-[#176f78] text-white flex items-center justify-center shadow-xs shrink-0">
-                  <Settings className="w-4 h-4" />
-                </div>
-                <div>
-                  <h1 className="text-base sm:text-lg font-bold text-[#17343a] font-display flex items-center gap-2">
-                    <span>Control Center &amp; Preferences</span>
-                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-[#176f78]/10 text-[#176f78] font-bold border border-[#176f78]/25">
-                      Operations &amp; Config
-                    </span>
-                  </h1>
-                  <p className="text-xs text-[#527078]">
-                    Plant configuration, floor control, line balancing telemetry, checklists, lean tools, reports, and personalized preferences.
-                  </p>
-                </div>
-              </div>
+  // If viewing a full sub-workspace component, show the sub-workspace with a clean header
+  const isFullWorkspace =
+    activeSection !== 'control-center' &&
+    activeSection !== 'preferences';
 
-              {/* Quick Plant Badge */}
-              <div className="hidden sm:flex items-center gap-2">
-                <div className="px-2.5 py-1 rounded-xl bg-white border border-[#d9d2c2] text-xs flex items-center gap-1.5 shadow-2xs">
-                  <Factory className="w-3.5 h-3.5 text-[#176f78]" />
-                  <span className="font-bold text-[#17343a]">{factoryProfile?.name || 'Debonair LTD'}</span>
-                  <span className="text-[#527078] font-mono">({factoryProfile?.unitName || 'Unit-02'})</span>
-                </div>
-              </div>
-            </div>
+  if (isFullWorkspace) {
+    return (
+      <div className="space-y-4">
+        {/* Workspace Return Bar */}
+        <div className="bg-[#fbfaf6] dark:bg-[#1a1f26] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-3 sm:p-4 shadow-2xs flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleSetSection('control-center')}
+              className="px-3 py-1.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-white dark:bg-[#232a34] text-xs font-semibold text-[#17343a] dark:text-slate-200 hover:text-[#176f78] hover:border-[#176f78] transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Back to Settings</span>
+            </button>
+            <span className="text-slate-400 dark:text-slate-600">/</span>
+            <span className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider">
+              {activeSection === 'line-data' && 'Line Data Operations Hub'}
+              {activeSection === 'checklist' && 'Check List & Floor Compliance Hub'}
+              {activeSection === 'lean-tools' && 'Lean Tools & Industrial Engineering Cockpit'}
+              {activeSection === 'capacity' && 'Line Capacity & Pitch Calculator'}
+              {activeSection === 'reports' && 'Reports & Production Analytics Hub'}
+              {activeSection === 'world' && 'World Class Manufacturing (WCM)'}
+              {activeSection === 'tier_0' && 'Tier_0 Root Command Suite'}
+            </span>
+          </div>
 
-            {/* Master Section Selector Pills: Line Data, Checklist, Lean Tools, World WCM, Control Center, Preferences */}
-            <div className="flex items-center gap-1 bg-[#f1eee6] p-1 rounded-2xl border border-[#d9d2c2] overflow-x-auto scrollbar-none">
-              {masterSections.map(tab => {
-                const Icon = tab.icon;
-                const isActive = activeSection === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      handleSetSection(tab.id);
-                      if (tab.id === 'control-center') setActiveSubTab('factory');
-                      if (tab.id === 'preferences') setActiveSubTab('theme');
-                    }}
-                    title={tab.label}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap touch-manipulation active:scale-95 ${
-                      isActive
-                        ? 'bg-[#176f78] text-white shadow-xs'
-                        : 'text-slate-600 hover:text-[#176f78] hover:bg-white/50'
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
-                    <span className="hidden min-[480px]:inline">{tab.shortLabel}</span>
-                    <span className="min-[480px]:hidden">{tab.shortLabel.split(' ')[0]}</span>
-                    {tab.badge && (
-                      <span
-                        className={`text-[9.5px] px-1.5 py-0.2 rounded-md font-mono font-bold ${
-                          isActive ? 'bg-white/20 text-white' : 'bg-white text-[#176f78] border border-[#d9d2c2]'
-                        }`}
-                      >
-                        {tab.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="hidden sm:flex items-center gap-2 text-xs text-[#527078] dark:text-slate-400">
+            <span>{factoryProfile?.name || 'Debonair LTD'}</span>
+            <span aria-hidden="true">·</span>
+            <span>{totalActiveLines} Lines</span>
           </div>
         </div>
-      )}
 
-      {/* SECTION 1: LINE DATA OPERATIONS HUB */}
-      {activeSection === 'line-data' && (
-        <LineDataPage
-          lines={lines}
-          checklists={checklists}
-          selectedLineNo={selectedLineNo}
-          onSelectLineNo={onSelectLineNo}
-          onSaveLine={onSaveLine}
-          onAddNewLine={onAddNewLine}
-          onDeleteLine={onDeleteLine}
-          onDeleteFloor={onDeleteFloor}
-          onReorderLines={onReorderLines}
-          onNavigate={onNavigate}
-          activeDate={activeDate}
-          onSelectDate={onSelectDate}
-          profile={profile}
-          roleTiers={roleTiers}
-          initialSubTab={lineDataSubTab}
-          stations={stations}
-          hourlyData={hourlyData}
-          downtimeLog={downtimeLog}
-          onOpenNewDowntime={onOpenNewDowntime}
-          onUpdateHourNotes={onUpdateHourNotes}
-          onUpdateHourOutput={onUpdateHourOutput}
-          factoryProfile={factoryProfile}
-          onUpdateFactoryProfile={onUpdateFactoryProfile}
-          savedFactories={savedFactories}
-          onSaveFactoryList={onSaveFactoryList}
-          onOpenDatabase={onOpenDatabase}
-          actions={leanActions}
-          onUpdateActions={onUpdateLeanActions}
-        />
-      )}
+        {/* Render Workspace Content */}
+        {activeSection === 'line-data' && (
+          <LineDataPage
+            lines={lines}
+            checklists={checklists}
+            selectedLineNo={selectedLineNo}
+            onSelectLineNo={onSelectLineNo}
+            onSaveLine={onSaveLine}
+            onAddNewLine={onAddNewLine}
+            onDeleteLine={onDeleteLine}
+            onDeleteFloor={onDeleteFloor}
+            onReorderLines={onReorderLines}
+            onNavigate={onNavigate}
+            activeDate={activeDate}
+            onSelectDate={onSelectDate}
+            profile={profile}
+            roleTiers={roleTiers}
+            initialSubTab={lineDataSubTab}
+            stations={stations}
+            hourlyData={hourlyData}
+            downtimeLog={downtimeLog}
+            onOpenNewDowntime={onOpenNewDowntime}
+            onUpdateHourNotes={onUpdateHourNotes}
+            onUpdateHourOutput={onUpdateHourOutput}
+            factoryProfile={factoryProfile}
+            onUpdateFactoryProfile={onUpdateFactoryProfile}
+            savedFactories={savedFactories}
+            onSaveFactoryList={onSaveFactoryList}
+            onOpenDatabase={onOpenDatabase}
+            actions={leanActions}
+            onUpdateActions={onUpdateLeanActions}
+          />
+        )}
 
-      {/* SECTION 2: CHECK LIST & FLOOR COMPLIANCE HUB */}
-      {activeSection === 'checklist' && (
-        <ChecklistPage
-          checklists={checklists}
-          selectedDate={selectedChecklistDate}
-          onSelectDate={onSelectChecklistDate}
-          onUpdateTaskStatus={onUpdateTaskStatus}
-          onBatchUpdateChecklist={onBatchUpdateChecklist}
-          profile={profile}
-          roleTiers={roleTiers}
-          onNavigate={onNavigate}
-          todos={todos}
-          schedules={schedules}
-          onUpdateTodos={onUpdateTodos}
-          onUpdateSchedules={onUpdateSchedules}
-          actions={actionItems}
-          fiveWhys={fiveWhys}
-          onOpenNewAction={onOpenNewAction}
-          onUpdateActionStatus={onUpdateActionStatus}
-          onAddNewFiveWhy={onAddNewFiveWhy}
-          auditItems={auditChecks}
-          centerlines={centerlines}
-          onToggleAuditItem={onToggleAuditItem}
-          onUpdateCenterlineValue={onUpdateCenterlineValue}
-          lines={lines}
-          onAddTodoFromAudit={onAddTodoFromAudit}
-          initialSubTab={checklistSubTab}
-        />
-      )}
+        {activeSection === 'checklist' && (
+          <ChecklistPage
+            checklists={checklists}
+            selectedDate={selectedChecklistDate}
+            onSelectDate={onSelectChecklistDate}
+            onUpdateTaskStatus={onUpdateTaskStatus}
+            onBatchUpdateChecklist={onBatchUpdateChecklist}
+            profile={profile}
+            roleTiers={roleTiers}
+            onNavigate={onNavigate}
+            todos={todos}
+            schedules={schedules}
+            onUpdateTodos={onUpdateTodos}
+            onUpdateSchedules={onUpdateSchedules}
+            actions={actionItems}
+            fiveWhys={fiveWhys}
+            onOpenNewAction={onOpenNewAction}
+            onUpdateActionStatus={onUpdateActionStatus}
+            onAddNewFiveWhy={onAddNewFiveWhy}
+            auditItems={auditChecks}
+            centerlines={centerlines}
+            onToggleAuditItem={onToggleAuditItem}
+            onUpdateCenterlineValue={onUpdateCenterlineValue}
+            lines={lines}
+            selectedLineNo={selectedLineNo}
+            onSelectLineNo={onSelectLineNo}
+            onAddTodoFromAudit={onAddTodoFromAudit}
+            initialSubTab={checklistSubTab}
+          />
+        )}
 
-      {/* SECTION 3: LEAN TOOLS & INDUSTRIAL ENGINEERING COCKPIT */}
-      {activeSection === 'lean-tools' && (
-        <LeanToolsPage
-          actions={leanActions}
-          onUpdateActions={onUpdateLeanActions}
-          profile={profile}
-          lines={lines}
-          onSaveLine={onSaveLine}
-          selectedLineNo={selectedLineNo}
-          onSelectLineNo={onSelectLineNo}
-          onApplySimulationToLine={onApplySimulationToLine}
-          onAddNewLineWithSimulation={onAddNewLineWithSimulation}
-          onNavigate={onNavigate}
-          initialSubTab={leanToolsSubTab}
-        />
-      )}
+        {activeSection === 'lean-tools' && (
+          <LeanToolsPage
+            actions={leanActions}
+            onUpdateActions={onUpdateLeanActions}
+            profile={profile}
+            lines={lines}
+            onSaveLine={onSaveLine}
+            selectedLineNo={selectedLineNo}
+            onSelectLineNo={onSelectLineNo}
+            onNavigate={onNavigate}
+            onApplySimulationToLine={onApplySimulationToLine}
+            onAddNewLineWithSimulation={onAddNewLineWithSimulation}
+            initialSubTab={leanToolsSubTab}
+          />
+        )}
 
-      {/* SECTION 4: WORLD CLASS MANUFACTURING (WCM) & STANDARDS */}
-      {activeSection === 'world' && (
-        <WorldClassManufacturingSection
-          lines={lines}
-          profile={profile}
-          onNavigateToTool={toolId => {
-            if (toolId === 'lean-tools') handleSetSection('lean-tools');
-            if (toolId === 'line-data') handleSetSection('line-data');
-            if (toolId === 'checklist') handleSetSection('checklist');
-            if (toolId === 'reports') handleSetSection('reports');
-          }}
-        />
-      )}
-
-      {/* SECTION 5: REPORTS & PRODUCTION ANALYTICS HUB */}
-      {activeSection === 'reports' && (
-        <Reports
-          lines={lines}
-          todayDate={activeDate || '2026-09-24'}
-          activeDate={activeDate}
-          onSelectDate={onSelectDate}
-          activeFloor={activeFloor}
-          onSelectFloor={onSelectFloor}
-          checklists={checklists}
-          profile={profile}
-          onNavigate={onNavigate}
-          onDeleteFloor={onDeleteFloor}
-          onImportLines={onImportLines}
-          onOpenDatabase={onOpenDatabase}
-        />
-      )}
-
-      {/* SECTION 6: CAPACITY CALCULATOR WORKSPACE (TRANSFERRED FROM LEAN TOOLS) */}
-      {activeSection === 'capacity' && (
-        <div className="bg-white rounded-2xl border border-[#d9d2c2] p-4 sm:p-6 shadow-2xs">
+        {activeSection === 'capacity' && (
           <CapacityCalculatorWorkspace
             onBack={() => handleSetSection('control-center')}
             lines={lines}
             selectedLineNo={selectedLineNo}
             onSaveLine={onSaveLine}
             actions={leanActions}
-            onUpdateActions={onUpdateLeanActions}
+            onUpdateActions={actions => {
+              if (typeof onUpdateLeanActions === 'function') {
+                onUpdateLeanActions(actions);
+              }
+            }}
             profile={profile}
           />
-        </div>
-      )}
+        )}
 
-      {/* SECTION 7: CONTROL CENTER & PLANT PROFILE */}
-      {activeSection === 'control-center' && (
-        <div className="space-y-4">
-          {/* Sub-navigation bar */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            {[
-              { id: 'factory', label: 'Plant & Factory Profile', icon: Factory },
-              { id: 'rbac', label: 'IE Org & RBAC Tiers', icon: Network },
-              { id: 'backup', label: 'Data Hub & Backup', icon: Database },
-              { id: 'security', label: 'Floor Security & Lock', icon: Lock }
-            ].map(tab => {
-              const Icon = tab.icon;
-              const isActive = activeSubTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveSubTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    isActive
-                      ? 'bg-white text-[#176f78] border border-[#176f78] shadow-xs'
-                      : 'bg-[#fbfaf6] text-slate-600 border border-[#d9d2c2] hover:bg-white'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
+        {activeSection === 'reports' && (
+          <Reports
+            lines={lines}
+            checklists={checklists}
+            onNavigate={onNavigate}
+            todayDate={activeDate || '2026-09-24'}
+            profile={profile}
+          />
+        )}
+
+        {activeSection === 'world' && (
+          <WorldClassManufacturingSection
+            profile={profile}
+            onNavigateToTool={tool => {
+              if (tool === 'control-center') handleSetSection('control-center');
+              else if (tool === 'checklist') handleSetSection('checklist');
+              else if (tool === 'lean-tools') handleSetSection('lean-tools');
+              else if (tool === 'line-data') handleSetSection('line-data');
+            }}
+          />
+        )}
+
+        {activeSection === 'tier_0' && isSysAdmin && (
+          <Tier0CommandHub
+            profile={profile}
+            lines={lines}
+            roleTiers={roleTiers}
+            factoryProfile={factoryProfile}
+            dailyBackupSettings={dailyBackupSettings}
+            onUpdateDailyBackupSettings={onUpdateDailyBackupSettings}
+            onTriggerManualBackup={onTriggerManualBackup}
+            onLockTerminal={onLockTerminal}
+            onNavigate={onNavigate}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // CORE SETTINGS WORKSPACE (Clean, Apple/Linear-grade 2-column layout)
+  return (
+    <div className="space-y-6">
+      {/* 1. Header Zone: Clean typography, unboxed metadata */}
+      <header className="bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-5 sm:p-6 shadow-2xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#176f78] text-white flex items-center justify-center shadow-2xs shrink-0">
+                <Settings className="w-4 h-4" />
+              </div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#17343a] dark:text-slate-100 font-display">
+                Settings
+              </h1>
+            </div>
+            <p className="text-xs text-[#527078] dark:text-slate-400">
+              Plant identity, floor distribution, audio alerts, and industrial data configuration.
+            </p>
           </div>
 
-          {/* Plant Profile Sub-view */}
-          {activeSubTab === 'factory' && (
-            <div className="bg-white rounded-2xl border border-[#d9d2c2] p-5 sm:p-6 shadow-2xs space-y-6">
-              <div className="flex items-center justify-between border-b border-[#e7e1d5] pb-4">
-                <div>
-                  <h2 className="text-base font-bold text-[#17343a] flex items-center gap-2">
-                    <Factory className="w-4 h-4 text-[#176f78]" />
-                    <span>Enterprise Plant Identity</span>
-                  </h2>
-                  <p className="text-xs text-[#527078] mt-0.5">
-                    Unit-02 manufacturing facility configuration and active floor buildings.
-                  </p>
+          {/* Plant Metadata */}
+          <div className="flex items-center gap-2 text-xs text-[#527078] dark:text-slate-400 font-mono">
+            <span className="font-semibold text-[#17343a] dark:text-slate-200">
+              {factoryProfile?.name || 'Debonair LTD'}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>{factoryProfile?.unitName || 'Unit-02'}</span>
+            <span aria-hidden="true">·</span>
+            <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+              {totalActiveLines} Lines Active
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {/* 2. Main Two-Column Settings Workspace */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Navigation Rail (Categories) */}
+        <nav
+          aria-label="Settings Categories"
+          className="lg:col-span-4 xl:col-span-3 bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-2 sm:p-3 shadow-2xs flex lg:flex-col overflow-x-auto lg:overflow-visible gap-1.5 scrollbar-none"
+        >
+          {categories.map(cat => {
+            const Icon = cat.icon;
+            const isActive = activeCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setActiveCategory(cat.id)}
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all cursor-pointer whitespace-nowrap lg:whitespace-normal w-full group ${
+                  isActive
+                    ? 'bg-[#176f78] text-white shadow-xs'
+                    : 'text-[#17343a] dark:text-slate-300 hover:bg-[#f1eee6] dark:hover:bg-[#252e3a]'
+                }`}
+              >
+                <div
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                    isActive
+                      ? 'bg-white/20 text-white'
+                      : 'bg-[#f1eee6] dark:bg-[#252e3a] text-[#176f78] dark:text-teal-400 group-hover:bg-[#e7e1d5] dark:group-hover:bg-[#2c3746]'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
                 </div>
-                <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-[#176f78]/10 text-[#176f78] border border-[#176f78]/25">
-                  UNIT-02 ACTIVE
+                <div className="hidden min-[480px]:block">
+                  <div className="text-xs font-bold leading-snug">
+                    {cat.label}
+                  </div>
+                  <div
+                    className={`text-[10px] hidden lg:block leading-tight ${
+                      isActive ? 'text-white/80' : 'text-[#527078] dark:text-slate-400'
+                    }`}
+                  >
+                    {cat.description}
+                  </div>
+                </div>
+                <span className="min-[480px]:hidden text-xs font-bold">
+                  {cat.label.split(' ')[0]}
                 </span>
+              </button>
+            );
+          })}
+
+          {isSysAdmin && (
+            <div className="pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] mt-1">
+              <button
+                type="button"
+                onClick={() => handleSetSection('tier_0')}
+                className="flex items-center gap-3 px-3.5 py-2 rounded-xl text-left transition-all cursor-pointer text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800/60 w-full"
+              >
+                <ShieldCheck className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" />
+                <span className="text-xs font-bold">Tier_0 Root Suite</span>
+              </button>
+            </div>
+          )}
+        </nav>
+
+        {/* Right Settings Content Area */}
+        <main className="lg:col-span-8 xl:col-span-9 bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-5 sm:p-7 shadow-2xs">
+          {/* ========================================================
+              CATEGORY 1: PLANT IDENTITY & OPERATING FLOORS
+          ======================================================== */}
+          {activeCategory === 'factory' && (
+            <section className="space-y-6">
+              <div className="border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4">
+                <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
+                  <Factory className="w-4 h-4 text-[#176f78]" />
+                  <span>Plant Identity &amp; Enterprise Facility</span>
+                </h2>
+                <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
+                  Configure corporate plant identification, active complex unit, and floor distribution.
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2]">
-                  <div className="text-[11px] font-bold text-[#527078] uppercase">Company / Group</div>
-                  <div className="text-base font-bold text-[#17343a] mt-1 font-display">
-                    {factoryProfile?.name || 'Debonair LTD'}
+              {/* Plant Identity Form */}
+              <form onSubmit={handleSavePlantIdentity} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#17343a] dark:text-slate-200 mb-1">
+                      Company / Group Name
+                    </label>
+                    <div className="relative">
+                      <Building className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                      <input
+                        type="text"
+                        value={factoryName}
+                        onChange={e => setFactoryName(e.target.value)}
+                        placeholder="e.g. Debonair LTD"
+                        className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-[#d9d2c2] dark:border-[#384454] bg-[#fbfaf6] dark:bg-[#151a21] text-[#17343a] dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-[#176f78]"
+                      />
+                    </div>
                   </div>
-                  <div className="text-xs text-[#527078] mt-0.5">
-                    Sector: {factoryProfile?.industrySector || 'Apparel & Garment Manufacturing (RMG)'}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#17343a] dark:text-slate-200 mb-1">
+                      Active Unit Designation
+                    </label>
+                    <div className="relative">
+                      <Briefcase className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                      <input
+                        type="text"
+                        value={unitName}
+                        onChange={e => setUnitName(e.target.value)}
+                        placeholder="e.g. Unit-02 Manufacturing Complex"
+                        className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-[#d9d2c2] dark:border-[#384454] bg-[#fbfaf6] dark:bg-[#151a21] text-[#17343a] dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-[#176f78]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#17343a] dark:text-slate-200 mb-1">
+                      Industry Sector
+                    </label>
+                    <input
+                      type="text"
+                      value={sector}
+                      onChange={e => setSector(e.target.value)}
+                      placeholder="e.g. Apparel & Garments (RMG)"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-[#d9d2c2] dark:border-[#384454] bg-[#fbfaf6] dark:bg-[#151a21] text-[#17343a] dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-[#176f78]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#17343a] dark:text-slate-200 mb-1">
+                      Factory Facility Code
+                    </label>
+                    <input
+                      type="text"
+                      value={factoryCode}
+                      onChange={e => setFactoryCode(e.target.value)}
+                      placeholder="e.g. DBN-U02"
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-[#d9d2c2] dark:border-[#384454] bg-[#fbfaf6] dark:bg-[#151a21] text-[#17343a] dark:text-slate-100 font-mono focus:outline-hidden focus:ring-2 focus:ring-[#176f78]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-[#17343a] dark:text-slate-200 mb-1">
+                      Facility Location / Address
+                    </label>
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                      <input
+                        type="text"
+                        value={location}
+                        onChange={e => setLocation(e.target.value)}
+                        placeholder="e.g. Gorai, Mirzapur, Tangail, Bangladesh"
+                        className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-[#d9d2c2] dark:border-[#384454] bg-[#fbfaf6] dark:bg-[#151a21] text-[#17343a] dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-[#176f78]"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2]">
-                  <div className="text-[11px] font-bold text-[#527078] uppercase">Active Unit</div>
-                  <div className="text-base font-bold text-[#17343a] mt-1 font-display">
-                    {factoryProfile?.unitName || 'Unit-02 Manufacturing Complex'}
+                <div className="flex items-center justify-between pt-2">
+                  <div className="text-xs text-[#527078] dark:text-slate-400">
+                    {isSavedPlant && (
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Changes saved successfully</span>
+                      </span>
+                    )}
                   </div>
-                  <div className="text-xs text-[#527078] mt-0.5">
-                    Location: Gorai, Mirzapur, Tangail, Bangladesh
-                  </div>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-[#176f78] text-white text-xs font-bold hover:bg-[#12555c] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Save Plant Profile</span>
+                  </button>
                 </div>
-              </div>
+              </form>
 
-              {/* Floors Overview */}
-              <div>
-                <h3 className="text-xs font-bold text-[#17343a] uppercase tracking-wider mb-2">
-                  Operating Production Floors ({totalActiveLines} Lines)
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+              {/* Operating Production Floors Section */}
+              <div className="pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846]">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider">
+                      Operating Production Floors ({totalActiveLines} Active Lines)
+                    </h3>
+                    <p className="text-[11px] text-[#527078] dark:text-slate-400">
+                      Standard unit divisions configured for floor supervision and balancing.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSetSection('line-data')}
+                    className="text-xs font-bold text-[#176f78] dark:text-teal-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>View in Line Data</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
-                    { name: 'Padma', lines: 'Lines 01 - 06', color: 'bg-blue-50 border-blue-200 text-blue-900' },
-                    { name: 'Meghna', lines: 'Lines 07 - 12', color: 'bg-emerald-50 border-emerald-200 text-emerald-900' },
-                    { name: 'Karnophuli', lines: 'Lines 13 - 17', color: 'bg-amber-50 border-amber-200 text-amber-900' },
-                    { name: 'Korotoya', lines: 'Lines 18 - 23', color: 'bg-purple-50 border-purple-200 text-purple-900' },
-                    { name: 'Shitalokshya', lines: 'Lines 24 - 29', color: 'bg-teal-50 border-teal-200 text-teal-900' },
-                    { name: 'Turag', lines: 'Lines 30 - 34', color: 'bg-rose-50 border-rose-200 text-rose-900' }
+                    { name: 'Padma', lines: 'Lines 01 - 06', count: 6, lineFilter: '1' },
+                    { name: 'Meghna', lines: 'Lines 07 - 12', count: 6, lineFilter: '7' },
+                    { name: 'Karnophuli', lines: 'Lines 13 - 17', count: 5, lineFilter: '13' },
+                    { name: 'Korotoya', lines: 'Lines 18 - 23', count: 6, lineFilter: '18' },
+                    { name: 'Shitalokshya', lines: 'Lines 24 - 29', count: 6, lineFilter: '24' },
+                    { name: 'Turag', lines: 'Lines 30 - 34', count: 5, lineFilter: '30' }
                   ].map(f => (
-                    <div key={f.name} className={`p-3 rounded-xl border ${f.color} text-center`}>
-                      <div className="font-bold text-xs">{f.name}</div>
-                      <div className="text-[10px] opacity-80 mt-0.5">{f.lines}</div>
+                    <div
+                      key={f.name}
+                      onClick={() => {
+                        handleSetSection('line-data');
+                        onSelectLineNo(f.lineFilter);
+                      }}
+                      className="p-3.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white dark:hover:bg-[#202732] hover:border-[#176f78] transition-all cursor-pointer shadow-2xs group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-[#17343a] dark:text-slate-200 group-hover:text-[#176f78] transition-colors">
+                          {f.name}
+                        </span>
+                        <span className="text-[10px] font-mono text-[#527078] dark:text-slate-400">
+                          {f.count} Lines
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-[#527078] dark:text-slate-400 font-mono mt-1">
+                        {f.lines}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Featured Transferred Tool: Line Capacity Calculator */}
-              <div
-                id="featured-capacity-calculator-banner"
-                onClick={() => handleSetSection('capacity')}
-                className="p-4 sm:p-5 rounded-3xl bg-linear-to-r from-[#0c4a60] via-[#176f78] to-[#12555c] text-white shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
-              >
-                <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
-                    <Calculator className="w-6 h-6 stroke-[2.2]" />
+              {/* Working Hours & Shift Norms */}
+              <div className="pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846] grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846]">
+                  <div className="text-[11px] font-semibold text-[#527078] dark:text-slate-400">
+                    Standard Shift Hours
                   </div>
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-full bg-amber-400 text-amber-950 text-[10px] font-extrabold uppercase tracking-wide">
-                        CENTRALIZED IN SETTINGS
-                      </span>
-                      <span className="text-xs font-bold text-cyan-200 uppercase tracking-wider">
-                        Production Planning &amp; Pitch Takt
-                      </span>
+                  <div className="text-sm font-bold text-[#17343a] dark:text-slate-200 mt-1 font-mono">
+                    08:00 AM – 05:00 PM
+                  </div>
+                  <div className="text-[10px] text-[#527078] dark:text-slate-400 mt-0.5">
+                    9h duration · 1h lunch pause
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846]">
+                  <div className="text-[11px] font-semibold text-[#527078] dark:text-slate-400">
+                    Target Efficiency Baseline
+                  </div>
+                  <div className="text-sm font-bold text-[#17343a] dark:text-slate-200 mt-1 font-mono">
+                    68.0% Benchmark
+                  </div>
+                  <div className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5">
+                    IE standard for RMG jackets
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846]">
+                  <div className="text-[11px] font-semibold text-[#527078] dark:text-slate-400">
+                    Hourly Telemetry Slots
+                  </div>
+                  <div className="text-sm font-bold text-[#17343a] dark:text-slate-200 mt-1 font-mono">
+                    10 Production Hours
+                  </div>
+                  <div className="text-[10px] text-[#527078] dark:text-slate-400 mt-0.5">
+                    H1 (08-09) to H10 (18-19 OT)
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* ========================================================
+              CATEGORY 2: DISPLAY & VISUAL ERGONOMICS
+          ======================================================== */}
+          {activeCategory === 'display' && (
+            <section className="space-y-6">
+              <div className="border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4">
+                <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
+                  <Sun className="w-4 h-4 text-[#176f78]" />
+                  <span>Display &amp; Visual Ergonomics</span>
+                </h2>
+                <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
+                  Select interface contrast mode tailored for daylight shop floors or night control rooms.
+                </p>
+              </div>
+
+              {/* Theme Choice Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => onSelectTheme('light')}
+                  className={`p-5 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                    currentTheme === 'light'
+                      ? 'border-[#176f78] bg-[#176f78]/5 ring-2 ring-[#176f78]/20 shadow-xs'
+                      : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center">
+                      <Sun className="w-4 h-4" />
                     </div>
-                    <h2 className="text-lg font-extrabold text-white tracking-tight">
-                      Line Capacity Calculator
-                    </h2>
-                    <p className="text-xs text-cyan-100 max-w-xl">
-                      Input total machine hours and planned SMV to determine theoretical daily production capacity, pitch takt time, and delivery targets.
+                    {currentTheme === 'light' && (
+                      <CheckCircle2 className="w-5 h-5 text-[#176f78]" />
+                    )}
+                  </div>
+                  <div className="font-bold text-sm text-[#17343a] dark:text-slate-100">
+                    Light Cockpit (Default)
+                  </div>
+                  <p className="text-xs text-[#527078] dark:text-slate-400 mt-1 leading-relaxed">
+                    Warm architectural canvas with deep industrial teal accents. Glare-resistant under factory fluorescent lighting.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onSelectTheme('dark')}
+                  className={`p-5 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                    currentTheme === 'dark'
+                      ? 'border-[#176f78] bg-slate-900 text-white ring-2 ring-[#176f78]/20 shadow-xs'
+                      : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-900 text-indigo-200 flex items-center justify-center">
+                      <Moon className="w-4 h-4" />
+                    </div>
+                    {currentTheme === 'dark' && (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    )}
+                  </div>
+                  <div className="font-bold text-sm text-[#17343a] dark:text-slate-100">
+                    Dark Studio (Night Shift)
+                  </div>
+                  <p className="text-xs text-[#527078] dark:text-slate-400 mt-1 leading-relaxed">
+                    Low-fatigue dark slate canvas designed for control room displays, night audits, and low-light environments.
+                  </p>
+                </button>
+              </div>
+
+              {/* Layout Density Controls */}
+              <div className="pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846]">
+                <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider mb-2">
+                  Shop Floor Viewport Density
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24]">
+                    <div className="font-bold text-xs text-[#17343a] dark:text-slate-200">
+                      Standard Tablet Ergonomics
+                    </div>
+                    <p className="text-[11px] text-[#527078] dark:text-slate-400 mt-0.5">
+                      Touch targets 44px and above optimized for floor operators and tablet gloves.
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24]">
+                    <div className="font-bold text-xs text-[#17343a] dark:text-slate-200">
+                      High Contrast Numerals
+                    </div>
+                    <p className="text-[11px] text-[#527078] dark:text-slate-400 mt-0.5">
+                      Tabular figures (`font-mono tabular-nums`) enabled across all production tables.
                     </p>
                   </div>
                 </div>
+              </div>
+            </section>
+          )}
 
-                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                  <span className="px-4 py-2 rounded-xl bg-white text-[#0c4a60] font-extrabold text-xs shadow-xs group-hover:bg-cyan-50 transition-colors flex items-center gap-1.5">
-                    <span>Launch Calculator</span>
-                    <ArrowUpRight className="w-4 h-4" />
-                  </span>
-                </div>
+          {/* ========================================================
+              CATEGORY 3: SOUND & FLOOR ALERTS
+          ======================================================== */}
+          {activeCategory === 'alerts' && (
+            <section className="space-y-6">
+              <div className="border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4">
+                <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-[#176f78]" />
+                  <span>Auditory Alert Rules &amp; Floor Signals</span>
+                </h2>
+                <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
+                  Web Audio telemetry alerts when line bottlenecks choke or WIP starvation occurs.
+                </p>
               </div>
 
-              {/* Integrated Operational Hubs Directory (Transferred to Settings) */}
-              <div className="pt-2 border-t border-[#e7e1d5]">
-                <div className="flex items-center justify-between mb-3">
+              {/* Master Audio Toggle */}
+              <div className="p-4 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <div className="text-sm font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
+                    {auditoryAlertsEnabled ? (
+                      <Volume2 className="w-4 h-4 text-[#176f78]" />
+                    ) : (
+                      <VolumeX className="w-4 h-4 text-slate-400" />
+                    )}
+                    <span>Auditory Alerts Master Switch</span>
+                  </div>
+                  <p className="text-xs text-[#527078] dark:text-slate-400">
+                    Enables synth chimes for floor supervisor tablet alerts.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onToggleAuditoryAlerts(!auditoryAlertsEnabled)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                    auditoryAlertsEnabled ? 'bg-[#176f78]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      auditoryAlertsEnabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Specific Alert Channels */}
+              <div className="space-y-3">
+                <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-xs font-bold text-[#17343a] uppercase tracking-wider">
-                      Integrated Operational Hubs
-                    </h3>
-                    <p className="text-[11px] text-[#527078]">
-                      All frontline manufacturing and engineering tools centralized in Control Center &amp; Preferences.
-                    </p>
+                    <div className="text-xs font-bold text-[#17343a] dark:text-slate-200">
+                      Bottleneck Choke Frequency Chime
+                    </div>
+                    <div className="text-[11px] text-[#527078] dark:text-slate-400">
+                      Harmonic alert fires when station cycle time exceeds line takt time by &gt;15%.
+                    </div>
                   </div>
-                  <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    6 Hubs Centralized
-                  </span>
+                  <button
+                    type="button"
+                    onClick={handleTestBottleneck}
+                    disabled={testingSound === 'bottleneck'}
+                    className="px-3.5 py-1.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-white dark:bg-[#232a34] text-xs font-bold text-[#17343a] dark:text-slate-200 hover:text-[#176f78] hover:border-[#176f78] transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 self-start sm:self-auto shrink-0"
+                  >
+                    <Play className={`w-3.5 h-3.5 text-[#176f78] ${testingSound === 'bottleneck' ? 'animate-ping' : ''}`} />
+                    <span>{testingSound === 'bottleneck' ? 'Playing...' : 'Test Sound'}</span>
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {[
-                    {
-                      id: 'line-data' as SettingsPageSection,
-                      title: 'Line Data Operations Hub',
-                      desc: `${totalActiveLines} sewing lines telemetry, Yamazumi balancing, hourly pacing, and loss Pareto.`,
-                      icon: Layers,
-                      badge: `${totalActiveLines} Lines`,
-                      color: 'text-[#176f78] bg-[#176f78]/10'
-                    },
-                    {
-                      id: 'checklist' as SettingsPageSection,
-                      title: 'Check List & Floor Compliance',
-                      desc: '12-point daily verification routine, action tracker, 5-whys, and 5S centerline audits.',
-                      icon: CheckSquare,
-                      badge: `${checklistProgress}% Complete`,
-                      color: 'text-emerald-700 bg-emerald-50'
-                    },
-                    {
-                      id: 'lean-tools' as SettingsPageSection,
-                      title: 'Lean Tools & IE Simulator',
-                      desc: '13 lean manufacturing methods, Kaizen workshops, SMV tuning, and flow simulator.',
-                      icon: Wrench,
-                      badge: '13 Methods',
-                      color: 'text-amber-700 bg-amber-50'
-                    },
-                    {
-                      id: 'capacity' as SettingsPageSection,
-                      title: 'Capacity & Pitch Calculator',
-                      desc: 'Theoretical daily output, pitch takt time, machine hours balance, and order delivery planning.',
-                      icon: Calculator,
-                      badge: 'IE Tool',
-                      color: 'text-amber-700 bg-amber-50'
-                    },
-                    {
-                      id: 'reports' as SettingsPageSection,
-                      title: 'Reports & Production Analytics',
-                      desc: 'Consolidated executive shift summaries, production matrix, and CSV / PDF exports.',
-                      icon: FileSpreadsheet,
-                      badge: 'Export Hub',
-                      color: 'text-teal-700 bg-teal-50'
-                    },
-                    {
-                      id: 'world' as SettingsPageSection,
-                      title: 'World Class Manufacturing (WCM)',
-                      desc: '5 WCM pillars, TPM, SMED, Poka-Yoke, and zero-defect quality benchmarks.',
-                      icon: Globe,
-                      badge: 'Global WCM',
-                      color: 'text-indigo-700 bg-indigo-50'
-                    }
-                  ].map(hub => {
-                    const HubIcon = hub.icon;
-                    return (
-                      <button
-                        key={hub.id}
-                        type="button"
-                        onClick={() => handleSetSection(hub.id)}
-                        className="p-3.5 rounded-xl border border-[#d9d2c2] bg-[#fbfaf6] hover:bg-white hover:border-[#176f78] transition-all text-left group cursor-pointer shadow-2xs hover:shadow-xs flex flex-col justify-between"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${hub.color}`}>
-                              <HubIcon className="w-4 h-4" />
-                            </div>
-                            <span className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-white border border-[#d9d2c2] text-[#17343a]">
-                              {hub.badge}
-                            </span>
-                          </div>
-                          <div className="font-bold text-xs text-[#17343a] group-hover:text-[#176f78] transition-colors">
-                            {hub.title}
-                          </div>
-                          <p className="text-[11px] text-[#527078] mt-1 leading-relaxed">
-                            {hub.desc}
-                          </p>
-                        </div>
-                        <div className="pt-2.5 mt-2.5 border-t border-[#e7e1d5] flex items-center justify-between text-[11px] font-bold text-[#176f78]">
-                          <span>Launch Operational Hub</span>
-                          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                        </div>
-                      </button>
-                    );
-                  })}
+                <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-bold text-[#17343a] dark:text-slate-200">
+                      WIP Buffer Starvation Chime
+                    </div>
+                    <div className="text-[11px] text-[#527078] dark:text-slate-400">
+                      Subtle alert when downstream operations run out of bundle inventory.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleTestWip}
+                    disabled={testingSound === 'wip'}
+                    className="px-3.5 py-1.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-white dark:bg-[#232a34] text-xs font-bold text-[#17343a] dark:text-slate-200 hover:text-[#176f78] hover:border-[#176f78] transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 self-start sm:self-auto shrink-0"
+                  >
+                    <Play className={`w-3.5 h-3.5 text-amber-600 ${testingSound === 'wip' ? 'animate-ping' : ''}`} />
+                    <span>{testingSound === 'wip' ? 'Playing...' : 'Test Sound'}</span>
+                  </button>
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
-          {/* RBAC Sub-view */}
-          {activeSubTab === 'rbac' && (
-            <div className="space-y-4">
-              <ActiveOperationalTiers
-                currentTierId={profile.tierId || 'tier_1'}
-                onSelectTier={tier => {
-                  if (onUpdateProfile) {
-                    onUpdateProfile({ tierId: tier.id, jobTitle: tier.name });
-                  }
-                }}
-                profile={profile}
-                roleTiers={roleTiers}
-                onOpenRoleEditor={() => onOpenUserModal && onOpenUserModal('roles')}
-                onSelectLineFilter={lineNo => {
-                  handleSetSection('line-data');
-                  if (onSelectLineNo) onSelectLineNo(lineNo);
-                }}
-              />
-            </div>
-          )}
-
-          {/* Backup Sub-view */}
-          {activeSubTab === 'backup' && (
-            <div className="bg-white rounded-2xl border border-[#d9d2c2] p-5 sm:p-6 shadow-2xs space-y-6">
-              <div className="flex items-center justify-between border-b border-[#e7e1d5] pb-4">
+          {/* ========================================================
+              CATEGORY 4: DATA VAULT & STORAGE
+          ======================================================== */}
+          {activeCategory === 'backup' && (
+            <section className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4">
                 <div>
-                  <h2 className="text-base font-bold text-[#17343a] flex items-center gap-2">
+                  <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
                     <Database className="w-4 h-4 text-[#176f78]" />
-                    <span>Local Data Management &amp; Snapshots</span>
+                    <span>Data Vault, Snapshots &amp; Storage</span>
                   </h2>
-                  <p className="text-xs text-[#527078] mt-0.5">
-                    IndexedDB storage, automated hourly snapshots, and CSV/Excel backup.
+                  <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
+                    Local IndexedDB database, automated daily backups, and factory reset recovery.
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={handleManualBackupClick}
                   disabled={isBackingUp}
-                  className="px-3.5 py-1.5 rounded-xl bg-[#176f78] text-white text-xs font-bold hover:bg-[#12555c] transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl bg-[#176f78] text-white text-xs font-bold hover:bg-[#12555c] transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isBackingUp ? 'animate-spin' : ''}`} />
-                  <span>Snapshot Now</span>
+                  <span>{isBackingUp ? 'Verifying...' : 'Snapshot Now'}</span>
                 </button>
               </div>
 
               {backupMsg && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                   <span>{backupMsg}</span>
                 </div>
               )}
 
+              {/* Status Metric Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-4 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2]">
-                  <div className="text-[11px] font-bold text-[#527078]">IndexedDB State</div>
-                  <div className="text-sm font-bold text-[#17343a] mt-1 font-mono">{totalActiveLines} Lines Loaded</div>
-                  <div className="text-[10px] text-emerald-700 font-bold mt-1">Status: Synced &amp; Clean</div>
+                <div className="p-4 rounded-xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846]">
+                  <div className="text-[11px] font-semibold text-[#527078] dark:text-slate-400">
+                    Local Storage Engine
+                  </div>
+                  <div className="text-sm font-bold text-[#17343a] dark:text-slate-200 mt-1 font-mono">
+                    {totalActiveLines} Lines Cached
+                  </div>
+                  <div className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold mt-1">
+                    IndexedDB Online
+                  </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2]">
-                  <div className="text-[11px] font-bold text-[#527078]">Auto-Backup Interval</div>
-                  <div className="text-sm font-bold text-[#17343a] mt-1 font-mono">Daily (05:00 PM)</div>
-                  <div className="text-[10px] text-[#527078] mt-1">Retention: 30 snapshots</div>
+                <div className="p-4 rounded-xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846]">
+                  <div className="text-[11px] font-semibold text-[#527078] dark:text-slate-400">
+                    Automated Shift Snapshot
+                  </div>
+                  <div className="text-sm font-bold text-[#17343a] dark:text-slate-200 mt-1 font-mono">
+                    Daily at 05:00 PM
+                  </div>
+                  <div className="text-[10px] text-[#527078] dark:text-slate-400 mt-1">
+                    30-Day Rolling Vault
+                  </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2]">
-                  <div className="text-[11px] font-bold text-[#527078]">Factory Defaults</div>
+                <div className="p-4 rounded-xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846]">
+                  <div className="text-[11px] font-semibold text-[#527078] dark:text-slate-400">
+                    Factory Defaults
+                  </div>
                   <button
+                    type="button"
                     onClick={onResetFactoryDefaults}
-                    className="mt-1 text-xs font-bold text-rose-700 hover:text-rose-800 flex items-center gap-1 cursor-pointer"
+                    className="mt-1 text-xs font-bold text-rose-700 dark:text-rose-400 hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Reset to Debonair Set</span>
                   </button>
-                  <div className="text-[10px] text-[#527078] mt-1">Restores 24-Sep baseline</div>
+                  <div className="text-[10px] text-[#527078] dark:text-slate-400 mt-1">
+                    Restores 24-Sep baseline
+                  </div>
                 </div>
               </div>
 
+              {/* Advanced Hub Link */}
               {onOpenDatabase && (
                 <div className="pt-2">
                   <button
+                    type="button"
                     onClick={() => onOpenDatabase('backup')}
-                    className="w-full py-2.5 rounded-xl border border-[#176f78] text-[#176f78] hover:bg-[#176f78]/10 text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3 rounded-xl border border-[#176f78] text-[#176f78] dark:text-teal-400 hover:bg-[#176f78]/10 text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <HardDrive className="w-4 h-4" />
                     <span>Open Advanced Data &amp; Telemetry Hub</span>
                   </button>
                 </div>
               )}
-            </div>
+            </section>
           )}
 
-          {/* Security Sub-view */}
-          {activeSubTab === 'security' && (
-            <div className="bg-white rounded-2xl border border-[#d9d2c2] p-5 sm:p-6 shadow-2xs space-y-6">
-              <div className="flex items-center justify-between border-b border-[#e7e1d5] pb-4">
+          {/* ========================================================
+              CATEGORY 5: SECURITY & RBAC CLEARANCE
+          ======================================================== */}
+          {activeCategory === 'security' && (
+            <section className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4">
                 <div>
-                  <h2 className="text-base font-bold text-[#17343a] flex items-center gap-2">
+                  <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
                     <Lock className="w-4 h-4 text-[#176f78]" />
                     <span>Floor Terminal Security &amp; Access</span>
                   </h2>
-                  <p className="text-xs text-[#527078] mt-0.5">
-                    Terminal lockout, PIN protection, and operator shift clearance.
+                  <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
+                    Terminal lock screen, active session clearance, and RBAC tiers.
                   </p>
                 </div>
                 {onLockTerminal && (
                   <button
+                    type="button"
                     onClick={onLockTerminal}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-800 text-white text-xs font-bold hover:bg-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <Lock className="w-3.5 h-3.5" />
-                    <span>Lock Terminal Now</span>
+                    <span>Lock Terminal</span>
                   </button>
                 )}
               </div>
 
-              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 shrink-0 text-amber-700" />
-                <span>
-                  Current active session authenticated for: <strong>{profile.name}</strong> ({profile.jobTitle || 'Industrial Engineer'}).
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* SECTION 6: PREFERENCES & DISPLAY */}
-      {activeSection === 'preferences' && (
-        <div className="space-y-4">
-          {/* Sub-navigation bar */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            {[
-              { id: 'theme', label: 'Theme & Display', icon: Sun },
-              { id: 'alerts', label: 'Audio & Alerts', icon: Volume2 },
-              { id: 'android', label: 'PWA & Android App', icon: Smartphone }
-            ].map(tab => {
-              const Icon = tab.icon;
-              const isActive = activeSubTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveSubTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    isActive
-                      ? 'bg-white text-[#176f78] border border-[#176f78] shadow-xs'
-                      : 'bg-[#fbfaf6] text-slate-600 border border-[#d9d2c2] hover:bg-white'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Theme Sub-view */}
-          {activeSubTab === 'theme' && (
-            <div className="bg-white rounded-2xl border border-[#d9d2c2] p-5 sm:p-6 shadow-2xs space-y-6">
-              <div className="border-b border-[#e7e1d5] pb-4">
-                <h2 className="text-base font-bold text-[#17343a] flex items-center gap-2">
-                  <Sun className="w-4 h-4 text-[#176f78]" />
-                  <span>Theme &amp; Visual Appearance</span>
-                </h2>
-                <p className="text-xs text-[#527078] mt-0.5">
-                  Choose the optimal color palette for shop floor visibility or office audit reviews.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <button
-                  onClick={() => onSelectTheme('light')}
-                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
-                    currentTheme === 'light'
-                      ? 'border-[#176f78] bg-[#176f78]/5 ring-2 ring-[#176f78]/20'
-                      : 'border-[#d9d2c2] bg-white hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-[#17343a] flex items-center gap-2">
-                      <Sun className="w-4 h-4 text-amber-500" /> Light Cockpit (Default)
-                    </span>
-                    {currentTheme === 'light' && <CheckCircle2 className="w-4 h-4 text-[#176f78]" />}
-                  </div>
-                  <p className="text-xs text-[#527078] mt-1">
-                    Warm ergonomic shop floor daylight mode optimized for factory tablets.
-                  </p>
-                </button>
-
-                <button
-                  onClick={() => onSelectTheme('dark')}
-                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
-                    currentTheme === 'dark'
-                      ? 'border-[#176f78] bg-slate-900 text-white ring-2 ring-[#176f78]/20'
-                      : 'border-[#d9d2c2] bg-white hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-[#17343a] flex items-center gap-2">
-                      <Moon className="w-4 h-4 text-indigo-400" /> Dark Studio
-                    </span>
-                    {currentTheme === 'dark' && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-                  </div>
-                  <p className="text-xs text-[#527078] mt-1">
-                    Low-glare high contrast theme for night shifts and control room monitors.
-                  </p>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Audio Alerts Sub-view */}
-          {activeSubTab === 'alerts' && (
-            <div className="bg-white rounded-2xl border border-[#d9d2c2] p-5 sm:p-6 shadow-2xs space-y-6">
-              <div className="border-b border-[#e7e1d5] pb-4">
-                <h2 className="text-base font-bold text-[#17343a] flex items-center gap-2">
-                  <Volume2 className="w-4 h-4 text-[#176f78]" />
-                  <span>Auditory Alert Settings</span>
-                </h2>
-                <p className="text-xs text-[#527078] mt-0.5">
-                  Real-time audio signals when line efficiency drops below threshold or bottleneck chokes.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between p-4 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2]">
-                <div className="space-y-0.5">
-                  <div className="text-sm font-bold text-[#17343a]">Sound on Bottleneck Choke</div>
-                  <div className="text-xs text-[#527078]">Plays harmonic chime when cycle time exceeds takt</div>
-                </div>
-                <button
-                  onClick={() => onToggleAuditoryAlerts(!auditoryAlertsEnabled)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                    auditoryAlertsEnabled
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-gray-200 text-gray-700'
-                  }`}
-                >
-                  {auditoryAlertsEnabled ? 'ENABLED' : 'MUTED'}
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => playBottleneckAlertSound()}
-                  className="px-3.5 py-2 rounded-xl bg-[#f1eee6] border border-[#d9d2c2] text-xs font-bold text-[#17343a] hover:bg-[#e7e1d5] flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Play className="w-3.5 h-3.5 text-[#176f78]" />
-                  <span>Test Bottleneck Alert Sound</span>
-                </button>
-                <button
-                  onClick={() => playWipAlertSound()}
-                  className="px-3.5 py-2 rounded-xl bg-[#f1eee6] border border-[#d9d2c2] text-xs font-bold text-[#17343a] hover:bg-[#e7e1d5] flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Play className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Test WIP Alert Sound</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Android & PWA Sub-view */}
-          {activeSubTab === 'android' && (
-            <div className="bg-white rounded-2xl border border-[#d9d2c2] p-5 sm:p-6 shadow-2xs space-y-6">
-              <div className="flex items-center justify-between border-b border-[#e7e1d5] pb-4">
+              {/* Active Operator Clearance Card */}
+              <div className="p-4 rounded-xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-base font-bold text-[#17343a] flex items-center gap-2">
+                  <div className="text-[11px] font-semibold text-[#527078] dark:text-slate-400 uppercase">
+                    Authenticated Operator Session
+                  </div>
+                  <div className="text-base font-bold text-[#17343a] dark:text-slate-100 mt-0.5 font-display">
+                    {profile.name}
+                  </div>
+                  <div className="text-xs text-[#527078] dark:text-slate-400 font-mono mt-0.5">
+                    Role: {profile.jobTitle || 'Industrial Engineer'} · Tier ID: {profile.tierId || 'tier_1'}
+                  </div>
+                </div>
+
+                {onOpenUserModal && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenUserModal('roles')}
+                    className="px-3.5 py-1.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-white dark:bg-[#232a34] text-xs font-bold text-[#17343a] dark:text-slate-200 hover:text-[#176f78] hover:border-[#176f78] transition-all cursor-pointer self-start sm:self-auto shrink-0"
+                  >
+                    <span>Manage Roles &amp; Permissions</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Operational Tiers Integration */}
+              <div className="pt-2">
+                <ActiveOperationalTiers
+                  currentTierId={profile.tierId || 'tier_1'}
+                  onSelectTier={tier => {
+                    if (onUpdateProfile) {
+                      onUpdateProfile({ tierId: tier.id, jobTitle: tier.name });
+                    }
+                  }}
+                  profile={profile}
+                  roleTiers={roleTiers}
+                  onOpenRoleEditor={() => onOpenUserModal && onOpenUserModal('roles')}
+                  onSelectLineFilter={lineNo => {
+                    handleSetSection('line-data');
+                    if (onSelectLineNo) onSelectLineNo(lineNo);
+                  }}
+                />
+              </div>
+
+              {onOpenPrivacySecurity && (
+                <div className="pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846]">
+                  <button
+                    type="button"
+                    onClick={onOpenPrivacySecurity}
+                    className="text-xs font-bold text-[#176f78] dark:text-teal-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>View Privacy &amp; Security Compliance Policy</span>
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ========================================================
+              CATEGORY 6: MOBILE & ANDROID PWA INSTALL
+          ======================================================== */}
+          {activeCategory === 'android' && (
+            <section className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4">
+                <div>
+                  <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
                     <Smartphone className="w-4 h-4 text-[#176f78]" />
-                    <span>Android TWA &amp; PWA Installation</span>
+                    <span>Mobile PWA &amp; Android Tablet Deployment</span>
                   </h2>
-                  <p className="text-xs text-[#527078] mt-0.5">
-                    Deploy as native Android APK on floor tablets with Digital Asset Links.
+                  <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
+                    Offline capabilities, service worker precache, and Android TWA packaging.
                   </p>
                 </div>
                 {onOpenAndroidPackage && (
                   <button
+                    type="button"
                     onClick={onOpenAndroidPackage}
-                    className="px-3.5 py-1.5 rounded-xl bg-[#176f78] text-white text-xs font-bold hover:bg-[#12555c] transition-colors flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-[#176f78] text-white text-xs font-bold hover:bg-[#12555c] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <Smartphone className="w-3.5 h-3.5" />
                     <span>Package Wizard</span>
@@ -1088,35 +1296,132 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="p-3.5 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2]">
-                  <span className="font-bold text-[#17343a]">Package ID:</span>
-                  <div className="font-mono text-slate-600 mt-1">com.debonair.iedailycontrol</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24]">
+                  <div className="text-[11px] font-semibold text-[#527078] dark:text-slate-400 uppercase">
+                    Service Worker Precache
+                  </div>
+                  <div className="text-sm font-bold text-[#17343a] dark:text-slate-200 mt-1 font-mono">
+                    68 Assets Precached
+                  </div>
+                  <div className="text-xs text-emerald-700 dark:text-emerald-400 font-bold mt-1">
+                    Zero-Network Offline Ready
+                  </div>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2]">
-                  <span className="font-bold text-[#17343a]">Digital Asset Links:</span>
-                  <div className="font-mono text-emerald-700 mt-1">Verified SHA-256 Fingerprint</div>
+
+                <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24]">
+                  <div className="text-[11px] font-semibold text-[#527078] dark:text-slate-400 uppercase">
+                    Android Package Identifier
+                  </div>
+                  <div className="text-sm font-bold text-[#17343a] dark:text-slate-200 mt-1 font-mono">
+                    com.debonair.iedailycontrol
+                  </div>
+                  <div className="text-xs text-[#527078] dark:text-slate-400 mt-1">
+                    Digital Asset Links Verified
+                  </div>
                 </div>
               </div>
-            </div>
+            </section>
           )}
-        </div>
-      )}
 
-      {/* SECTION 7: TIER_0 ONLY ROOT CONTROL - STRICTLY VISIBLE ONLY WHEN isSystemAdmin(profile) === true */}
-      {activeSection === 'tier_0' && isSysAdmin && (
-        <Tier0CommandHub
-          profile={profile}
-          lines={lines}
-          roleTiers={roleTiers}
-          factoryProfile={factoryProfile}
-          dailyBackupSettings={dailyBackupSettings}
-          onUpdateDailyBackupSettings={onUpdateDailyBackupSettings}
-          onTriggerManualBackup={onTriggerManualBackup}
-          onLockTerminal={onLockTerminal}
-          onNavigate={onNavigate}
-        />
-      )}
+          {/* ========================================================
+              CATEGORY 7: CENTRALIZED OPERATIONAL HUBS DIRECT JUMP
+          ======================================================== */}
+          {activeCategory === 'hubs' && (
+            <section className="space-y-6">
+              <div className="border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4">
+                <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-[#176f78]" />
+                  <span>Centralized Operational Hubs</span>
+                </h2>
+                <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
+                  Launch any frontline manufacturing or industrial engineering workspace directly.
+                </p>
+              </div>
+
+              {/* 6 Hubs Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  {
+                    id: 'line-data' as SettingsPageSection,
+                    title: 'Line Data Operations Hub',
+                    desc: `${totalActiveLines} sewing lines telemetry, Yamazumi balancing, and hourly pacing.`,
+                    icon: Layers,
+                    badge: `${totalActiveLines} Lines`
+                  },
+                  {
+                    id: 'checklist' as SettingsPageSection,
+                    title: 'Check List & Floor Compliance',
+                    desc: '13-point daily verification routine, action tracker, and 5-whys investigations.',
+                    icon: CheckSquare,
+                    badge: `${checklistProgress}% Done`
+                  },
+                  {
+                    id: 'lean-tools' as SettingsPageSection,
+                    title: 'Lean Tools & IE Simulator',
+                    desc: '13 lean manufacturing methods, Kaizen workshops, SMV tuning, and flow simulator.',
+                    icon: Wrench,
+                    badge: '13 Methods'
+                  },
+                  {
+                    id: 'capacity' as SettingsPageSection,
+                    title: 'Capacity & Pitch Calculator',
+                    desc: 'Theoretical daily output, pitch takt time, machine hours balance, and order delivery.',
+                    icon: Calculator,
+                    badge: 'IE Tool'
+                  },
+                  {
+                    id: 'reports' as SettingsPageSection,
+                    title: 'Reports & Production Analytics',
+                    desc: 'Consolidated shift summaries, production matrix, and CSV / PDF exports.',
+                    icon: FileSpreadsheet,
+                    badge: 'Export'
+                  },
+                  {
+                    id: 'world' as SettingsPageSection,
+                    title: 'World Class Manufacturing (WCM)',
+                    desc: '5 WCM pillars, TPM, SMED, Poka-Yoke, and zero-defect quality benchmarks.',
+                    icon: Globe,
+                    badge: 'WCM Audit'
+                  }
+                ].map(hub => {
+                  const HubIcon = hub.icon;
+                  return (
+                    <button
+                      key={hub.id}
+                      type="button"
+                      onClick={() => handleSetSection(hub.id)}
+                      className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white dark:hover:bg-[#202732] hover:border-[#176f78] transition-all text-left group cursor-pointer shadow-2xs flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="w-8 h-8 rounded-lg bg-[#176f78]/10 text-[#176f78] dark:text-teal-400 flex items-center justify-center">
+                            <HubIcon className="w-4 h-4" />
+                          </div>
+                          <span className="text-[10px] font-mono text-[#527078] dark:text-slate-400 font-semibold">
+                            {hub.badge}
+                          </span>
+                        </div>
+                        <div className="font-bold text-xs text-[#17343a] dark:text-slate-100 group-hover:text-[#176f78] transition-colors">
+                          {hub.title}
+                        </div>
+                        <p className="text-[11px] text-[#527078] dark:text-slate-400 mt-1 leading-relaxed">
+                          {hub.desc}
+                        </p>
+                      </div>
+
+                      <div className="pt-3 mt-3 border-t border-[#e7e1d5] dark:border-[#2e3846] flex items-center justify-between text-xs font-bold text-[#176f78] dark:text-teal-400">
+                        <span>Launch Workspace</span>
+                        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+        </main>
+      </div>
     </div>
   );
 };

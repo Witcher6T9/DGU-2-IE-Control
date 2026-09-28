@@ -1807,61 +1807,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -28 }}
             transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="flex overflow-x-auto snap-x snap-mandatory sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pb-2 sm:pb-0 no-scrollbar -mx-2 sm:mx-0 px-2 sm:px-0"
+            className="flex overflow-x-auto snap-x snap-mandatory sm:grid sm:grid-cols-2 gap-4 pb-2 sm:pb-0 no-scrollbar -mx-2 sm:mx-0 px-2 sm:px-0"
           >
-            {/* 1. Overall Factory Efficiency */}
-            <DashboardKpiCard
-              id="efficiency"
-              title="Factory Efficiency"
-              value={factory.overallEfficiency}
-              unit="%"
-              badge={{ text: effVarianceText, positive: isEffPositive }}
-              icon={<TrendingUp className="w-4 h-4" />}
-              iconBgColor="#dceceb"
-              iconColor="#176f78"
-              accentColor="#176f78"
-              progressValue={factory.overallEfficiency}
-              progressColor="#176f78"
-              secondaryStats={[
-                { label: 'Produced', value: `${(factory.totalProducedMinutes ?? 0).toLocaleString()} min` },
-                { label: 'Available', value: `${(factory.totalAvailableMinutes ?? 0).toLocaleString()} min` }
-              ]}
-              hourlyBreakdown={efficiencyHourlyBreakdown}
-              historicalTrends={efficiencyHistorical}
-              metricType="percentage"
-              onOpenDrillDown={id => setDrillDownKpiId(id as any)}
-            />
-
-            {/* 2. Total Achieved Production */}
-            <DashboardKpiCard
-              id="production"
-              title="Total Production Output"
-              value={factory.totalAchievedProd}
-              subValue={`/ ${(factory.totalTargetProd ?? 0).toLocaleString()} Pcs`}
-              badge={{
-                text: `${Math.round((factory.totalAchievedProd / (factory.totalTargetProd || 1)) * 100)}% Met`,
-                positive: factory.totalAchievedProd >= factory.totalTargetProd
-              }}
-              icon={<Target className="w-4 h-4" />}
-              iconBgColor="#f8e5d7"
-              iconColor="#e6813e"
-              accentColor="#e6813e"
-              progressValue={(factory.totalAchievedProd / (factory.totalTargetProd || 1)) * 100}
-              progressColor="#e6813e"
-              secondaryStats={[
-                {
-                  label: 'Shift Variance',
-                  value: `${factory.targetVariance >= 0 ? '+' : ''}${factory.targetVariance.toLocaleString()} pcs`,
-                  color: factory.targetVariance >= 0 ? 'text-emerald-600' : 'text-rose-600'
-                }
-              ]}
-              hourlyBreakdown={productionHourlyBreakdown}
-              historicalTrends={productionHistorical}
-              metricType="units"
-              onOpenDrillDown={id => setDrillDownKpiId(id as any)}
-            />
-
-            {/* 3. Sewing Manpower Attendance */}
+            {/* 1. Sewing Manpower Attendance */}
             <DashboardKpiCard
               id="attendance"
               title="Sewing Manpower Attendance"

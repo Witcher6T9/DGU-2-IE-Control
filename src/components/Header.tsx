@@ -324,14 +324,14 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Control Center & Preferences Button */}
+            {/* Settings Button */}
             {onOpenSettings && (
               <button
                 id="header-control-preferences-btn"
                 type="button"
                 onClick={onOpenSettings}
-                title="Control Center & Preferences"
-                aria-label="Control Center & Preferences"
+                title="Settings"
+                aria-label="Settings"
                 className="hidden sm:flex relative w-9 h-9 rounded-xl border border-[#d9d2c2] bg-white text-slate-700 hover:text-[#176f78] hover:border-[#176f78] items-center justify-center transition-all shadow-2xs cursor-pointer group touch-manipulation active:scale-95 shrink-0"
               >
                 <Sliders className="w-4 h-4 transition-transform group-hover:rotate-45" />

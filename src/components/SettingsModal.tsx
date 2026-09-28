@@ -790,7 +790,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       case 'tier_0':
         return 'Tier_0 Only • Root Suite';
       default:
-        return 'Control Center & Preferences';
+        return 'Settings';
     }
   };
 

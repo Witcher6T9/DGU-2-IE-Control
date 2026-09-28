@@ -58,6 +58,8 @@ interface ChecklistPageProps {
   onToggleAuditItem?: (id: string, newStatus: 'pass' | 'warning' | 'fail') => void;
   onUpdateCenterlineValue?: (id: string, newValue: number) => void;
   lines?: LineEntry[];
+  selectedLineNo?: string;
+  onSelectLineNo?: (lineNo: string) => void;
   onAddTodoFromAudit?: (item: Partial<TodoItem>) => void;
   initialSubTab?: ChecklistSubTab;
 }
@@ -85,6 +87,8 @@ export const ChecklistPage: React.FC<ChecklistPageProps> = ({
   onToggleAuditItem = () => {},
   onUpdateCenterlineValue = () => {},
   lines = [],
+  selectedLineNo,
+  onSelectLineNo,
   onAddTodoFromAudit = () => {},
   initialSubTab = 'daily-checklist'
 }) => {
@@ -119,6 +123,9 @@ export const ChecklistPage: React.FC<ChecklistPageProps> = ({
             profile={profile}
             roleTiers={roleTiers}
             onNavigate={onNavigate}
+            lines={lines}
+            selectedLineNo={selectedLineNo}
+            onSelectLineNo={onSelectLineNo}
           />
         )}
 

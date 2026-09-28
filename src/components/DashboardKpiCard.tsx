@@ -62,6 +62,7 @@ export interface DashboardKpiCardProps {
   metricType: 'percentage' | 'units' | 'count';
   onOpenDrillDown?: (cardId: string) => void;
   quickSummaryNote?: string;
+  iconPosition?: 'top' | 'bottom';
 }
 
 export const DashboardKpiCard: React.FC<DashboardKpiCardProps> = ({
@@ -83,7 +84,8 @@ export const DashboardKpiCard: React.FC<DashboardKpiCardProps> = ({
   historicalTrends,
   metricType,
   onOpenDrillDown,
-  quickSummaryNote
+  quickSummaryNote,
+  iconPosition = 'bottom'
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [activeHourlyIdx, setActiveHourlyIdx] = useState<number | null>(null);
@@ -129,83 +131,97 @@ export const DashboardKpiCard: React.FC<DashboardKpiCardProps> = ({
         setActiveHourlyIdx(null);
       }}
       onClick={() => onOpenDrillDown && onOpenDrillDown(id)}
-      className="group relative w-[82vw] max-w-[300px] shrink-0 snap-start sm:w-auto sm:max-w-none sm:shrink rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-1 hover:shadow-md hover:border-[#176f78] cursor-pointer select-none"
+      className="group relative flex flex-col justify-between w-[82vw] max-w-[300px] shrink-0 snap-start sm:w-auto sm:max-w-none sm:shrink rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-1 hover:shadow-md hover:border-[#176f78] cursor-pointer select-none"
     >
-      {/* Top Header Row */}
-      <div className="flex items-center justify-between text-xs text-[#527078] font-bold uppercase tracking-wider mb-2">
-        <span className="truncate pr-1">{title}</span>
-        <div className="flex items-center gap-1.5">
-          {/* Subtle Drill-Down Icon Tag visible on hover */}
-          <span className="hidden sm:inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-[#176f78] opacity-0 group-hover:opacity-100 transition-opacity bg-[#dceceb] px-1.5 py-0.5 rounded-md">
-            Drill-down <Maximize2 className="w-2.5 h-2.5" />
-          </span>
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105"
-            style={{ backgroundColor: iconBgColor, color: iconColor }}
-          >
-            {icon}
-          </div>
-        </div>
-      </div>
-
-      {/* Main KPI Value Row */}
-      <div className="flex items-baseline gap-2 flex-wrap">
-        <span className="font-display text-3xl sm:text-4xl font-bold text-[#17343a] tracking-tight">
-          {typeof value === 'number' ? value.toLocaleString() : value}
-          {unit && <span className="text-xl font-normal ml-0.5">{unit}</span>}
-        </span>
-        {subValue && (
-          <span className="text-xs text-[#527078] font-mono-numbers">
-            {subValue}
-          </span>
-        )}
-        {badge && (
-          <span
-            className={`text-xs font-bold px-1.5 py-0.5 rounded border ${
-              badge.positive
-                ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
-                : 'text-amber-700 bg-amber-50 border-amber-200'
-            }`}
-          >
-            {badge.text}
-          </span>
-        )}
-      </div>
-
-      {/* Progress Bar (if provided) */}
-      {progressValue !== undefined && (
-        <div className="mt-3">
-          <div className="h-2 w-full rounded-full bg-[#f1eee6] overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                backgroundColor: progressColor,
-                width: `${Math.min(100, Math.max(0, (progressValue / progressMax) * 100))}%`
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Secondary Stats Footer */}
-      {secondaryStats && secondaryStats.length > 0 && (
-        <div className="mt-2.5 flex justify-between items-center text-[10px] text-[#527078] font-mono-numbers">
-          {secondaryStats.map((st, i) => (
-            <span key={i} className="truncate">
-              {st.label}:{' '}
-              <strong className={st.color || 'text-[#17343a]'}>
-                {typeof st.value === 'number' ? st.value.toLocaleString() : st.value}
-              </strong>
+      <div>
+        {/* Top Header Row */}
+        <div className="flex items-center justify-between text-xs text-[#527078] font-bold uppercase tracking-wider mb-2">
+          <span className="truncate pr-1">{title}</span>
+          <div className="flex items-center gap-1.5">
+            {/* Subtle Drill-Down Icon Tag visible on hover */}
+            <span className="hidden sm:inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-[#176f78] opacity-0 group-hover:opacity-100 transition-opacity bg-[#dceceb] px-1.5 py-0.5 rounded-md">
+              Drill-down <Maximize2 className="w-2.5 h-2.5" />
             </span>
-          ))}
+            {iconPosition === 'top' && (
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105"
+                style={{ backgroundColor: iconBgColor, color: iconColor }}
+              >
+                {icon}
+              </div>
+            )}
+          </div>
         </div>
-      )}
 
-      {/* Quick Interactive Tooltip Cue */}
-      <div className="mt-2 pt-2 border-t border-[#f1eee6] flex items-center justify-between text-[9px] text-slate-400 group-hover:text-[#176f78] transition-colors">
-        <span className="flex items-center gap-1 font-mono">
-          <Clock className="w-2.5 h-2.5" /> Hourly Pacing & 7-Day Trend
-        </span>
+        {/* Main KPI Value Row */}
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="font-display text-3xl sm:text-4xl font-bold text-[#17343a] tracking-tight">
+            {typeof value === 'number' ? value.toLocaleString() : value}
+            {unit && <span className="text-xl font-normal ml-0.5">{unit}</span>}
+          </span>
+          {subValue && (
+            <span className="text-xs text-[#527078] font-mono-numbers">
+              {subValue}
+            </span>
+          )}
+          {badge && (
+            <span
+              className={`text-xs font-bold px-1.5 py-0.5 rounded border ${
+                badge.positive
+                  ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                  : 'text-amber-700 bg-amber-50 border-amber-200'
+              }`}
+            >
+              {badge.text}
+            </span>
+          )}
+        </div>
+
+        {/* Progress Bar (if provided) */}
+        {progressValue !== undefined && (
+          <div className="mt-3">
+            <div className="h-2 w-full rounded-full bg-[#f1eee6] overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  backgroundColor: progressColor,
+                  width: `${Math.min(100, Math.max(0, (progressValue / progressMax) * 100))}%`
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Secondary Stats Footer */}
+        {secondaryStats && secondaryStats.length > 0 && (
+          <div className="mt-2.5 flex justify-between items-center text-[10px] text-[#527078] font-mono-numbers">
+            {secondaryStats.map((st, i) => (
+              <span key={i} className="truncate">
+                {st.label}:{' '}
+                <strong className={st.color || 'text-[#17343a]'}>
+                  {typeof st.value === 'number' ? st.value.toLocaleString() : st.value}
+                </strong>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Quick Interactive Tooltip Cue / Bottom Row (Icon moved to bottom) */}
+      <div className="mt-3 pt-2.5 border-t border-[#f1eee6] flex items-center justify-between text-[9px] text-slate-400 group-hover:text-[#176f78] transition-colors">
+        <div className="flex items-center gap-2">
+          {iconPosition === 'bottom' && (
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition-transform group-hover:scale-105 shrink-0 shadow-2xs"
+              style={{ backgroundColor: iconBgColor, color: iconColor }}
+            >
+              {icon}
+            </div>
+          )}
+          <span className="flex items-center gap-1 font-mono">
+            <Clock className="w-2.5 h-2.5" /> Hourly Pacing & 7-Day Trend
+          </span>
+        </div>
         <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
       </div>
 

@@ -79,25 +79,26 @@ import {
 } from './utils';
 import { playAuditoryAlert } from './utils/audioAlert';
 import { isSystemOffline, logOfflineActivity } from './utils/offlineSyncManager';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 
-// Code-split secondary tabs for fast initial boot
-const DailyChecklist = lazy(() => import('./components/DailyChecklist').then(m => ({ default: m.DailyChecklist })));
-const TodoSchedule = lazy(() => import('./components/TodoSchedule').then(m => ({ default: m.TodoSchedule })));
-const LineData = lazy(() => import('./components/LineData').then(m => ({ default: m.LineData })));
-const LeanToolkit = lazy(() => import('./components/LeanToolkit').then(m => ({ default: m.LeanToolkit })));
-const MonthlySummary = lazy(() => import('./components/MonthlySummary').then(m => ({ default: m.MonthlySummary })));
-const IESimulator = lazy(() => import('./components/IESimulator').then(m => ({ default: m.IESimulator })));
-const FloorPlanLineSetup = lazy(() => import('./components/FloorPlanLineSetup').then(m => ({ default: m.FloorPlanLineSetup })));
-const LineProductionHistoryView = lazy(() => import('./components/LineProductionHistoryView').then(m => ({ default: m.LineProductionHistoryView })));
-const ActiveOperationalTiers = lazy(() => import('./components/ActiveOperationalTiers').then(m => ({ default: m.ActiveOperationalTiers })));
+// Code-split secondary tabs for fast initial boot with automatic retry on stale chunks
+const DailyChecklist = lazyWithRetry(() => import('./components/DailyChecklist').then(m => ({ default: m.DailyChecklist })));
+const TodoSchedule = lazyWithRetry(() => import('./components/TodoSchedule').then(m => ({ default: m.TodoSchedule })));
+const LineData = lazyWithRetry(() => import('./components/LineData').then(m => ({ default: m.LineData })));
+const LeanToolkit = lazyWithRetry(() => import('./components/LeanToolkit').then(m => ({ default: m.LeanToolkit })));
+const MonthlySummary = lazyWithRetry(() => import('./components/MonthlySummary').then(m => ({ default: m.MonthlySummary })));
+const IESimulator = lazyWithRetry(() => import('./components/IESimulator').then(m => ({ default: m.IESimulator })));
+const FloorPlanLineSetup = lazyWithRetry(() => import('./components/FloorPlanLineSetup').then(m => ({ default: m.FloorPlanLineSetup })));
+const LineProductionHistoryView = lazyWithRetry(() => import('./components/LineProductionHistoryView').then(m => ({ default: m.LineProductionHistoryView })));
+const ActiveOperationalTiers = lazyWithRetry(() => import('./components/ActiveOperationalTiers').then(m => ({ default: m.ActiveOperationalTiers })));
 
 // 5 Canonical Primary Page Components
-const LineDataPage = lazy(() => import('./components/LineDataPage').then(m => ({ default: m.LineDataPage })));
-const ChecklistPage = lazy(() => import('./components/ChecklistPage').then(m => ({ default: m.ChecklistPage })));
-const LeanToolsPage = lazy(() => import('./components/LeanToolsPage').then(m => ({ default: m.LeanToolsPage })));
-const SettingsControlCenterPage = lazy(() => import('./components/SettingsControlCenterPage').then(m => ({ default: m.SettingsControlCenterPage })));
-const NewDowntimeModal = lazy(() => import('./components/NewDowntimeModal').then(m => ({ default: m.NewDowntimeModal })));
-const NewActionModal = lazy(() => import('./components/NewActionModal').then(m => ({ default: m.NewActionModal })));
+const LineDataPage = lazyWithRetry(() => import('./components/LineDataPage').then(m => ({ default: m.LineDataPage })));
+const ChecklistPage = lazyWithRetry(() => import('./components/ChecklistPage').then(m => ({ default: m.ChecklistPage })));
+const LeanToolsPage = lazyWithRetry(() => import('./components/LeanToolsPage').then(m => ({ default: m.LeanToolsPage })));
+const SettingsControlCenterPage = lazyWithRetry(() => import('./components/SettingsControlCenterPage').then(m => ({ default: m.SettingsControlCenterPage })));
+const NewDowntimeModal = lazyWithRetry(() => import('./components/NewDowntimeModal').then(m => ({ default: m.NewDowntimeModal })));
+const NewActionModal = lazyWithRetry(() => import('./components/NewActionModal').then(m => ({ default: m.NewActionModal })));
 
 import {
   INITIAL_STATIONS,
@@ -123,16 +124,16 @@ import type { LeanToolsSubTab } from './components/LeanToolsPage';
 import type { SettingsPageSection } from './components/SettingsControlCenterPage';
 
 // Code-split modals loaded strictly on-demand
-const AuthPage = lazy(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
-const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
-const UserModal = lazy(() => import('./components/UserModal').then(m => ({ default: m.UserModal })));
-const NotificationsModal = lazy(() => import('./components/NotificationsModal').then(m => ({ default: m.NotificationsModal })));
-const DatabaseModal = lazy(() => import('./components/DatabaseModal').then(m => ({ default: m.DatabaseModal })));
-const PerformanceScorecardModal = lazy(() => import('./components/PerformanceScorecardModal').then(m => ({ default: m.PerformanceScorecardModal })));
-const GoogleChatHubModal = lazy(() => import('./components/GoogleChatHubModal').then(m => ({ default: m.GoogleChatHubModal })));
-const PrivacySecurityModal = lazy(() => import('./components/PrivacySecurityModal').then(m => ({ default: m.PrivacySecurityModal })));
-const TerminalLockScreen = lazy(() => import('./components/TerminalLockScreen').then(m => ({ default: m.TerminalLockScreen })));
-const AndroidPackageModal = lazy(() => import('./components/AndroidPackageModal').then(m => ({ default: m.AndroidPackageModal })));
+const AuthPage = lazyWithRetry(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
+const SettingsModal = lazyWithRetry(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+const UserModal = lazyWithRetry(() => import('./components/UserModal').then(m => ({ default: m.UserModal })));
+const NotificationsModal = lazyWithRetry(() => import('./components/NotificationsModal').then(m => ({ default: m.NotificationsModal })));
+const DatabaseModal = lazyWithRetry(() => import('./components/DatabaseModal').then(m => ({ default: m.DatabaseModal })));
+const PerformanceScorecardModal = lazyWithRetry(() => import('./components/PerformanceScorecardModal').then(m => ({ default: m.PerformanceScorecardModal })));
+const GoogleChatHubModal = lazyWithRetry(() => import('./components/GoogleChatHubModal').then(m => ({ default: m.GoogleChatHubModal })));
+const PrivacySecurityModal = lazyWithRetry(() => import('./components/PrivacySecurityModal').then(m => ({ default: m.PrivacySecurityModal })));
+const TerminalLockScreen = lazyWithRetry(() => import('./components/TerminalLockScreen').then(m => ({ default: m.TerminalLockScreen })));
+const AndroidPackageModal = lazyWithRetry(() => import('./components/AndroidPackageModal').then(m => ({ default: m.AndroidPackageModal })));
 
 function TabLoadingSkeleton() {
   return (

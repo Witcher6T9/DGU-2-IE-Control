@@ -83,10 +83,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     },
     {
       id: 'settings',
-      label: 'Control Center & Preferences',
-      mobileLabel: 'Control & Prefs',
-      sublabel: 'Control',
-      fullLabel: 'Control Center & Preferences Hub',
+      label: 'Settings',
+      mobileLabel: 'Settings',
+      sublabel: 'Settings',
+      fullLabel: 'Settings Hub',
       icon: Settings,
       badge: undefined
     }
@@ -260,11 +260,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               onClick={() => {
                 onTabChange('settings');
               }}
-              title="Open Control Center & Preferences"
+              title="Open Settings"
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-[#d9d2c2] text-[11px] font-bold text-[#176f78] hover:bg-gray-50 transition-colors cursor-pointer"
             >
               <Settings className="w-3 h-3" />
-              <span>Control Center &amp; Preferences</span>
+              <span>Settings</span>
             </button>
           </div>
         </div>
