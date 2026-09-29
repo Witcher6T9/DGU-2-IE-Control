@@ -141,7 +141,7 @@ jobs:
       # Prepare GitHub Pages Artifact if pushing to main/master
       - name: Configure GitHub Pages Artifact
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist/
 
