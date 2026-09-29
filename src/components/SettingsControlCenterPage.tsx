@@ -56,6 +56,8 @@ import {
   DownloadCloud,
   Palette,
   Shield,
+  ShieldAlert,
+  Key,
   Award,
   Minimize2,
   SlidersHorizontal,
@@ -79,7 +81,7 @@ import {
   applyLayoutStyling
 } from '../utils/layoutManager';
 import { triggerHaptic, setHapticsEnabled } from '../utils/haptics';
-import { TIER_0_MODULES } from './tier0/Tier0CommandHub';
+import { TIER_0_MODULES, Tier0ModuleId, Tier0Category } from './tier0/Tier0CommandHub';
 import {
   UserProfile,
   RoleTier,
@@ -136,7 +138,7 @@ export type SettingsPageSection =
   | 'tier_0'
   | 'components';
 
-type SettingsCategory =
+export type SettingsCategory =
   | 'all'
   | 'factory'
   | 'display'
@@ -365,11 +367,20 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   const [internalSection, setInternalSection] = useState<SettingsPageSection>('control-center');
   const activeSection = controlledSection || internalSection;
 
+  const [selectedTier0Module, setSelectedTier0Module] = useState<Tier0ModuleId>('schema-forge');
+  const [selectedTier0Category, setSelectedTier0Category] = useState<Tier0Category>('all');
+
   const handleSetSection = (sec: SettingsPageSection) => {
     if (onSelectSection) {
       onSelectSection(sec);
     }
     setInternalSection(sec);
+  };
+
+  const handleOpenTier0 = (moduleId?: Tier0ModuleId, category?: Tier0Category) => {
+    if (moduleId) setSelectedTier0Module(moduleId);
+    if (category) setSelectedTier0Category(category);
+    handleSetSection('tier_0');
   };
 
   useEffect(() => {
@@ -1079,7 +1090,62 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
             onTriggerManualBackup={onTriggerManualBackup}
             onLockTerminal={onLockTerminal}
             onNavigate={onNavigate}
+            onClose={() => handleSetSection('control-center')}
+            initialModule={selectedTier0Module}
+            initialCategory={selectedTier0Category}
+            currentTheme={currentTheme}
+            onSelectTheme={onSelectTheme}
+            checklists={checklists}
+            selectedLineNo={selectedLineNo}
+            onSelectLineNo={onSelectLineNo}
+            onSaveLine={onSaveLine}
+            onAddNewLine={onAddNewLine}
+            leanActions={leanActions}
+            onUpdateLeanActions={onUpdateLeanActions}
+            onApplySimulationToLine={onApplySimulationToLine}
+            onAddNewLineWithSimulation={onAddNewLineWithSimulation}
+            todos={todos}
+            onOpenAndroidPackage={onOpenAndroidPackage}
+            onOpenDataVault={onOpenDataVault}
+            onOpenDatabase={onOpenDatabase}
           />
+        )}
+
+        {/* Zero Trust Architecture: Access Sentinel Screen for Tier 0 Master Console */}
+        {activeSection === 'tier_0' && !isSysAdmin && (
+          <div className="rounded-3xl border border-rose-500/30 bg-gradient-to-b from-rose-950/20 via-slate-900 to-slate-950 p-6 sm:p-10 text-center max-w-2xl mx-auto shadow-2xl my-6">
+            <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 mx-auto flex items-center justify-center mb-4">
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+            <span className="px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 uppercase tracking-wider">
+              Zero Trust Architecture • Root Level Enforcement
+            </span>
+            <h2 className="text-xl sm:text-2xl font-bold text-white mt-3 font-display">
+              0_Tier Master Console Access Denied
+            </h2>
+            <p className="text-sm text-slate-300 mt-2 max-w-lg mx-auto leading-relaxed">
+              Consolidated <strong>Development Systems</strong>, <strong>Maintaining Infrastructure</strong>, and <strong>Core IE Frontline Tools</strong> are strictly gated under Zero Trust clearance. Your current identity (<span className="text-teal-300 font-mono font-semibold">{profile.name}</span>, role <span className="text-amber-300 font-mono font-semibold">{profile.role}</span>) does not possess Tier 0 (System Administrator) clearance.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
+              {onOpenUserModal && (
+                <button
+                  type="button"
+                  onClick={() => onOpenUserModal('roles')}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white cursor-pointer shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+                >
+                  <Key className="w-4 h-4" />
+                  <span>Authenticate as System Admin</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleSetSection('control-center')}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 cursor-pointer shadow-xs transition-all active:scale-95"
+              >
+                Return to Safe Control Center
+              </button>
+            </div>
+          </div>
         )}
 
         {activeSection === 'components' && (
@@ -1380,59 +1446,92 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
 
               {/* 2. Tier_0 Master Suite Banner (System Admin Only) */}
               {isSysAdmin && (
-                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-slate-950 via-[#0e272c] to-[#09353b] text-white p-4 sm:p-5 border border-teal-500/30 shadow-md space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-slate-950 via-[#0e272c] to-[#09353b] text-white p-4 sm:p-5.5 border border-teal-500/35 shadow-xl space-y-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-4">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-                        <h3 className="text-base font-bold text-white flex items-center gap-2 font-display">
+                        <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 font-display">
                           <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0" />
-                          <span>Tier_0 Master Console</span>
+                          <span>0_Tier Master Console</span>
                         </h3>
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">
                           ROOT CLEARANCE
                         </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/10 text-slate-300">
+                          19 CONSOLIDATED ENGINES
+                        </span>
                       </div>
-                      <p className="text-xs text-slate-300 mt-1">
-                        Schema Forge • Access Matrix • Security Loop • Plant Security • Privacy Vault • Backup Forge • Audit Forensics • Maintenance Hub
+                      <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                        Centrally consolidated <strong>Development Systems</strong>, <strong>Maintaining Infrastructure</strong>, and <strong>Core IE Frontline Tools</strong> under authoritative root clearance.
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleSetSection('tier_0')}
-                      className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-teal-500 text-slate-950 hover:bg-teal-400 cursor-pointer shadow-sm transition-all shrink-0 self-start sm:self-auto"
-                    >
-                      <span>Open Tier_0 Suite</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    {/* Suite Fast-Jump Action Buttons */}
+                    <div className="flex items-center gap-2 flex-wrap shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenTier0('uiux-visualizer', 'dev')}
+                        className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-sky-500/20 hover:bg-sky-500 text-sky-200 hover:text-slate-950 border border-sky-500/30 transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                      >
+                        <span>🛠️ Dev Suite</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenTier0('maintenance-hub', 'maintaining')}
+                        className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-500/20 hover:bg-indigo-500 text-indigo-200 hover:text-white border border-indigo-500/30 transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                      >
+                        <span>🛡️ Maintaining</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenTier0('lean-toolkit', 'core')}
+                        className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-400 text-amber-200 hover:text-slate-950 border border-amber-500/30 transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                      >
+                        <span>⚙️ Core Tools</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenTier0('schema-forge', 'all')}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-teal-500 text-slate-950 hover:bg-teal-400 cursor-pointer shadow-sm transition-all"
+                      >
+                        <span>Open Console</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* 8 Quick Tools Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {TIER_0_MODULES.map(mod => {
-                      const Icon = mod.icon;
-                      return (
-                        <button
-                          key={mod.id}
-                          type="button"
-                          onClick={() => handleSetSection('tier_0')}
-                          className="flex items-center gap-2.5 p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors text-left cursor-pointer group"
-                        >
-                          <div className="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                            <Icon className="w-3 h-3" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-bold text-white truncate">
-                              {mod.name}
+                  {/* Quick Modules Grid */}
+                  <div>
+                    <div className="text-[10px] font-mono text-teal-300 font-bold uppercase tracking-wider mb-2 flex items-center justify-between">
+                      <span>Root Systems &amp; Workstations</span>
+                      <span className="text-slate-400">Click any engine to launch in 0_Tier Console</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                      {TIER_0_MODULES.slice(0, 12).map(mod => {
+                        const Icon = mod.icon;
+                        return (
+                          <button
+                            key={mod.id}
+                            type="button"
+                            onClick={() => handleOpenTier0(mod.id, mod.category)}
+                            className="flex items-center gap-2 p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors text-left cursor-pointer group"
+                          >
+                            <div className="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                              <Icon className="w-3 h-3" />
                             </div>
-                            <div className="text-[9px] text-slate-400 font-mono truncate">
-                              {mod.badge}
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-bold text-white truncate">
+                                {mod.name}
+                              </div>
+                              <div className="text-[8px] text-slate-400 font-mono truncate uppercase">
+                                {mod.badge}
+                              </div>
                             </div>
-                          </div>
-                        </button>
-                      );
-                    })}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}

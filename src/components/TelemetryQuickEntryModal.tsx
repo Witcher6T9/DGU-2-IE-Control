@@ -186,8 +186,11 @@ export const TelemetryQuickEntryModal: React.FC<TelemetryQuickEntryModalProps> =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-      <div className="relative w-full max-w-3xl max-h-[92vh] flex flex-col rounded-3xl bg-white border border-[#d9d2c2] shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+      <div className="relative w-full max-w-3xl max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-white border border-[#d9d2c2] shadow-2xl overflow-hidden pb-safe">
+        {/* Mobile Drag Handle */}
+        <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 mx-auto my-1.5 sm:hidden shrink-0" />
+
         {/* Header */}
         <div className="p-4 sm:p-5 bg-gradient-to-r from-[#17343a] via-[#17464e] to-[#176f78] text-white flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
@@ -215,7 +218,7 @@ export const TelemetryQuickEntryModal: React.FC<TelemetryQuickEntryModalProps> =
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+            className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation"
             title="Close Quick Entry"
           >
             <X className="w-5 h-5" />
@@ -336,34 +339,38 @@ export const TelemetryQuickEntryModal: React.FC<TelemetryQuickEntryModalProps> =
                     <button
                       type="button"
                       onClick={() => setHourlyRate(prev => Math.max(0, prev - 5))}
-                      className="w-10 h-10 rounded-xl bg-white border border-[#d9d2c2] text-[#17343a] font-bold text-lg hover:bg-[#f1eee6] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
+                      className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white border border-[#d9d2c2] text-[#17343a] font-bold text-sm hover:bg-[#f1eee6] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
                     >
                       -5
                     </button>
                     <button
                       type="button"
                       onClick={() => setHourlyRate(prev => Math.max(0, prev - 1))}
-                      className="w-10 h-10 rounded-xl bg-white border border-[#d9d2c2] text-[#17343a] font-bold text-lg hover:bg-[#f1eee6] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
+                      className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white border border-[#d9d2c2] text-[#17343a] font-bold text-sm hover:bg-[#f1eee6] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
                     >
                       -1
                     </button>
                     <input
                       type="number"
+                      inputMode="numeric"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={hourlyRate}
                       onChange={e => setHourlyRate(parseInt(e.target.value) || 0)}
-                      className="flex-1 h-10 px-3 rounded-xl bg-white border border-[#d9d2c2] font-mono-numbers font-bold text-center text-lg text-[#176f78]"
+                      className="flex-1 h-11 px-3 rounded-xl bg-white border border-[#d9d2c2] font-mono-numbers font-bold text-center text-lg text-[#176f78]"
                     />
                     <button
                       type="button"
                       onClick={() => setHourlyRate(prev => prev + 1)}
-                      className="w-10 h-10 rounded-xl bg-white border border-[#d9d2c2] text-[#17343a] font-bold text-lg hover:bg-[#f1eee6] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
+                      className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white border border-[#d9d2c2] text-[#17343a] font-bold text-sm hover:bg-[#f1eee6] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
                     >
                       +1
                     </button>
                     <button
                       type="button"
                       onClick={() => setHourlyRate(prev => prev + 5)}
-                      className="w-10 h-10 rounded-xl bg-[#176f78] text-white font-bold text-lg hover:bg-[#12555c] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
+                      className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-[#176f78] text-white font-bold text-sm hover:bg-[#12555c] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
                     >
                       +5
                     </button>
@@ -379,34 +386,38 @@ export const TelemetryQuickEntryModal: React.FC<TelemetryQuickEntryModalProps> =
                     <button
                       type="button"
                       onClick={() => setTotalWip(prev => Math.max(0, prev - 10))}
-                      className="w-10 h-10 rounded-xl bg-white border border-[#d9d2c2] text-[#17343a] font-bold text-sm hover:bg-[#f1eee6] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
+                      className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white border border-[#d9d2c2] text-[#17343a] font-bold text-sm hover:bg-[#f1eee6] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
                     >
                       -10
                     </button>
                     <button
                       type="button"
                       onClick={() => setTotalWip(prev => Math.max(0, prev - 5))}
-                      className="w-10 h-10 rounded-xl bg-white border border-[#d9d2c2] text-[#17343a] font-bold text-sm hover:bg-[#f1eee6] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
+                      className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white border border-[#d9d2c2] text-[#17343a] font-bold text-sm hover:bg-[#f1eee6] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
                     >
                       -5
                     </button>
                     <input
                       type="number"
+                      inputMode="numeric"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={totalWip}
                       onChange={e => setTotalWip(parseInt(e.target.value) || 0)}
-                      className="flex-1 h-10 px-3 rounded-xl bg-white border border-[#d9d2c2] font-mono-numbers font-bold text-center text-lg text-amber-800"
+                      className="flex-1 h-11 px-3 rounded-xl bg-white border border-[#d9d2c2] font-mono-numbers font-bold text-center text-lg text-amber-800"
                     />
                     <button
                       type="button"
                       onClick={() => setTotalWip(prev => prev + 5)}
-                      className="w-10 h-10 rounded-xl bg-white border border-[#d9d2c2] text-[#17343a] font-bold text-sm hover:bg-[#f1eee6] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
+                      className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white border border-[#d9d2c2] text-[#17343a] font-bold text-sm hover:bg-[#f1eee6] flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
                     >
                       +5
                     </button>
                     <button
                       type="button"
                       onClick={() => setTotalWip(prev => prev + 10)}
-                      className="w-10 h-10 rounded-xl bg-amber-700 text-white font-bold text-sm hover:bg-amber-800 flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
+                      className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-amber-700 text-white font-bold text-sm hover:bg-amber-800 flex items-center justify-center cursor-pointer transition-colors shadow-2xs touch-manipulation active:scale-95"
                     >
                       +10
                     </button>
@@ -477,18 +488,18 @@ export const TelemetryQuickEntryModal: React.FC<TelemetryQuickEntryModalProps> =
                       </div>
 
                       {/* Rapid adjust controls */}
-                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                      <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
                         <button
                           type="button"
                           onClick={() => adjustCycleTime(idx, -2)}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-[#d9d2c2] text-xs font-bold hover:bg-[#f1eee6] cursor-pointer shadow-2xs touch-manipulation active:scale-95"
+                          className="min-h-[44px] min-w-[40px] px-2.5 py-1.5 rounded-xl bg-white border border-[#d9d2c2] text-xs font-bold hover:bg-[#f1eee6] cursor-pointer shadow-2xs touch-manipulation active:scale-95 flex items-center justify-center"
                         >
                           -2s
                         </button>
                         <button
                           type="button"
                           onClick={() => adjustCycleTime(idx, -0.5)}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-[#d9d2c2] text-xs font-bold hover:bg-[#f1eee6] cursor-pointer shadow-2xs touch-manipulation active:scale-95"
+                          className="min-h-[44px] min-w-[40px] px-2.5 py-1.5 rounded-xl bg-white border border-[#d9d2c2] text-xs font-bold hover:bg-[#f1eee6] cursor-pointer shadow-2xs touch-manipulation active:scale-95 flex items-center justify-center"
                         >
                           -0.5s
                         </button>
@@ -496,13 +507,14 @@ export const TelemetryQuickEntryModal: React.FC<TelemetryQuickEntryModalProps> =
                         <div className="w-18 text-center">
                           <input
                             type="number"
+                            inputMode="decimal"
                             step="0.5"
                             value={station.observedCycleTimeSec}
                             onChange={e => {
                               const val = parseFloat(e.target.value) || 0;
                               setStations(prev => prev.map((s, i) => i === idx ? { ...s, observedCycleTimeSec: val } : s));
                             }}
-                            className={`w-full text-center font-mono-numbers font-bold text-base py-1 rounded-lg border ${
+                            className={`w-full text-center font-mono-numbers font-bold text-base py-1.5 rounded-lg border min-h-[44px] ${
                               isCritical ? 'bg-rose-100 text-rose-900 border-rose-300' : 'bg-white text-[#17343a] border-[#d9d2c2]'
                             }`}
                           />
@@ -512,14 +524,14 @@ export const TelemetryQuickEntryModal: React.FC<TelemetryQuickEntryModalProps> =
                         <button
                           type="button"
                           onClick={() => adjustCycleTime(idx, 0.5)}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-[#d9d2c2] text-xs font-bold hover:bg-[#f1eee6] cursor-pointer shadow-2xs touch-manipulation active:scale-95"
+                          className="min-h-[44px] min-w-[40px] px-2.5 py-1.5 rounded-xl bg-white border border-[#d9d2c2] text-xs font-bold hover:bg-[#f1eee6] cursor-pointer shadow-2xs touch-manipulation active:scale-95 flex items-center justify-center"
                         >
                           +0.5s
                         </button>
                         <button
                           type="button"
                           onClick={() => adjustCycleTime(idx, 2)}
-                          className="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 cursor-pointer shadow-2xs touch-manipulation active:scale-95"
+                          className="min-h-[44px] min-w-[40px] px-2.5 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 cursor-pointer shadow-2xs touch-manipulation active:scale-95 flex items-center justify-center"
                         >
                           +2s
                         </button>
@@ -596,7 +608,7 @@ export const TelemetryQuickEntryModal: React.FC<TelemetryQuickEntryModalProps> =
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="e.g. Needle replacement on station 1 complete, line back to target pacing"
-              className="w-full px-3 py-2 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2] text-xs"
+              className="w-full px-3 py-2.5 rounded-xl bg-[#fbfaf6] border border-[#d9d2c2] text-base sm:text-xs min-h-[44px]"
             />
           </div>
         </div>
@@ -607,11 +619,11 @@ export const TelemetryQuickEntryModal: React.FC<TelemetryQuickEntryModalProps> =
             <span className="font-bold text-[#17343a]">Fast-Track Sync:</span> Updates will instantly save to Line {line.lineNo} and reflect across Live Telemetry and Shift Balances.
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-[#d9d2c2] bg-white text-xs font-bold text-[#527078] hover:bg-[#f1eee6] transition-colors cursor-pointer"
+              className="px-4 py-2.5 rounded-xl border border-[#d9d2c2] bg-white text-xs font-bold text-[#527078] hover:bg-[#f1eee6] transition-colors cursor-pointer touch-manipulation min-h-[44px] flex items-center justify-center"
             >
               Cancel
             </button>
@@ -620,7 +632,7 @@ export const TelemetryQuickEntryModal: React.FC<TelemetryQuickEntryModalProps> =
               type="button"
               disabled={!canEdit}
               onClick={handleSave}
-              className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold shadow-xs transition-all ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all touch-manipulation min-h-[44px] active:scale-98 ${
                 canEdit
                   ? 'bg-[#176f78] text-white hover:bg-[#125860] cursor-pointer'
                   : 'bg-slate-300 text-slate-500 cursor-not-allowed border border-slate-300'

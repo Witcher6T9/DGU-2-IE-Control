@@ -117,6 +117,7 @@ import {
 import { playTelemetryHeartbeatChime } from './utils/audioAlert';
 import { AutoRefreshEngineCustomizerModal } from './components/AutoRefreshEngineCustomizerModal';
 import { QuickHourlyProductionModal, HourlyProductionUpdatePayload } from './components/QuickHourlyProductionModal';
+import { MobileQuickActionFAB } from './components/MobileQuickActionFAB';
 
 import {
   INITIAL_STATIONS,
@@ -140,6 +141,7 @@ import type { LineDataSubTab } from './components/LineDataPage';
 import type { ChecklistSubTab } from './components/ChecklistPage';
 import type { LeanToolsSubTab } from './components/LeanToolsPage';
 import type { SettingsPageSection } from './components/SettingsControlCenterPage';
+import type { ZeroTrustAuthMode } from './components/AuthPage';
 
 // Code-split modals loaded strictly on-demand
 const AuthPage = lazyWithRetry(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
@@ -174,6 +176,7 @@ export default function App() {
       const tab = params.get('tab');
       if (tab === 'datas' || tab === 'data' || tab === 'linedata' || tab === 'lines') return 'settings';
       if (tab === 'components' || tab === 'visualizer' || tab === 'uiux' || tab === 'ui-ux') return 'settings';
+      if (tab === 'tier_0' || tab === '0_tier' || tab === 'master-console' || tab === 'tier-0' || tab === 'forge') return 'settings';
       if (tab) return tab;
     } catch {}
     return 'dashboard';
@@ -196,6 +199,7 @@ export default function App() {
       if (tab === 'checklist') return 'checklist';
       if (tab === 'lean-tools' || tab === 'lean') return 'lean-tools';
       if (tab === 'components' || tab === 'visualizer' || tab === 'uiux' || tab === 'ui-ux') return 'components';
+      if (tab === 'tier_0' || tab === '0_tier' || tab === 'master-console' || tab === 'tier-0' || tab === 'forge') return 'tier_0';
     } catch {}
     return 'control-center';
   });
@@ -485,6 +489,12 @@ export default function App() {
   const [isPrivacySecurityOpen, setIsPrivacySecurityOpen] = useState(false);
   const [isAndroidPackageModalOpen, setIsAndroidPackageModalOpen] = useState(false);
   const [isAuthPageOpen, setIsAuthPageOpen] = useState(false);
+  const [authPageInitialMode, setAuthPageInitialMode] = useState<ZeroTrustAuthMode>('sign_in');
+
+  const handleOpenAuth = (mode: ZeroTrustAuthMode = 'sign_in') => {
+    setAuthPageInitialMode(mode);
+    setIsAuthPageOpen(true);
+  };
   const [topBarConfig, setTopBarConfig] = useState<TopBarConfig>(() => getStoredTopBarConfig());
   const [isTopBarCustomizerOpen, setIsTopBarCustomizerOpen] = useState(false);
 
@@ -2227,6 +2237,21 @@ export default function App() {
       return;
     }
 
+    // 5c. 0_Tier Master Console
+    if (
+      tab === 'tier_0' ||
+      tab === '0_tier' ||
+      tab === 'master-console' ||
+      tab === 'tier-0' ||
+      tab === '0_tier-master-console' ||
+      tab === 'forge'
+    ) {
+      setSettingsSection('tier_0');
+      setCurrentTab('settings');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     // 6. Settings (Control Center & Preferences)
     if (
       tab === 'settings' ||
@@ -2508,6 +2533,14 @@ export default function App() {
       </footer>
       </motion.div>
 
+      {/* Mobile Ergonomic Quick-Action FAB Speed Dial */}
+      <MobileQuickActionFAB
+        onOpenHourlyProduction={() => setIsHourlyProductionModalOpen(true)}
+        onOpenNewDowntime={() => setIsNewDowntimeModalOpen(true)}
+        onOpenNewAction={() => setIsNewActionModalOpen(true)}
+        onNavigate={handleNavigate}
+      />
+
       {/* Fixed Bottom Navigation Bar */}
       <BottomNav
         currentTab={currentTab}
@@ -2536,6 +2569,7 @@ export default function App() {
             isOpen={isAuthPageOpen}
             currentProfile={profile}
             roleTiers={roleTiers}
+            initialMode={authPageInitialMode}
             onSuccess={(updatedProfile) => {
               setProfile(updatedProfile);
               setIsAuthPageOpen(false);

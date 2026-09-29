@@ -883,7 +883,7 @@ export const DailyChecklist: React.FC<DailyChecklistProps> = ({
             <span className="text-[#176f78] font-mono-numbers">Active: Line {activeLineNo} ({activeLineMeta.lineIEName})</span>
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 no-scrollbar touch-pan-x">
             {filteredOrgLines.map(item => {
               const isSelected = item.lineNo === activeLineNo;
               const isDone = item.completionPct === 100;
@@ -899,7 +899,7 @@ export const DailyChecklist: React.FC<DailyChecklistProps> = ({
                       setActiveViewMode('linewise');
                     }
                   }}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+                  className={`flex items-center gap-2 px-3.5 py-2 min-h-[44px] rounded-xl border text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 touch-manipulation active:scale-95 ${
                     isSelected
                       ? 'bg-[#176f78] border-[#176f78] text-white shadow-xs ring-2 ring-[#176f78]/30 scale-102'
                       : 'bg-[#fbfaf6] hover:bg-[#f1eee6] border-[#d9d2c2] text-[#17343a]'
@@ -1171,7 +1171,7 @@ export const DailyChecklist: React.FC<DailyChecklistProps> = ({
                       placeholder={`Record Line ${activeLineNo} IE observation or specific action notes...`}
                       value={activeLineNotes[idx] || ''}
                       onChange={e => handleNoteChange(idx, e.target.value)}
-                      className="w-full text-xs px-3 py-1.5 rounded-xl bg-[#f1eee6]/60 border border-[#e7e1d5] text-[#17343a] placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-[#176f78]"
+                      className="w-full text-base sm:text-xs min-h-[44px] px-3 py-2 rounded-xl bg-[#f1eee6]/60 border border-[#e7e1d5] text-[#17343a] placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-[#176f78]"
                     />
                   </div>
                 </div>

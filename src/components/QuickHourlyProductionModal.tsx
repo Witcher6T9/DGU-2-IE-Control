@@ -154,11 +154,14 @@ export const QuickHourlyProductionModal: React.FC<QuickHourlyProductionModalProp
       role="dialog"
       aria-modal="true"
       aria-labelledby="hourly-production-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
     >
-      <div className="w-full max-w-xl max-h-[92vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 bg-white dark:bg-slate-900 rounded-3xl border border-[#d9d2c2] dark:border-slate-800 shadow-2xl p-5 sm:p-6 text-slate-800 dark:text-slate-100 space-y-5">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+      <div className="w-full max-w-xl max-h-[92vh] flex flex-col bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl border border-[#d9d2c2] dark:border-slate-800 shadow-2xl overflow-hidden pb-safe text-slate-800 dark:text-slate-100">
+        {/* Mobile Drag Handle */}
+        <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 mx-auto my-2 sm:hidden shrink-0" />
+
+        {/* Sticky Header */}
+        <div className="px-4 sm:px-6 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-2xl bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300">
               <Clock className="w-5 h-5" />
@@ -178,34 +181,37 @@ export const QuickHourlyProductionModal: React.FC<QuickHourlyProductionModalProp
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
             title="Close dialog"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* 3-Stage Visual Pipeline Bar */}
-        <div className="grid grid-cols-3 gap-2 p-2 rounded-2xl bg-[#fbfaf6] dark:bg-slate-800/60 border border-[#d9d2c2] dark:border-slate-700">
-          {/* 1. Bottle Neck */}
-          <button
-            type="button"
-            onClick={() => setActiveStageTab('bottleneck')}
-            className={`p-2.5 rounded-xl text-left transition-all cursor-pointer border ${
-              activeStageTab === 'bottleneck' || activeStageTab === 'all'
-                ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-950 dark:text-rose-200'
-                : 'bg-white dark:bg-slate-800 border-transparent text-slate-600 dark:text-slate-400'
-            }`}
-          >
-            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider mb-0.5 text-rose-700 dark:text-rose-400">
-              <span className="flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
-                1. Bottle Neck
-              </span>
-            </div>
-            <div className="text-lg font-mono font-black">{bottleneckUnits} <span className="text-[10px] font-normal">pcs</span></div>
-            <div className="text-[9px] text-slate-500 truncate">{bottleneckStationName.split(' ')[0]}</div>
-          </button>
+        {/* Form Container */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="overflow-y-auto p-4 sm:p-6 space-y-4 flex-1">
+          {/* 3-Stage Visual Pipeline Bar */}
+          <div className="grid grid-cols-3 gap-2 p-2 rounded-2xl bg-[#fbfaf6] dark:bg-slate-800/60 border border-[#d9d2c2] dark:border-slate-700">
+            {/* 1. Bottle Neck */}
+            <button
+              type="button"
+              onClick={() => setActiveStageTab('bottleneck')}
+              className={`p-2.5 rounded-xl text-left transition-all cursor-pointer touch-manipulation border ${
+                activeStageTab === 'bottleneck' || activeStageTab === 'all'
+                  ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-950 dark:text-rose-200'
+                  : 'bg-white dark:bg-slate-800 border-transparent text-slate-600 dark:text-slate-400'
+              }`}
+            >
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider mb-0.5 text-rose-700 dark:text-rose-400">
+                <span className="flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  1. Bottle Neck
+                </span>
+              </div>
+              <div className="text-lg font-mono font-black">{bottleneckUnits} <span className="text-[10px] font-normal">pcs</span></div>
+              <div className="text-[9px] text-slate-500 truncate">{bottleneckStationName.split(' ')[0]}</div>
+            </button>
 
           {/* 2. Assembly */}
           <button
@@ -248,7 +254,7 @@ export const QuickHourlyProductionModal: React.FC<QuickHourlyProductionModalProp
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4">
           {/* Row 1: Line Selection & Hour Slot */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -304,18 +310,22 @@ export const QuickHourlyProductionModal: React.FC<QuickHourlyProductionModalProp
                 <button
                   type="button"
                   onClick={() => setBottleneckUnits(prev => Math.max(0, prev - 1))}
-                  className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 font-bold text-rose-700 dark:text-rose-300 flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 font-bold text-rose-700 dark:text-rose-300 flex items-center justify-center cursor-pointer shadow-xs active:scale-95 touch-manipulation"
                 >
-                  <Minus className="w-4 h-4" />
+                  <Minus className="w-5 h-5" />
                 </button>
                 <div className="flex-1 relative">
                   <input
                     type="number"
+                    inputMode="numeric"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     min="0"
                     max="500"
                     value={bottleneckUnits}
                     onChange={(e) => setBottleneckUnits(Number(e.target.value) || 0)}
-                    className="w-full text-center text-xl font-mono font-black py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-rose-300 dark:border-rose-800 text-slate-900 dark:text-white"
+                    className="w-full text-center text-xl font-mono font-black py-2 rounded-xl bg-white dark:bg-slate-800 border border-rose-300 dark:border-rose-800 text-slate-900 dark:text-white"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono font-bold text-slate-400">
                     BN pcs
@@ -324,16 +334,16 @@ export const QuickHourlyProductionModal: React.FC<QuickHourlyProductionModalProp
                 <button
                   type="button"
                   onClick={() => setBottleneckUnits(prev => Math.max(0, prev + 1))}
-                  className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 font-bold text-rose-700 dark:text-rose-300 flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 font-bold text-rose-700 dark:text-rose-300 flex items-center justify-center cursor-pointer shadow-xs active:scale-95 touch-manipulation"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-5 h-5" />
                 </button>
                 {[-5, +5].map((d) => (
                   <button
                     key={d}
                     type="button"
                     onClick={() => setBottleneckUnits(prev => Math.max(0, prev + d))}
-                    className="px-2 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 text-[10px] font-mono font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-100 transition-colors cursor-pointer"
+                    className="min-h-[44px] min-w-[40px] px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 text-xs font-mono font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-100 transition-colors cursor-pointer touch-manipulation flex items-center justify-center"
                   >
                     {d > 0 ? `+${d}` : d}
                   </button>
@@ -357,18 +367,22 @@ export const QuickHourlyProductionModal: React.FC<QuickHourlyProductionModalProp
                 <button
                   type="button"
                   onClick={() => setAssemblyUnits(prev => Math.max(0, prev - 1))}
-                  className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 font-bold text-amber-700 dark:text-amber-300 flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 font-bold text-amber-700 dark:text-amber-300 flex items-center justify-center cursor-pointer shadow-xs active:scale-95 touch-manipulation"
                 >
-                  <Minus className="w-4 h-4" />
+                  <Minus className="w-5 h-5" />
                 </button>
                 <div className="flex-1 relative">
                   <input
                     type="number"
+                    inputMode="numeric"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     min="0"
                     max="500"
                     value={assemblyUnits}
                     onChange={(e) => setAssemblyUnits(Number(e.target.value) || 0)}
-                    className="w-full text-center text-xl font-mono font-black py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-800 text-slate-900 dark:text-white"
+                    className="w-full text-center text-xl font-mono font-black py-2 rounded-xl bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-800 text-slate-900 dark:text-white"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono font-bold text-slate-400">
                     Asm pcs
@@ -377,16 +391,16 @@ export const QuickHourlyProductionModal: React.FC<QuickHourlyProductionModalProp
                 <button
                   type="button"
                   onClick={() => setAssemblyUnits(prev => Math.max(0, prev + 1))}
-                  className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 font-bold text-amber-700 dark:text-amber-300 flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 font-bold text-amber-700 dark:text-amber-300 flex items-center justify-center cursor-pointer shadow-xs active:scale-95 touch-manipulation"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-5 h-5" />
                 </button>
                 {[-5, +5].map((d) => (
                   <button
                     key={d}
                     type="button"
                     onClick={() => setAssemblyUnits(prev => Math.max(0, prev + d))}
-                    className="px-2 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors cursor-pointer"
+                    className="min-h-[44px] min-w-[40px] px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 text-xs font-mono font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors cursor-pointer touch-manipulation flex items-center justify-center"
                   >
                     {d > 0 ? `+${d}` : d}
                   </button>
@@ -410,18 +424,22 @@ export const QuickHourlyProductionModal: React.FC<QuickHourlyProductionModalProp
                 <button
                   type="button"
                   onClick={() => setOutputUnits(prev => Math.max(0, prev - 1))}
-                  className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 font-bold text-emerald-700 dark:text-emerald-300 flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 font-bold text-emerald-700 dark:text-emerald-300 flex items-center justify-center cursor-pointer shadow-xs active:scale-95 touch-manipulation"
                 >
-                  <Minus className="w-4 h-4" />
+                  <Minus className="w-5 h-5" />
                 </button>
                 <div className="flex-1 relative">
                   <input
                     type="number"
+                    inputMode="numeric"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     min="0"
                     max="500"
                     value={outputUnits}
                     onChange={(e) => setOutputUnits(Number(e.target.value) || 0)}
-                    className="w-full text-center text-xl font-mono font-black py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-800 text-slate-900 dark:text-white"
+                    className="w-full text-center text-xl font-mono font-black py-2 rounded-xl bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-800 text-slate-900 dark:text-white"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono font-bold text-slate-400">
                     Output pcs
@@ -430,16 +448,16 @@ export const QuickHourlyProductionModal: React.FC<QuickHourlyProductionModalProp
                 <button
                   type="button"
                   onClick={() => setOutputUnits(prev => Math.max(0, prev + 1))}
-                  className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 font-bold text-emerald-700 dark:text-emerald-300 flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 font-bold text-emerald-700 dark:text-emerald-300 flex items-center justify-center cursor-pointer shadow-xs active:scale-95 touch-manipulation"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-5 h-5" />
                 </button>
                 {[-5, +5, +10].map((d) => (
                   <button
                     key={d}
                     type="button"
                     onClick={() => setOutputUnits(prev => Math.max(0, prev + d))}
-                    className="px-2 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 transition-colors cursor-pointer"
+                    className="min-h-[44px] min-w-[40px] px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-xs font-mono font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 transition-colors cursor-pointer touch-manipulation flex items-center justify-center"
                   >
                     {d > 0 ? `+${d}` : d}
                   </button>
@@ -458,16 +476,20 @@ export const QuickHourlyProductionModal: React.FC<QuickHourlyProductionModalProp
               <div className="flex items-center gap-1.5">
                 <input
                   type="number"
+                  inputMode="numeric"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   min="0"
                   max="100"
                   value={scrapUnits}
                   onChange={(e) => setScrapUnits(Number(e.target.value) || 0)}
-                  className="w-16 text-center font-mono font-bold py-1 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                  className="w-16 min-h-[44px] text-center font-mono font-bold py-1 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                 />
                 <button
                   type="button"
                   onClick={() => setScrapUnits(prev => prev + 1)}
-                  className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-bold"
+                  className="min-h-[44px] min-w-[40px] px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-bold active:scale-95 touch-manipulation flex items-center justify-center cursor-pointer"
                 >
                   +1
                 </button>
@@ -482,16 +504,20 @@ export const QuickHourlyProductionModal: React.FC<QuickHourlyProductionModalProp
               <div className="flex items-center gap-1.5">
                 <input
                   type="number"
+                  inputMode="numeric"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   min="0"
                   max="60"
                   value={downtimeMinutes}
                   onChange={(e) => setDowntimeMinutes(Number(e.target.value) || 0)}
-                  className="w-16 text-center font-mono font-bold py-1 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                  className="w-16 min-h-[44px] text-center font-mono font-bold py-1 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                 />
                 <button
                   type="button"
                   onClick={() => setDowntimeMinutes(prev => Math.min(60, prev + 5))}
-                  className="px-2 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 font-bold"
+                  className="min-h-[44px] min-w-[40px] px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 font-bold active:scale-95 touch-manipulation flex items-center justify-center cursor-pointer"
                 >
                   +5m
                 </button>
@@ -509,26 +535,28 @@ export const QuickHourlyProductionModal: React.FC<QuickHourlyProductionModalProp
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Balanced flow between BN & Assembly, thread tension adjusted"
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-[#d9d2c2] dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-cyan-500"
+              className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-[#d9d2c2] dark:border-slate-700 text-base sm:text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-cyan-500 min-h-[44px]"
             />
+            </div>
           </div>
+        </div>
 
-          {/* Footer Actions */}
-          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+        {/* Sticky Bottom Actions */}
+          <div className="p-4 sm:px-6 py-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-[#d9d2c2] dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="px-4 py-2.5 rounded-xl border border-[#d9d2c2] dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer touch-manipulation min-h-[44px]"
             >
               Cancel
             </button>
 
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-700 to-teal-700 hover:brightness-110 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer active:scale-95"
+              className="flex-1 sm:flex-initial px-5 py-3 sm:py-2.5 rounded-xl bg-gradient-to-r from-[#176f78] to-[#125860] hover:brightness-110 text-white text-xs sm:text-sm font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-98 touch-manipulation min-h-[44px]"
             >
               <Save className="w-4 h-4" />
-              <span>Save (Bottle Neck, Assembly, Output)</span>
+              <span>Save (BN, Asm &amp; Output)</span>
             </button>
           </div>
         </form>

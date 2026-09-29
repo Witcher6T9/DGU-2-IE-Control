@@ -6,7 +6,7 @@
  * Principle: "Never Trust, Always Verify" — Fail-Secure Least Privilege
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   ShieldCheck,
   ShieldAlert,
@@ -17,15 +17,12 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
-  Building2,
-  Layers,
   Factory,
   KeyRound,
   Eye,
   EyeOff,
   Radio,
   Clock,
-  Key,
   Fingerprint,
   Cpu,
   UserPlus,
@@ -33,7 +30,8 @@ import {
   Check,
   AlertTriangle,
   FileCheck,
-  HelpCircle
+  HelpCircle,
+  Zap
 } from 'lucide-react';
 import { UserProfile, RoleTier } from '../types';
 import {
@@ -42,10 +40,6 @@ import {
   verifySystemAdminPasscode,
   generateSessionFingerprint,
   FACTORY_BLOCKS,
-  BLUE_WING_LINES,
-  GREEN_WING_LINES,
-  ALL_FACTORY_LINES,
-  validateBreakGlassToken,
   isSystemAdmin
 } from '../utils/rbac';
 import { SYSTEM_ADMIN_PROFILE, ROLE_TIERS } from '../mockData';
@@ -57,18 +51,26 @@ interface AuthPageProps {
   onCancel?: () => void;
   currentProfile?: UserProfile;
   roleTiers?: RoleTier[];
+  initialMode?: ZeroTrustAuthMode;
 }
 
-export type ZeroTrustAuthMode = 'sign_in' | 'sign_up' | 'break_glass' | 'admin_pin' | 'demo_tiers';
+export type ZeroTrustAuthMode = 'sign_in' | 'sign_up';
 
 export const AuthPage: React.FC<AuthPageProps> = ({
   isOpen = true,
   onSuccess,
   onCancel,
   currentProfile,
-  roleTiers = ROLE_TIERS
+  roleTiers = ROLE_TIERS,
+  initialMode = 'sign_in'
 }) => {
-  const [authMode, setAuthMode] = useState<ZeroTrustAuthMode>('sign_in');
+  const [authMode, setAuthMode] = useState<ZeroTrustAuthMode>(initialMode);
+
+  useEffect(() => {
+    if (initialMode) {
+      setAuthMode(initialMode);
+    }
+  }, [initialMode]);
   
   // Shared Form State
   const [email, setEmail] = useState(currentProfile?.email || '');
@@ -82,19 +84,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [unauthorizedDomain, setUnauthorizedDomain] = useState(false);
 
-  // Scoping State (Zero Trust Least Privilege)
-  const [selectedWing, setSelectedWing] = useState<'Blue Wing' | 'Green Wing' | 'All'>('Blue Wing');
-  const [selectedBlockId, setSelectedBlockId] = useState<string>('block_1');
-  const [selectedLine, setSelectedLine] = useState<string>('Line 01');
+  // State
   const [selectedTier, setSelectedTier] = useState<string>('tier_4'); // Zero Trust defaults to Tier 4 (Least Privilege)
   const [agreeTerms, setAgreeTerms] = useState(true);
-
-  // Break Glass Emergency Token State
-  const [breakGlassTokenInput, setBreakGlassTokenInput] = useState('');
-  const [breakGlassReasonInput, setBreakGlassReasonInput] = useState('Emergency line stoppage / andon alarm response');
-
-  // Root Admin PIN State
-  const [adminPin, setAdminPin] = useState('');
 
   // Live Zero Trust Session Fingerprint
   const sessionFingerprint = useMemo(() => {
@@ -118,7 +110,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     // Check if designated System Administrator email
     const isTargetAdmin = SYSTEM_ADMIN_EMAILS.some(e => e.toLowerCase() === cleanEmail);
     if (isTargetAdmin) {
-      if (!verifySystemAdminPasscode(password.trim() || adminPin.trim())) {
+      if (!verifySystemAdminPasscode(password.trim())) {
         setErrorMsg('System Administrator clearance requires verified root passcode.');
         return;
       }
@@ -132,19 +124,51 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }
 
     // Standard Zero Trust Floor Authentication
-    const matchedTier = roleTiers.find(t => t.id === selectedTier) || roleTiers[4] || roleTiers[0];
+    // Assignments are loaded from existing authorized profile or default least-privilege boundary
+    let assignedUnit = 'Debonair LTD (Unit 02)';
+    let assignedWing: 'Blue Wing' | 'Green Wing' | 'All' = 'Blue Wing';
+    let assignedBlock: string | undefined = FACTORY_BLOCKS[0]?.label;
+    let assignedLines: string[] = ['Line 01'];
+    let role: UserProfile['role'] = selectedTier === 'tier_1' ? 'sr_manager' : selectedTier === 'tier_2' ? 'manager' : selectedTier === 'tier_3' ? 'ie_incharge' : 'line_ie';
+    let tierId = selectedTier;
+
+    try {
+      const savedStr = localStorage.getItem('ie_user_profile');
+      if (savedStr) {
+        const saved = JSON.parse(savedStr);
+        if (saved.email && saved.email.toLowerCase() === cleanEmail) {
+          assignedUnit = saved.assignedUnit || assignedUnit;
+          assignedWing = saved.assignedWing || assignedWing;
+          assignedBlock = saved.assignedBlock || assignedBlock;
+          assignedLines = saved.assignedLines || assignedLines;
+          role = saved.role || role;
+          tierId = saved.tierId || tierId;
+        }
+      }
+    } catch {}
+
+    if (currentProfile?.email && currentProfile.email.toLowerCase() === cleanEmail) {
+      assignedUnit = currentProfile.assignedUnit || assignedUnit;
+      assignedWing = currentProfile.assignedWing || assignedWing;
+      assignedBlock = currentProfile.assignedBlock || assignedBlock;
+      assignedLines = currentProfile.assignedLines || assignedLines;
+      role = currentProfile.role || role;
+      tierId = currentProfile.tierId || tierId;
+    }
+
+    const matchedTier = roleTiers.find(t => t.id === tierId) || roleTiers[4] || roleTiers[0];
     const newProfile: UserProfile = {
       ...(currentProfile || {}),
       name: fullName.trim() || cleanEmail.split('@')[0],
       email: cleanEmail,
       employeeId: employeeId.trim() || 'IE-9042',
-      tierId: selectedTier,
-      role: selectedTier === 'tier_1' ? 'sr_manager' : selectedTier === 'tier_2' ? 'manager' : selectedTier === 'tier_3' ? 'ie_incharge' : 'line_ie',
+      tierId,
+      role,
       jobTitle: matchedTier.roleTitle || matchedTier.name,
-      assignedUnit: 'Debonair LTD (Unit 02)',
-      assignedWing: selectedWing,
-      assignedBlock: FACTORY_BLOCKS.find(b => b.blockId === selectedBlockId)?.label,
-      assignedLines: [selectedLine],
+      assignedUnit,
+      assignedWing,
+      assignedBlock,
+      assignedLines,
       shift: 'General Shift (8:00 AM - 5:00 PM)',
       photoURL: currentProfile?.photoURL || `data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="50" fill="%23176f78"/%3E%3Ctext x="50%25" y="55%25" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-size="36" font-weight="700"%3EIE%3C/text%3E%3C/svg%3E`
     };
@@ -177,6 +201,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }
 
     // Zero Trust Principle: New user accounts strictly default to Tier 4 (Line IE / Data Entry)
+    // Factory boundary (wings, floors, lines) is allocated by administration via the central organogram
     const tier4 = roleTiers.find(t => t.id === 'tier_4') || roleTiers[0];
     const registeredProfile: UserProfile = {
       ...(currentProfile || {}),
@@ -187,14 +212,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       role: 'line_ie',
       jobTitle: tier4.roleTitle || 'Line Industrial Engineer',
       assignedUnit: 'Debonair LTD (Unit 02)',
-      assignedWing: selectedWing,
-      assignedBlock: FACTORY_BLOCKS.find(b => b.blockId === selectedBlockId)?.label,
-      assignedLines: [selectedLine],
+      assignedWing: 'Blue Wing',
+      assignedBlock: FACTORY_BLOCKS[0]?.label,
+      assignedLines: ['Line 01'],
       shift: 'General Shift (8:00 AM - 5:00 PM)',
       photoURL: `data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="50" fill="%23176f78"/%3E%3Ctext x="50%25" y="55%25" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-size="36" font-weight="700"%3EIE%3C/text%3E%3C/svg%3E`
     };
 
-    setSuccessMsg('Zero Trust registration complete: Enrolled with Tier 4 (Line IE Least-Privilege).');
+    setSuccessMsg('Zero Trust registration complete: Enrolled with Tier 4 (Line IE Least-Privilege). Operational boundaries will be provisioned by Department Administration.');
     setTimeout(() => {
       saveAndComplete(registeredProfile);
     }, 800);
@@ -213,6 +238,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         const userEmail = (u.email || email).toLowerCase().trim();
         const isSysAdminUser = SYSTEM_ADMIN_EMAILS.some(e => e.toLowerCase() === userEmail);
 
+        let ssoAssignedUnit = isSysAdminUser ? 'Debonair LTD (Unit-02) — Master Administration' : (currentProfile?.assignedUnit || 'Debonair LTD (Unit 02)');
+        let ssoAssignedWing: 'Blue Wing' | 'Green Wing' | 'All' = isSysAdminUser ? 'All' : (currentProfile?.assignedWing || 'Blue Wing');
+        let ssoRole: UserProfile['role'] = isSysAdminUser ? 'admin' : (selectedTier === 'tier_1' ? 'sr_manager' : selectedTier === 'tier_2' ? 'manager' : selectedTier === 'tier_3' ? 'ie_incharge' : 'line_ie');
+        let ssoTierId = isSysAdminUser ? 'tier_0' : selectedTier;
+
+        try {
+          const savedStr = localStorage.getItem('ie_user_profile');
+          if (savedStr) {
+            const saved = JSON.parse(savedStr);
+            if (saved.email && saved.email.toLowerCase() === userEmail) {
+              ssoAssignedUnit = saved.assignedUnit || ssoAssignedUnit;
+              ssoAssignedWing = saved.assignedWing || ssoAssignedWing;
+              ssoRole = isSysAdminUser ? 'admin' : (saved.role || ssoRole);
+              ssoTierId = isSysAdminUser ? 'tier_0' : (saved.tierId || ssoTierId);
+            }
+          }
+        } catch {}
+
         const finalProfile: UserProfile = {
           ...(currentProfile || {}),
           name: isSysAdminUser ? SYSTEM_ADMIN_PROFILE.name : (u.displayName || fullName || 'IE Engineer'),
@@ -220,11 +263,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           photoURL: u.photoURL || (isSysAdminUser ? SYSTEM_ADMIN_PROFILE.photoURL : undefined),
           googleUid: u.uid,
           employeeId: employeeId || 'IE-9042',
-          role: isSysAdminUser ? 'admin' : (selectedTier === 'tier_1' ? 'sr_manager' : selectedTier === 'tier_2' ? 'manager' : selectedTier === 'tier_3' ? 'ie_incharge' : 'line_ie'),
-          tierId: isSysAdminUser ? 'tier_0' : selectedTier,
-          jobTitle: isSysAdminUser ? 'System Administrator (Root Operations)' : (roleTiers.find(t => t.id === selectedTier)?.roleTitle || 'Industrial Engineer'),
-          assignedUnit: isSysAdminUser ? 'Debonair LTD (Unit-02) — Master Administration' : 'Unit 02 (Sewing Floor)',
-          assignedWing: isSysAdminUser ? 'All' : selectedWing,
+          role: ssoRole,
+          tierId: ssoTierId,
+          jobTitle: isSysAdminUser ? 'System Administrator (Root Operations)' : (roleTiers.find(t => t.id === ssoTierId)?.roleTitle || 'Industrial Engineer'),
+          assignedUnit: ssoAssignedUnit,
+          assignedWing: ssoAssignedWing,
           shift: isSysAdminUser ? '24/7 Root Operations & System Control' : 'General Shift (8:00 AM - 5:00 PM)'
         };
 
@@ -247,81 +290,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }
   };
 
-  // Break-Glass Emergency Token Authorization
-  const handleBreakGlassSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
-
-    const validation = validateBreakGlassToken(breakGlassTokenInput.trim());
-    if (!validation.isValid) {
-      setErrorMsg(validation.reason || 'Invalid or expired Break-Glass Emergency Token.');
-      return;
-    }
-
-    // Grant temporary 4-Hour elevated supervisor session
-    const emergencyProfile: UserProfile = {
-      ...(currentProfile || {}),
-      name: `Emergency Supervisor (${email.split('@')[0] || 'Floor Leader'})`,
-      email: email.trim() || 'emergency.supervisor@debonair.com',
-      employeeId: employeeId || 'EMG-7700',
-      role: 'manager',
-      tierId: 'tier_2',
-      jobTitle: 'Emergency Shift Supervisor (Break-Glass Override Active)',
-      assignedUnit: 'Debonair LTD (Unit 02) — Emergency Control',
-      assignedWing: 'All',
-      shift: 'Emergency Floor Intervention'
-    };
-
-    saveAndComplete(emergencyProfile);
-  };
-
-  // Root Admin Terminal Passcode Form
-  const handleAdminPinSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
-
-    if (verifySystemAdminPasscode(adminPin.trim())) {
-      const adminProfile: UserProfile = {
-        ...SYSTEM_ADMIN_PROFILE,
-        email: email.trim() && SYSTEM_ADMIN_EMAILS.some(e => e.toLowerCase() === email.trim().toLowerCase())
-          ? email.trim()
-          : SYSTEM_ADMIN_EMAIL,
-        assignedUnit: 'Debonair LTD (Unit-02) — Master Administration'
-      };
-      saveAndComplete(adminProfile);
-    } else {
-      setErrorMsg('Invalid System Master Passcode.');
-    }
-  };
-
   // Helper to persist and close
   const saveAndComplete = (userProfile: UserProfile) => {
     try {
       localStorage.setItem('ie_user_profile', JSON.stringify(userProfile));
     } catch {}
     onSuccess(userProfile);
-  };
-
-  // Quick Demo Role loader
-  const handleQuickDemoLoad = (tierId: string) => {
-    setSelectedTier(tierId);
-    if (tierId === 'tier_1') {
-      setEmail('ie.manager@debonairgroup.com');
-      setFullName('Sr. IE Manager');
-      setSelectedWing('All');
-    } else if (tierId === 'tier_2') {
-      setEmail('wing.manager@debonairgroup.com');
-      setFullName('Wing Production Manager');
-      setSelectedWing('Blue Wing');
-    } else if (tierId === 'tier_3') {
-      setEmail('ie.incharge@debonairgroup.com');
-      setFullName('IE In-Charge (Floor 2)');
-      setSelectedWing('Blue Wing');
-    } else if (tierId === 'tier_4') {
-      setEmail('line.ie@debonairgroup.com');
-      setFullName('Line Industrial Engineer');
-      setSelectedWing('Blue Wing');
-    }
   };
 
   return (
@@ -374,63 +348,45 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           </div>
         </div>
 
-        {/* Four Dedicated Zero Trust Mode Selectors */}
-        <div className="px-6 pt-3 pb-1 border-b border-[#e7e1d5] bg-white flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          {/* Sign In */}
-          <button
-            type="button"
-            onClick={() => setAuthMode('sign_in')}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
-              authMode === 'sign_in'
-                ? 'bg-[#176f78] text-white shadow-2xs'
-                : 'text-[#506e75] hover:bg-[#f1eee6]'
-            }`}
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            <span>Sign In</span>
-          </button>
+        {/* Dedicated Zero Trust Mode Selectors */}
+        <div className="px-6 pt-3 pb-1 border-b border-[#e7e1d5] bg-white flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1.5">
+            {/* Mode 1: Sign In */}
+            <button
+              type="button"
+              onClick={() => setAuthMode('sign_in')}
+              className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                authMode === 'sign_in'
+                  ? 'bg-[#176f78] text-white shadow-2xs'
+                  : 'text-[#506e75] hover:bg-[#f1eee6]'
+              }`}
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </button>
 
-          {/* Sign Up / Register Terminal */}
-          <button
-            type="button"
-            onClick={() => setAuthMode('sign_up')}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
-              authMode === 'sign_up'
-                ? 'bg-[#176f78] text-white shadow-2xs'
-                : 'text-[#506e75] hover:bg-[#f1eee6]'
-            }`}
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Register Identity (Sign Up)</span>
-          </button>
+            {/* Mode 2: Sign Up / Register Terminal */}
+            <button
+              type="button"
+              onClick={() => setAuthMode('sign_up')}
+              className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                authMode === 'sign_up'
+                  ? 'bg-[#176f78] text-white shadow-2xs'
+                  : 'text-[#506e75] hover:bg-[#f1eee6]'
+              }`}
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Register Identity (Sign Up)</span>
+            </button>
+          </div>
 
-          {/* Break-Glass Emergency */}
-          <button
-            type="button"
-            onClick={() => setAuthMode('break_glass')}
-            className={`px-3 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
-              authMode === 'break_glass'
-                ? 'bg-purple-600 text-white shadow-2xs'
-                : 'text-purple-800 hover:bg-purple-50'
-            }`}
-          >
-            <Key className="w-3.5 h-3.5" />
-            <span>Break-Glass Emergency</span>
-          </button>
-
-          {/* Root Admin Passcode */}
-          <button
-            type="button"
-            onClick={() => setAuthMode('admin_pin')}
-            className={`px-3 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ml-auto ${
-              authMode === 'admin_pin'
-                ? 'bg-amber-500 text-teal-950 shadow-2xs font-black'
-                : 'text-amber-800 hover:bg-amber-50'
-            }`}
-          >
-            <Lock className="w-3.5 h-3.5 text-amber-600" />
-            <span>Root Admin PIN</span>
-          </button>
+          <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-mono font-bold text-slate-500 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Mode:</span>
+            <span className="text-teal-700 uppercase bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+              {authMode === 'sign_in' ? 'Sign In' : 'Register Terminal'}
+            </span>
+          </div>
         </div>
 
         {/* Main Content Area */}
@@ -520,37 +476,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   </div>
                 </div>
 
-                {/* Scoping details */}
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <label className="font-bold text-[#17343a] block mb-1">Factory Wing Scope</label>
-                    <select
-                      value={selectedWing}
-                      onChange={e => setSelectedWing(e.target.value as any)}
-                      className="w-full px-3 py-2 rounded-xl border border-[#d9d2c2] bg-white text-xs font-semibold text-[#17343a]"
-                    >
-                      <option value="Blue Wing">Blue Wing (Lines 01–17)</option>
-                      <option value="Green Wing">Green Wing (Lines 18–34)</option>
-                      <option value="All">All Factory Wings (Dept Admin)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-[#17343a] block mb-1">Active Line Context</label>
-                    <select
-                      value={selectedLine}
-                      onChange={e => setSelectedLine(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-[#d9d2c2] bg-white text-xs font-semibold text-[#17343a]"
-                    >
-                      {ALL_FACTORY_LINES.map(l => (
-                        <option key={l} value={l}>
-                          {l}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
                 <button
                   type="submit"
                   className="w-full py-3 rounded-2xl bg-[#176f78] hover:bg-[#125860] text-white text-xs font-bold uppercase tracking-wider shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all touch-manipulation active:scale-[0.98]"
@@ -560,13 +485,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 </button>
               </form>
 
-              <div className="text-center pt-1">
+              <div className="flex items-center justify-between gap-2 text-xs pt-1">
                 <button
                   type="button"
                   onClick={() => setAuthMode('sign_up')}
-                  className="text-xs text-[#176f78] hover:underline font-bold cursor-pointer"
+                  className="text-[#176f78] hover:underline font-bold cursor-pointer"
                 >
-                  New to Debonair Unit-02? Register Terminal Identity (Sign Up) &rarr;
+                  New to Debonair? Register Terminal &rarr;
                 </button>
               </div>
             </div>
@@ -671,55 +596,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   </div>
                 </div>
 
-                {/* Scoping Selection */}
-                <div className="p-3.5 rounded-2xl bg-white border border-[#d9d2c2] space-y-3">
-                  <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Building2 className="w-4 h-4 text-[#176f78]" />
-                    <span>Assign Initial Factory Boundary (SOP-IE-04 Scoping)</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div>
-                      <label className="text-slate-600 block mb-1 font-medium">Wing Scope</label>
-                      <select
-                        value={selectedWing}
-                        onChange={e => setSelectedWing(e.target.value as any)}
-                        className="w-full px-2.5 py-1.5 rounded-xl border border-[#d9d2c2] bg-[#fbfaf6] text-xs font-semibold text-slate-800"
-                      >
-                        <option value="Blue Wing">Blue Wing (Lines 01–17)</option>
-                        <option value="Green Wing">Green Wing (Lines 18–34)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-slate-600 block mb-1 font-medium">Floor Block</label>
-                      <select
-                        value={selectedBlockId}
-                        onChange={e => setSelectedBlockId(e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-xl border border-[#d9d2c2] bg-[#fbfaf6] text-xs font-semibold text-slate-800"
-                      >
-                        {FACTORY_BLOCKS.map(b => (
-                          <option key={b.blockId} value={b.blockId}>
-                            {b.label.split('—')[0]} ({b.lines[0]}–{b.lines[b.lines.length - 1]})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-slate-600 block mb-1 font-medium">Primary Line</label>
-                      <select
-                        value={selectedLine}
-                        onChange={e => setSelectedLine(e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-xl border border-[#d9d2c2] bg-[#fbfaf6] text-xs font-semibold text-slate-800"
-                      >
-                        {ALL_FACTORY_LINES.map(l => (
-                          <option key={l} value={l}>
-                            {l}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                {/* Administrative Allocation Notice (Zero Trust - No Self-Assignment) */}
+                <div className="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 text-xs text-slate-600 flex items-start gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-[#176f78] shrink-0 mt-0.5" />
+                  <div className="leading-relaxed">
+                    <span className="font-bold text-[#17343a] block">
+                      Admin-Provisioned Operational Scope
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Factory wing, floor block, and production line boundaries are centrally assigned by Department Administration (SOP-IE-04). Self-assignment is restricted under Zero Trust rules.
+                    </span>
                   </div>
                 </div>
 
@@ -746,7 +632,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 </button>
               </form>
 
-              <div className="text-center pt-1">
+              <div className="flex items-center justify-between gap-2 text-xs pt-1">
                 <button
                   type="button"
                   onClick={() => setAuthMode('sign_in')}
@@ -757,176 +643,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </div>
             </div>
           )}
-
-          {/* =========================================================================
-           * MODE 3: BREAK-GLASS EMERGENCY ACCESS
-           * ========================================================================= */}
-          {authMode === 'break_glass' && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 text-xs space-y-2">
-                <div className="font-bold text-purple-900 flex items-center gap-1.5">
-                  <Key className="w-4 h-4 text-purple-600" />
-                  <span>Emergency Break-Glass Protocol</span>
-                </div>
-                <p className="text-[11px] text-purple-800 leading-relaxed">
-                  Used by Shift Supervisors during critical production floor emergencies (e.g. line stoppages, un-cleared defect quarantine, or emergency pitch rebalancing). Enter the cryptographic supervisor token for temporary 4-Hour elevated access.
-                </p>
-              </div>
-
-              <form onSubmit={handleBreakGlassSubmit} className="space-y-3.5">
-                <div>
-                  <label className="text-xs font-bold text-[#17343a] block mb-1">
-                    Emergency Token (Format: BG-DGU2-XXXX-XXXX)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={breakGlassTokenInput}
-                    onChange={e => setBreakGlassTokenInput(e.target.value.toUpperCase())}
-                    placeholder="BG-DGU2-XXXX-XXXX"
-                    className="w-full px-4 py-3 rounded-xl border border-purple-300 bg-white font-mono text-center text-sm font-bold text-purple-900 focus:outline-hidden focus:border-purple-600 tracking-wider"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-[#17343a] block mb-1">
-                    Emergency Floor Reason (Mandatory Audit Log)
-                  </label>
-                  <select
-                    value={breakGlassReasonInput}
-                    onChange={e => setBreakGlassReasonInput(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-[#d9d2c2] bg-white text-xs font-semibold text-slate-800"
-                  >
-                    <option value="Emergency line stoppage / andon alarm response">
-                      Emergency line stoppage / andon alarm response
-                    </option>
-                    <option value="Mid-shift line target override & bottleneck relief">
-                      Mid-shift line target override & bottleneck relief
-                    </option>
-                    <option value="Quality defect quarantine batch release">
-                      Quality defect quarantine batch release
-                    </option>
-                    <option value="Floor terminal lockout override">
-                      Floor terminal lockout override
-                    </option>
-                  </select>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold uppercase tracking-wider shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all touch-manipulation active:scale-[0.98]"
-                >
-                  <Key className="w-4 h-4" />
-                  <span>Verify Token &amp; Unlock Emergency Session</span>
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* =========================================================================
-           * MODE 4: ROOT SYSTEM ADMIN PASSCODE
-           * ========================================================================= */}
-          {authMode === 'admin_pin' && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-400/40 text-amber-950 text-xs space-y-2">
-                <div className="font-bold flex items-center justify-between text-amber-900">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-amber-600" />
-                    <span>Master Administrator Elevation</span>
-                  </div>
-                  <span className="font-mono text-[10px] bg-amber-200 text-amber-950 px-2 py-0.5 rounded-md font-bold">
-                    Tier 0 Root
-                  </span>
-                </div>
-                <p className="text-[11px] text-amber-800 leading-relaxed">
-                  Master System Administrator root authorization is restricted to designated administrator credentials ({SYSTEM_ADMIN_EMAILS.join(', ')}). Enter the root security key to authorize this terminal session.
-                </p>
-              </div>
-
-              <form onSubmit={handleAdminPinSubmit} className="space-y-3.5">
-                <div>
-                  <label className="text-xs font-bold text-[#17343a] block mb-1">
-                    System Admin Email
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder={SYSTEM_ADMIN_EMAIL}
-                    className="w-full px-3 py-2.5 rounded-xl border border-amber-300 bg-white text-xs text-[#17343a] focus:outline-hidden focus:border-amber-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-[#17343a] block mb-1">
-                    Root Master Passcode
-                  </label>
-                  <input
-                    type="password"
-                    autoFocus
-                    value={adminPin}
-                    onChange={e => setAdminPin(e.target.value)}
-                    placeholder="Enter root passcode (e.g. 911999)"
-                    className="w-full px-4 py-3 rounded-2xl border border-amber-300 bg-white text-center font-mono text-base tracking-widest text-[#17343a] focus:outline-hidden focus:border-amber-500"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-teal-950 font-black text-xs uppercase tracking-wider shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all touch-manipulation active:scale-[0.98]"
-                >
-                  <Lock className="w-4 h-4" />
-                  <span>Verify Passcode &amp; Elevate Root</span>
-                </button>
-              </form>
-            </div>
-          )}
-        </div>
-
-        {/* Quick Floor Role Switcher Accordion (Demo & Simulation) */}
-        <div className="px-6 py-3 bg-[#f1eee6]/80 border-t border-[#e7e1d5] flex flex-col gap-2">
-          <div className="flex items-center justify-between text-[11px] text-slate-600">
-            <span className="font-bold flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-[#176f78]" />
-              <span>Quick Demo Role Presets:</span>
-            </span>
-            <span className="text-[10px] text-slate-500">Click to instantly populate floor role</span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px]">
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLoad('tier_1')}
-              className="p-1.5 rounded-lg bg-white hover:bg-blue-50 border border-[#d9d2c2] text-left text-slate-800 font-bold transition-all cursor-pointer flex items-center justify-between"
-            >
-              <span>Tier 1: Sr. Mgr</span>
-              <span className="text-[9px] font-mono text-blue-700 bg-blue-100 px-1 rounded">All</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLoad('tier_2')}
-              className="p-1.5 rounded-lg bg-white hover:bg-emerald-50 border border-[#d9d2c2] text-left text-slate-800 font-bold transition-all cursor-pointer flex items-center justify-between"
-            >
-              <span>Tier 2: Wing Mgr</span>
-              <span className="text-[9px] font-mono text-emerald-700 bg-emerald-100 px-1 rounded">Wing</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLoad('tier_3')}
-              className="p-1.5 rounded-lg bg-white hover:bg-teal-50 border border-[#d9d2c2] text-left text-slate-800 font-bold transition-all cursor-pointer flex items-center justify-between"
-            >
-              <span>Tier 3: In-Charge</span>
-              <span className="text-[9px] font-mono text-teal-700 bg-teal-100 px-1 rounded">Block</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemoLoad('tier_4')}
-              className="p-1.5 rounded-lg bg-white hover:bg-amber-50 border border-[#d9d2c2] text-left text-slate-800 font-bold transition-all cursor-pointer flex items-center justify-between"
-            >
-              <span>Tier 4: Line IE</span>
-              <span className="text-[9px] font-mono text-amber-700 bg-amber-100 px-1 rounded">Line</span>
-            </button>
-          </div>
         </div>
 
         {/* Footer Info */}

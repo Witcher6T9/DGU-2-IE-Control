@@ -390,3 +390,47 @@
   padding-bottom: 3.5rem !important;
 }
 
+/* =========================================================================
+   MOBILE ERGONOMICS & SAFE-AREA SYSTEM
+   ========================================================================= */
+
+/* Hardware safe area insets for notches & gesture bars */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Touch manipulation: removes 300ms tap delay on mobile webkit/blink */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth mobile scroll container */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Mobile responsive sheet adjustments */
+@media (max-width: 639px) {
+  .mobile-sheet-content {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-bottom-width: 0 !important;
+  }
+}
+

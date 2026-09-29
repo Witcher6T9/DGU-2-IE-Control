@@ -152,8 +152,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       aria-label="Bottom Navigation"
       className={
         isFloating
-          ? "fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl bg-[#fbfaf6]/95 dark:bg-[#181d24]/95 backdrop-blur-xl border border-[#d9d2c2] dark:border-[#2e3846] rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.18)] px-2 pb-[calc(env(safe-area-inset-bottom,0px)+4px)]"
-          : "fixed bottom-0 inset-x-0 z-40 bg-[#fbfaf6]/95 dark:bg-[#181d24]/95 backdrop-blur-md border-t border-[#d9d2c2] dark:border-[#2e3846] shadow-[0_-4px_20px_rgba(12,28,45,0.10)] pb-[calc(env(safe-area-inset-bottom,0px)+2px)] cockpit-nav"
+          ? "fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl bg-[#fbfaf6]/95 dark:bg-[#181d24]/95 backdrop-blur-xl border border-[#d9d2c2] dark:border-[#2e3846] rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.18)] px-2 pb-[calc(env(safe-area-inset-bottom,0px)+6px)]"
+          : "fixed bottom-0 inset-x-0 z-40 bg-[#fbfaf6]/95 dark:bg-[#181d24]/95 backdrop-blur-md border-t border-[#d9d2c2] dark:border-[#2e3846] shadow-[0_-4px_20px_rgba(12,28,45,0.10)] pb-[calc(env(safe-area-inset-bottom,0px)+6px)] cockpit-nav"
       }
     >
       <div className={isFloating ? "w-full mx-auto" : "max-w-[1500px] mx-auto px-2 sm:px-6"}>
@@ -168,7 +168,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 id={`bottom-nav-mobile-${tab.id}`}
                 onClick={() => handleTabClick(tab.id)}
                 aria-current={active ? 'page' : undefined}
-                className="flex flex-col items-center justify-center py-1 min-h-[52px] rounded-xl transition-all cursor-pointer touch-manipulation active:scale-95 w-full"
+                className="flex flex-col items-center justify-center py-1 min-h-[54px] rounded-xl transition-all cursor-pointer touch-manipulation active:scale-95 w-full"
               >
                 <div
                   className={`relative px-3 py-1 rounded-full transition-all duration-200 flex items-center justify-center ${

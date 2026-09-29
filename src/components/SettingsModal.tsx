@@ -1185,14 +1185,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <div className="flex items-center gap-2">
                           <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0" />
                           <h3 className="text-base font-bold text-white font-display">
-                            Tier_0 Master Console
+                            0_Tier Master Console
                           </h3>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                            ROOT CLEARANCE
+                          </span>
                         </div>
                         <p className="text-xs text-slate-300 mt-1 font-medium">
-                          Schema Forge • Access Matrix • Security Loop • Plant Security • Privacy Vault • Backup Forge • Audit Forensics • Maintenance Hub
+                          Consolidated Development Systems • Maintaining Infrastructure • Core IE Frontline Tools
                         </p>
                         <p className="text-[11px] text-teal-300/80 font-mono mt-0.5">
-                          (Visible only when isSystemAdmin(profile) === true)
+                          19 Engines Consolidated • System Administrator Clearance
                         </p>
                       </div>
 
@@ -1204,14 +1207,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         }}
                         className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-teal-500 text-slate-950 hover:bg-teal-400 cursor-pointer shadow-md transition-all active:scale-95 shrink-0 self-start sm:self-auto"
                       >
-                        <span>Open Tier_0 Suite</span>
+                        <span>Open 0_Tier Console</span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
 
-                    {/* 8 Quick Tools Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3.5">
-                      {TIER_0_MODULES.map(mod => {
+                    {/* Fast Jump Action Buttons */}
+                    <div className="flex items-center gap-1.5 flex-wrap mt-3 pt-3 border-t border-white/10">
+                      <span className="text-[11px] font-mono text-teal-300 font-bold mr-1">SUITES:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTier0Module('uiux-visualizer');
+                          setActiveSubPage('tier_0');
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-sky-500/20 hover:bg-sky-500 text-sky-200 hover:text-slate-950 border border-sky-500/30 transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>🛠️ Dev Tools</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTier0Module('maintenance-hub');
+                          setActiveSubPage('tier_0');
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-500/20 hover:bg-indigo-500 text-indigo-200 hover:text-white border border-indigo-500/30 transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>🛡️ Maintaining</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTier0Module('lean-toolkit');
+                          setActiveSubPage('tier_0');
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500/20 hover:bg-amber-400 text-amber-200 hover:text-slate-950 border border-amber-500/30 transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>⚙️ Core Tools</span>
+                      </button>
+                    </div>
+
+                    {/* Quick Engines Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                      {TIER_0_MODULES.slice(0, 8).map(mod => {
                         const Icon = mod.icon;
                         return (
                           <button
@@ -1221,16 +1259,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               setSelectedTier0Module(mod.id);
                               setActiveSubPage('tier_0');
                             }}
-                            className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 transition-all text-left cursor-pointer group"
+                            className="flex items-center gap-2 p-2 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 transition-all text-left cursor-pointer group"
                           >
-                            <div className="w-7 h-7 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                            <div className="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                               <Icon className="w-3.5 h-3.5" />
                             </div>
                             <div className="min-w-0">
-                              <div className="text-[12px] font-bold text-white truncate">
+                              <div className="text-[11px] font-bold text-white truncate">
                                 {mod.name}
                               </div>
-                              <div className="text-[9px] text-slate-400 font-mono truncate">
+                              <div className="text-[8px] text-slate-400 font-mono truncate uppercase">
                                 {mod.badge}
                               </div>
                             </div>
@@ -2585,6 +2623,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onLockTerminal={onLockTerminal}
                 onNavigate={onNavigate}
                 initialModule={selectedTier0Module}
+                currentTheme={currentTheme}
+                onSelectTheme={onSelectTheme}
                 onClose={() => setActiveSubPage('all')}
               />
             </div>
