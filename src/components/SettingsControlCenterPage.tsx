@@ -118,6 +118,7 @@ import { WorldClassManufacturingSection } from './WorldClassManufacturingSection
 import { Reports } from './Reports';
 import { CapacityCalculatorWorkspace } from './CapacityCalculatorWorkspace';
 import { ZipUpdateInjector } from './ZipUpdateInjector';
+import { UiUxComponentVisualizer } from './UiUxComponentVisualizer';
 
 export type SettingsPageSection =
   | 'control-center'
@@ -128,7 +129,8 @@ export type SettingsPageSection =
   | 'reports'
   | 'world'
   | 'preferences'
-  | 'tier_0';
+  | 'tier_0'
+  | 'components';
 
 type SettingsCategory =
   | 'all'
@@ -921,6 +923,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                 {activeSection === 'capacity' && 'Line Capacity & Pitch Calculator'}
                 {activeSection === 'reports' && 'Reports & Production Analytics Hub'}
                 {activeSection === 'tier_0' && 'Tier_0 Root Command Suite'}
+                {activeSection === 'components' && 'UI, UX & Font Component Visualizer'}
               </span>
             </div>
 
@@ -1062,6 +1065,40 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
             onTriggerManualBackup={onTriggerManualBackup}
             onLockTerminal={onLockTerminal}
             onNavigate={onNavigate}
+          />
+        )}
+
+        {activeSection === 'components' && (
+          <UiUxComponentVisualizer
+            currentTheme={currentTheme}
+            onSelectTheme={onSelectTheme}
+            fontFamily={fontFamily}
+            onSelectFontFamily={handleApplyFontFamily}
+            fontScale={fontScale}
+            onSelectFontScale={handleApplyFontScale}
+            brandAccent={brandAccent}
+            onSelectBrandAccent={handleApplyBrandAccent}
+            cardRadius={cardRadius}
+            onSelectCardRadius={handleApplyCardRadius}
+            surfaceStyle={surfaceStyle}
+            onSelectSurfaceStyle={handleApplySurfaceStyle}
+            clickPhysics={clickPhysics}
+            onSelectClickPhysics={handleApplyClickPhysics}
+            hapticFeedback={hapticFeedback}
+            onToggleHaptics={handleToggleHaptics}
+            tabularNumerals={tabularNumerals}
+            onToggleTabularNumerals={handleToggleTabularNumerals}
+            fontWeightMode={fontWeightMode}
+            onSelectFontWeightMode={handleApplyFontWeightMode}
+            scannerFocusRing={scannerFocusRing}
+            onToggleScannerFocus={handleToggleScannerFocus}
+            liveAlertPulses={liveAlertPulses}
+            onToggleLiveAlertPulses={handleToggleLivePulses}
+            density={currentDensity}
+            onSelectDensity={handleApplyDensity}
+            workspaceWidth={currentWorkspaceWidth}
+            onSelectWorkspaceWidth={handleApplyWorkspaceWidth}
+            onBackToOverview={() => handleSetSection('control-center')}
           />
         )}
       </div>
@@ -2109,11 +2146,55 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                     </p>
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleSetSection('components');
+                        triggerHaptic('selection');
+                      }}
+                      className="px-3 py-1 rounded-xl bg-[#176f78] hover:bg-[#135a62] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-97 cursor-pointer"
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                      <span>Visualize All Components (48)</span>
+                    </button>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#176f78]/10 text-[#176f78] dark:text-teal-300 border border-[#176f78]/25">
                       {fontFamily.toUpperCase()} • {fontScale}% SCALE
                     </span>
                   </div>
                 </div>
+              </div>
+
+              {/* HERO CARD: LAUNCH LIVE COMPONENT VISUALIZER */}
+              <div className="p-4 sm:p-5 rounded-2xl border-2 border-[#176f78]/30 dark:border-teal-500/30 bg-gradient-to-r from-[#176f78]/10 via-[#176f78]/5 to-transparent dark:from-teal-950/40 dark:via-teal-950/20 dark:to-transparent flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#176f78] text-white">
+                      Component Visualizer
+                    </span>
+                    <span className="text-xs font-bold text-[#176f78] dark:text-teal-300 font-mono">
+                      48 Live Interactive Components
+                    </span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-black text-[#17343a] dark:text-slate-100 flex items-center gap-2">
+                    <LayoutGrid className="w-4 h-4 text-[#176f78] dark:text-teal-400" />
+                    <span>Visualize All UI &amp; UX Components (Design System Laboratory)</span>
+                  </h3>
+                  <p className="text-xs text-[#527078] dark:text-slate-400 max-w-2xl leading-relaxed">
+                    Explore, test, and preview all atomic action buttons, live status sentinels, KPI telemetry cards, 5-font typography scales, barcode scanner focus rings, and tactile feedback in an interactive playground.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSetSection('components');
+                    triggerHaptic('selection');
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-[#176f78] hover:bg-[#135a62] text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all active:scale-97 cursor-pointer shrink-0"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>Launch Visualizer</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
 
               {/* 1. SEVEN INDUSTRIAL THEMES MATRIX */}
@@ -3478,6 +3559,13 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                     desc: '5 WCM pillars, TPM, SMED, Poka-Yoke, and zero-defect quality benchmarks.',
                     icon: Globe,
                     badge: 'WCM Audit'
+                  },
+                  {
+                    id: 'components' as SettingsPageSection,
+                    title: 'UI & UX Component Visualizer',
+                    desc: 'Interactive showcase of all 48 UI components, 5 typefaces, telemetry gauges, and design tokens.',
+                    icon: LayoutGrid,
+                    badge: '48 Components'
                   }
                 ].map(hub => {
                   const HubIcon = hub.icon;

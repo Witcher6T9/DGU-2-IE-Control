@@ -164,6 +164,7 @@ export default function App() {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab');
       if (tab === 'datas' || tab === 'data' || tab === 'linedata' || tab === 'lines') return 'settings';
+      if (tab === 'components' || tab === 'visualizer' || tab === 'uiux' || tab === 'ui-ux') return 'settings';
       if (tab) return tab;
     } catch {}
     return 'dashboard';
@@ -185,6 +186,7 @@ export default function App() {
       if (tab === 'datas' || tab === 'data' || tab === 'linedata' || tab === 'lines') return 'line-data';
       if (tab === 'checklist') return 'checklist';
       if (tab === 'lean-tools' || tab === 'lean') return 'lean-tools';
+      if (tab === 'components' || tab === 'visualizer' || tab === 'uiux' || tab === 'ui-ux') return 'components';
     } catch {}
     return 'control-center';
   });
@@ -2187,6 +2189,14 @@ export default function App() {
       return;
     }
 
+    // 5b. UI & UX Component Visualizer
+    if (tab === 'components' || tab === 'visualizer' || tab === 'uiux' || tab === 'ui-ux') {
+      setSettingsSection('components');
+      setCurrentTab('settings');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     // 6. Settings (Control Center & Preferences)
     if (
       tab === 'settings' ||
@@ -2345,7 +2355,7 @@ export default function App() {
           )}
 
           {/* Unified Settings Section (Hosting Datas Operations Hub, Check List Compliance Hub, Lean Tools, Reports & Analytics, World WCM, Control Center & Preferences) */}
-          {(currentTab === 'settings' || currentTab === 'datas' || currentTab === 'data' || currentTab === 'linedata' || currentTab === 'checklist' || currentTab === 'lean-tools' || currentTab === 'world' || currentTab === 'reports') && (
+          {(currentTab === 'settings' || currentTab === 'datas' || currentTab === 'data' || currentTab === 'linedata' || currentTab === 'checklist' || currentTab === 'lean-tools' || currentTab === 'world' || currentTab === 'reports' || currentTab === 'components' || currentTab === 'visualizer') && (
             <SettingsControlCenterPage
               profile={profile}
               onUpdateProfile={(updated) => setProfile(prev => ({ ...prev, ...updated }))}

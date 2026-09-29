@@ -672,6 +672,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           }
         ]
       : []),
+    {
+      id: 'util-uiux-visualizer',
+      title: 'UI & UX Component Visualizer & Font Studio',
+      subtitle: 'Visualize all 48 UI/UX components, 5 font families, 7 themes, and telemetry gauges',
+      category: 'Display & Interface',
+      icon: LayoutGrid,
+      color: 'bg-[#af52de]',
+      actionLabel: 'Launch',
+      badge: '48 Components',
+      onClick: () => {
+        onClose();
+        if (onNavigate) onNavigate('components');
+      }
+    },
     ...(isSysAdmin
       ? [
           {
