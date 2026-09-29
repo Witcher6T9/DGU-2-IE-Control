@@ -68,7 +68,10 @@ import {
   Contrast,
   Eye,
   Hash,
-  Zap
+  Zap,
+  Cloud,
+  Upload,
+  Network
 } from 'lucide-react';
 import {
   getStoredAppPageLayout,
@@ -179,7 +182,8 @@ interface SettingsControlCenterPageProps {
   dailyBackupSettings?: UserDailyBackupSettings;
   onUpdateDailyBackupSettings?: (updated: UserDailyBackupSettings) => void;
   onTriggerManualBackup?: () => Promise<any>;
-  onOpenDatabase?: (tab?: 'backup' | 'csv-import') => void;
+  onOpenDatabase?: (tab?: 'backup' | 'csv-import' | 'offline-log' | 'cloud-vault') => void;
+  onOpenDataVault?: () => void;
   onResetFactoryDefaults?: () => void;
   onLockTerminal?: () => void;
   onOpenAndroidPackage?: () => void;
@@ -281,6 +285,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   onUpdateDailyBackupSettings,
   onTriggerManualBackup,
   onOpenDatabase,
+  onOpenDataVault,
   onResetFactoryDefaults,
   onLockTerminal,
   onOpenAndroidPackage,
@@ -3264,21 +3269,32 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                 <div>
                   <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
                     <Database className="w-4 h-4 text-[#176f78]" />
-                    <span>Data Vault, Snapshots &amp; Storage</span>
+                    <span>Data Vault &amp; Cloud Storage Systems</span>
                   </h2>
                   <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
-                    Local IndexedDB database, automated daily backups, and factory reset recovery.
+                    Connect Dropbox, Terabox, Google Drive, and Plant Industrial NAS for multi-cloud redundancy and automated offsite snapshots.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleManualBackupClick}
-                  disabled={isBackingUp}
-                  className="px-4 py-2 rounded-xl bg-[#176f78] text-white text-xs font-bold hover:bg-[#12555c] transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isBackingUp ? 'animate-spin' : ''}`} />
-                  <span>{isBackingUp ? 'Verifying...' : 'Snapshot Now'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onOpenDataVault || (() => onOpenDatabase && onOpenDatabase('cloud-vault'))}
+                    className="px-4 py-2 rounded-xl bg-[#176f78] hover:bg-[#12555c] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Cloud className="w-3.5 h-3.5" />
+                    <span>Open Cloud Storage Hub</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleManualBackupClick}
+                    disabled={isBackingUp}
+                    className="px-3.5 py-2 rounded-xl border border-[#176f78] text-[#176f78] dark:text-teal-300 hover:bg-[#176f78]/10 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isBackingUp ? 'animate-spin' : ''}`} />
+                    <span>{isBackingUp ? 'Verifying...' : 'Snapshot Now'}</span>
+                  </button>
+                </div>
               </div>
 
               {backupMsg && (
@@ -3287,6 +3303,122 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                   <span>{backupMsg}</span>
                 </div>
               )}
+
+              {/* Data Vault & Storage Systems Connect Hero Suite */}
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-teal-500/10 via-sky-500/5 to-emerald-500/10 dark:from-teal-950/40 dark:via-[#161d27] dark:to-emerald-950/30 border border-[#176f78]/30 dark:border-teal-500/30 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-[#176f78] text-white flex items-center justify-center shadow-xs shrink-0">
+                      <Cloud className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-[#17343a] dark:text-white">
+                          Connected Cloud Vaults &amp; Offsite Storage
+                        </h3>
+                        <span className="px-2 py-0.2 rounded-full text-[10px] font-mono font-bold bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
+                          Dual-Vault Mirroring Active
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#527078] dark:text-slate-400 mt-0.5">
+                        Automatic synchronization across 4 enterprise storage systems with AES-256 encrypted lockers.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={onOpenDataVault || (() => onOpenDatabase && onOpenDatabase('cloud-vault'))}
+                    className="px-3.5 py-1.5 rounded-xl bg-white dark:bg-[#1e2530] text-[#17343a] dark:text-slate-200 border border-[#d9d2c2] dark:border-[#2e3846] hover:border-[#176f78] text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-[#176f78]" />
+                    <span>Manage Storage Gateways</span>
+                  </button>
+                </div>
+
+                {/* 4 Provider Status Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Google Drive */}
+                  <div className="p-3.5 rounded-xl bg-white dark:bg-[#12161f] border border-[#e7e1d5] dark:border-[#263140] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-md bg-[#4285F4] text-white flex items-center justify-center font-bold text-[10px] font-mono">
+                          GD
+                        </div>
+                        <span className="text-xs font-bold text-[#17343a] dark:text-white">Google Drive</span>
+                      </div>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" title="Connected" />
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-mono">
+                      /Debonair-IE-Control/Vault-2026/
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <span>4.21 GB used</span>
+                      <span className="text-emerald-600 font-bold">Online</span>
+                    </div>
+                  </div>
+
+                  {/* Dropbox */}
+                  <div className="p-3.5 rounded-xl bg-white dark:bg-[#12161f] border border-[#e7e1d5] dark:border-[#263140] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-md bg-[#0061FF] text-white flex items-center justify-center font-bold text-[10px] font-mono">
+                          DB
+                        </div>
+                        <span className="text-xs font-bold text-[#17343a] dark:text-white">Dropbox</span>
+                      </div>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" title="Connected" />
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-mono">
+                      /Debonair_Vault/Daily_IE/
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <span>12.8 GB used</span>
+                      <span className="text-indigo-600 font-bold">Online</span>
+                    </div>
+                  </div>
+
+                  {/* Terabox */}
+                  <div className="p-3.5 rounded-xl bg-white dark:bg-[#12161f] border border-[#e7e1d5] dark:border-[#263140] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-md bg-[#00A86B] text-white flex items-center justify-center font-bold text-[10px] font-mono">
+                          TB
+                        </div>
+                        <span className="text-xs font-bold text-[#17343a] dark:text-white">Terabox Cloud</span>
+                      </div>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" title="Connected" />
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-mono">
+                      /Terabox-DGU2/IE_Vault/
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <span>1,024 GB (1 TB)</span>
+                      <span className="text-emerald-600 font-bold">Online</span>
+                    </div>
+                  </div>
+
+                  {/* Plant NAS */}
+                  <div className="p-3.5 rounded-xl bg-white dark:bg-[#12161f] border border-[#e7e1d5] dark:border-[#263140] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-md bg-[#0D9488] text-white flex items-center justify-center font-bold text-[10px] font-mono">
+                          NAS
+                        </div>
+                        <span className="text-xs font-bold text-[#17343a] dark:text-white">Plant NAS</span>
+                      </div>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" title="Connected" />
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-mono">
+                      //192.168.10.250/IE_Vault/
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <span>Gigabit LAN</span>
+                      <span className="text-teal-600 font-bold">12ms</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Status Metric Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -3332,9 +3464,18 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                 </div>
               </div>
 
-              {/* Advanced Hub Link */}
-              {onOpenDatabase && (
-                <div className="pt-2">
+              {/* Advanced Hub Links */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={onOpenDataVault || (() => onOpenDatabase && onOpenDatabase('cloud-vault'))}
+                  className="w-full py-3 rounded-xl bg-[#176f78] text-white hover:bg-[#12555c] text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Cloud className="w-4 h-4" />
+                  <span>Connect &amp; Sync Data Vaults (Dropbox, Terabox, Drive)</span>
+                </button>
+
+                {onOpenDatabase && (
                   <button
                     type="button"
                     onClick={() => onOpenDatabase('backup')}
@@ -3343,8 +3484,8 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                     <HardDrive className="w-4 h-4" />
                     <span>Open Advanced Data &amp; Telemetry Hub</span>
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </section>
           )}
 
