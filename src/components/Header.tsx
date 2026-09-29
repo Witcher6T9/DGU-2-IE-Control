@@ -21,9 +21,13 @@ import {
   Building2,
   Sliders,
   Sun,
-  Moon
+  Moon,
+  Minimize2,
+  Maximize2,
+  ChevronDown,
+  SlidersHorizontal
 } from 'lucide-react';
-import { SaveStatus, UserProfile, LineEntry, FactoryIndustryProfile } from '../types';
+import { SaveStatus, UserProfile, LineEntry, FactoryIndustryProfile, WorkspaceWidthMode } from '../types';
 import { CustomDateSelector } from './CustomDateSelector';
 import { ProductionFloorDropdown } from './ProductionFloorSelector';
 import { isMasterAdminOrAdmin } from '../utils/rbac';
@@ -31,6 +35,13 @@ import { isMasterAdminOrAdmin } from '../utils/rbac';
 interface HeaderProps {
   theme: string;
   onToggleTheme: () => void;
+  density?: string;
+  onToggleDensity?: () => void;
+  onSelectDensity?: (density: 'compact' | 'comfortable' | 'spacious') => void;
+  workspaceWidth?: WorkspaceWidthMode;
+  onSelectWorkspaceWidth?: (width: WorkspaceWidthMode) => void;
+  smallAreaFeaturesEnabled?: boolean;
+  onToggleSmallAreaFeatures?: () => void;
   unreadCount: number;
   onOpenNotifications: () => void;
   onLogoClick?: () => void;
@@ -62,6 +73,13 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   theme,
   onToggleTheme,
+  density = 'comfortable',
+  onToggleDensity,
+  onSelectDensity,
+  workspaceWidth = 'maximized',
+  onSelectWorkspaceWidth,
+  smallAreaFeaturesEnabled = true,
+  onToggleSmallAreaFeatures,
   unreadCount,
   onOpenNotifications,
   onLogoClick,
@@ -87,13 +105,33 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings
 }) => {
   const isMasterAdmin = isMasterAdminOrAdmin(profile);
+  const [showDensityMenu, setShowDensityMenu] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowDensityMenu(false);
+      }
+    };
+    if (showDensityMenu) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [showDensityMenu]);
 
   return (
     <header
       id="app-top-header"
       className="sticky top-0 z-40 border-b border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6]/95 dark:bg-[#181d24]/95 backdrop-blur-md transition-colors cockpit-header"
     >
-      <div className="mx-auto max-w-[1500px] px-3 sm:px-6">
+      <div className={`transition-all ${
+        workspaceWidth === 'fluid'
+          ? 'w-full px-3 sm:px-6'
+          : workspaceWidth === 'maximized'
+          ? 'w-full max-w-[97vw] 2xl:max-w-[1850px] mx-auto px-3 sm:px-6'
+          : 'mx-auto max-w-[1500px] px-3 sm:px-6'
+      }`}>
         <div className="flex h-14 sm:h-16 items-center justify-between gap-1.5 sm:gap-4 w-full">
           {/* Logo & Brand */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -310,6 +348,197 @@ export const Header: React.FC<HeaderProps> = ({
                 <Upload className="w-4 h-4 shrink-0 text-emerald-700 group-hover:text-white" />
                 <span className="hidden md:inline font-display uppercase tracking-wide">Import Data</span>
               </button>
+            )}
+
+            {/* Compact Density & Small Area Mode Toggle Button with Workspace Area Menu */}
+            {(onToggleDensity || onSelectDensity) && (
+              <div className="relative" ref={menuRef}>
+                <div className="flex items-center">
+                  <button
+                    id="header-density-toggle-btn"
+                    type="button"
+                    onClick={onToggleDensity}
+                    title={
+                      density === 'compact'
+                        ? 'Compact Density Active (Small Area View) — Click to switch to Standard'
+                        : 'Switch to Compact Density Mode (Small Area View — Reduced Blank Space)'
+                    }
+                    aria-label="Toggle Density Mode"
+                    className={`relative h-10 sm:h-9 px-2 sm:px-2.5 rounded-l-xl border transition-all shadow-2xs cursor-pointer touch-manipulation active:scale-95 shrink-0 flex items-center gap-1.5 text-xs font-bold ${
+                      density === 'compact'
+                        ? 'border-[#176f78] bg-[#176f78]/15 text-[#176f78] dark:bg-teal-500/25 dark:text-teal-300 dark:border-teal-500/40 ring-1 ring-[#176f78]/30'
+                        : 'border-[#d9d2c2] dark:border-[#2e3846] bg-white dark:bg-[#1f2630] text-slate-700 dark:text-slate-300 hover:text-[#176f78] dark:hover:text-teal-300 hover:border-[#176f78]'
+                    }`}
+                  >
+                    <Minimize2 className="w-3.5 h-3.5 text-[#176f78] dark:text-teal-400" />
+                    <span className="hidden md:inline font-mono text-[11px]">
+                      {density === 'compact' ? 'Compact' : density === 'spacious' ? 'Spacious' : 'Standard'}
+                    </span>
+                    {density === 'compact' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" title="Small Area Mode Active" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDensityMenu(!showDensityMenu)}
+                    title="Density & Workspace Area Options (Fluid, Maximized, Small Area)"
+                    className={`h-10 sm:h-9 px-1.5 rounded-r-xl border border-l-0 transition-all shadow-2xs cursor-pointer touch-manipulation active:scale-95 flex items-center justify-center ${
+                      density === 'compact'
+                        ? 'border-[#176f78] bg-[#176f78]/20 text-[#176f78] dark:bg-teal-500/30 dark:text-teal-300 dark:border-teal-500/40'
+                        : 'border-[#d9d2c2] dark:border-[#2e3846] bg-white dark:bg-[#1f2630] text-slate-500 hover:text-[#176f78]'
+                    }`}
+                  >
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                </div>
+
+                {/* Density & Workspace Area Dropdown Menu */}
+                {showDensityMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-[#1c222b] rounded-2xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-xl p-3 z-50 space-y-3 animate-in fade-in zoom-in-95 duration-150">
+                    {/* Density Modes */}
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-[#527078] dark:text-slate-400 mb-1.5 flex items-center justify-between">
+                        <span>Density &amp; Spacing</span>
+                        <span className="text-emerald-700 dark:text-emerald-400 font-mono">System-Wide</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onSelectDensity) onSelectDensity('compact');
+                            setShowDensityMenu(false);
+                          }}
+                          className={`p-1.5 rounded-xl text-center border text-[11px] font-bold cursor-pointer transition-colors ${
+                            density === 'compact'
+                              ? 'border-[#176f78] bg-[#176f78]/15 text-[#176f78] dark:text-teal-300'
+                              : 'border-[#e7e1d5] dark:border-[#2e3846] hover:bg-[#faf8f4] dark:hover:bg-[#232a34] text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <div className="text-xs">Compact</div>
+                          <div className="text-[9px] text-slate-400 font-normal">Small Area</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onSelectDensity) onSelectDensity('comfortable');
+                            setShowDensityMenu(false);
+                          }}
+                          className={`p-1.5 rounded-xl text-center border text-[11px] font-bold cursor-pointer transition-colors ${
+                            density === 'comfortable'
+                              ? 'border-[#176f78] bg-[#176f78]/15 text-[#176f78] dark:text-teal-300'
+                              : 'border-[#e7e1d5] dark:border-[#2e3846] hover:bg-[#faf8f4] dark:hover:bg-[#232a34] text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <div className="text-xs">Standard</div>
+                          <div className="text-[9px] text-slate-400 font-normal">44px Target</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onSelectDensity) onSelectDensity('spacious');
+                            setShowDensityMenu(false);
+                          }}
+                          className={`p-1.5 rounded-xl text-center border text-[11px] font-bold cursor-pointer transition-colors ${
+                            density === 'spacious'
+                              ? 'border-[#176f78] bg-[#176f78]/15 text-[#176f78] dark:text-teal-300'
+                              : 'border-[#e7e1d5] dark:border-[#2e3846] hover:bg-[#faf8f4] dark:hover:bg-[#232a34] text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <div className="text-xs">Spacious</div>
+                          <div className="text-[9px] text-slate-400 font-normal">Wall TV</div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Blank Workspace Area Adjustment */}
+                    <div className="pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846]">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-[#527078] dark:text-slate-400 mb-1.5 flex items-center justify-between">
+                        <span>Workspace Blank Area</span>
+                        <span className="text-[#176f78] dark:text-teal-400 font-mono text-[9px]">Adjust Area</span>
+                      </div>
+                      <div className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onSelectWorkspaceWidth) onSelectWorkspaceWidth('fluid');
+                            setShowDensityMenu(false);
+                          }}
+                          className={`w-full p-1.5 px-2.5 rounded-xl border text-left text-xs font-semibold cursor-pointer transition-colors flex items-center justify-between ${
+                            workspaceWidth === 'fluid'
+                              ? 'border-[#176f78] bg-[#176f78]/10 text-[#176f78] dark:text-teal-300 font-bold'
+                              : 'border-[#e7e1d5] dark:border-[#2e3846] hover:bg-[#faf8f4] dark:hover:bg-[#232a34] text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <div>
+                            <div>Full Width Fluid</div>
+                            <div className="text-[10px] text-slate-400 font-normal">Zero blank margins (100% Edge-to-edge)</div>
+                          </div>
+                          {workspaceWidth === 'fluid' && <Check className="w-3.5 h-3.5 text-[#176f78] shrink-0" />}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onSelectWorkspaceWidth) onSelectWorkspaceWidth('maximized');
+                            setShowDensityMenu(false);
+                          }}
+                          className={`w-full p-1.5 px-2.5 rounded-xl border text-left text-xs font-semibold cursor-pointer transition-colors flex items-center justify-between ${
+                            workspaceWidth === 'maximized'
+                              ? 'border-[#176f78] bg-[#176f78]/10 text-[#176f78] dark:text-teal-300 font-bold'
+                              : 'border-[#e7e1d5] dark:border-[#2e3846] hover:bg-[#faf8f4] dark:hover:bg-[#232a34] text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <div>
+                            <div>Maximized (97% Wide)</div>
+                            <div className="text-[10px] text-slate-400 font-normal">Minimal gutters, optimal cockpit view</div>
+                          </div>
+                          {workspaceWidth === 'maximized' && <Check className="w-3.5 h-3.5 text-[#176f78] shrink-0" />}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onSelectWorkspaceWidth) onSelectWorkspaceWidth('standard');
+                            setShowDensityMenu(false);
+                          }}
+                          className={`w-full p-1.5 px-2.5 rounded-xl border text-left text-xs font-semibold cursor-pointer transition-colors flex items-center justify-between ${
+                            workspaceWidth === 'standard'
+                              ? 'border-[#176f78] bg-[#176f78]/10 text-[#176f78] dark:text-teal-300 font-bold'
+                              : 'border-[#e7e1d5] dark:border-[#2e3846] hover:bg-[#faf8f4] dark:hover:bg-[#232a34] text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <div>
+                            <div>Centered Standard</div>
+                            <div className="text-[10px] text-slate-400 font-normal">1500px boxed container</div>
+                          </div>
+                          {workspaceWidth === 'standard' && <Check className="w-3.5 h-3.5 text-[#176f78] shrink-0" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Small Area Features Toggle */}
+                    {onToggleSmallAreaFeatures && (
+                      <div className="pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] flex items-center justify-between">
+                        <div className="text-xs font-semibold text-[#17343a] dark:text-slate-200">
+                          Small Area Features
+                          <div className="text-[10px] text-[#527078] dark:text-slate-400 font-normal">Micro chips &amp; compact selectors</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={onToggleSmallAreaFeatures}
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold font-mono border transition-colors cursor-pointer ${
+                            smallAreaFeaturesEnabled
+                              ? 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-emerald-500/40'
+                              : 'bg-slate-100 text-slate-600 border-slate-300'
+                          }`}
+                        >
+                          {smallAreaFeaturesEnabled ? 'Active' : 'Off'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Theme Toggle Button (Daylight Cockpit / Night Shift Dark Studio) */}

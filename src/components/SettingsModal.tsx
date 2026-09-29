@@ -1514,7 +1514,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div>
                 <div className="px-3 mb-1.5 flex items-center justify-between">
                   <span className="text-[12px] font-bold text-[#6e6e73] dark:text-[#8e8e93] uppercase tracking-wider">
-                    About &amp; Mobile Architecture
+                    About &amp; Platform Information
                   </span>
                 </div>
 

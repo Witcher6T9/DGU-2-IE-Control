@@ -53,6 +53,8 @@ export const DEFAULT_APP_PAGE_LAYOUT: AppPageLayoutConfig = {
   brandColor: '#176f78',
   fontScalePct: 100,
   density: 'comfortable',
+  workspaceWidth: 'maximized',
+  smallAreaFeaturesEnabled: true,
   showAnnouncementTicker: true,
   tickerText: 'Debonair LTD Unit-02 • 34 Active Sewing Lines • Standard Shift Running',
   highContrastMode: false,
@@ -195,9 +197,28 @@ export function applyLayoutStyling(config: AppPageLayoutConfig): void {
     if (config.fontScalePct) {
       root.style.setProperty('--app-font-scale', `${config.fontScalePct}%`);
     }
-    if (config.density) {
-      root.setAttribute('data-layout-density', config.density);
+    const density = config.density || 'comfortable';
+    root.setAttribute('data-layout-density', density);
+    root.setAttribute('data-density', density);
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.setAttribute('data-layout-density', density);
+      document.body.setAttribute('data-density', density);
     }
+
+    // Workspace Width & Blank Space Mode Adjustment
+    const workspaceWidth = config.workspaceWidth || (density === 'compact' ? 'fluid' : 'maximized');
+    root.setAttribute('data-workspace-width', workspaceWidth);
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.setAttribute('data-workspace-width', workspaceWidth);
+    }
+
+    // Small Area Features Suite
+    const smallArea = config.smallAreaFeaturesEnabled !== false ? 'enabled' : 'disabled';
+    root.setAttribute('data-small-area', smallArea);
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.setAttribute('data-small-area', smallArea);
+    }
+
     if (config.highContrastMode) {
       root.classList.add('high-contrast-mode');
     } else {
@@ -206,6 +227,40 @@ export function applyLayoutStyling(config: AppPageLayoutConfig): void {
   } catch (e) {
     console.warn('Failed to apply layout styling:', e);
   }
+}
+
+export function setWorkspaceWidthMode(width: 'fluid' | 'maximized' | 'standard'): void {
+  const current = getStoredAppPageLayout();
+  const updated: AppPageLayoutConfig = {
+    ...current,
+    workspaceWidth: width,
+    lastUpdated: new Date().toISOString()
+  };
+  saveStoredAppPageLayout(updated);
+}
+
+export function toggleSmallAreaFeatures(): boolean {
+  const current = getStoredAppPageLayout();
+  const next = current.smallAreaFeaturesEnabled === false ? true : false;
+  const updated: AppPageLayoutConfig = {
+    ...current,
+    smallAreaFeaturesEnabled: next,
+    lastUpdated: new Date().toISOString()
+  };
+  saveStoredAppPageLayout(updated);
+  return next;
+}
+
+export function toggleDensityMode(): 'compact' | 'comfortable' {
+  const current = getStoredAppPageLayout();
+  const next = current.density === 'compact' ? 'comfortable' : 'compact';
+  const updated: AppPageLayoutConfig = {
+    ...current,
+    density: next,
+    lastUpdated: new Date().toISOString()
+  };
+  saveStoredAppPageLayout(updated);
+  return next;
 }
 
 export function resetToDefaultLayout(): AppPageLayoutConfig {

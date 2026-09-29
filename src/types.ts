@@ -57,6 +57,7 @@ export interface DashboardLayout {
 export type NavBarStyle = 'bottom-cupertino' | 'floating-dock' | 'top-header' | 'kiosk-minimal';
 export type FloorGridColumns = 1 | 2 | 3 | 4;
 export type LayoutDensity = 'compact' | 'comfortable' | 'spacious';
+export type WorkspaceWidthMode = 'fluid' | 'maximized' | 'standard';
 export type LayoutPresetId =
   | 'debonair-floor-default'
   | 'executive-attainment'
@@ -106,6 +107,8 @@ export interface AppPageLayoutConfig {
   brandColor: string; // hex color e.g. '#176f78'
   fontScalePct: number; // 90, 100, 115
   density: LayoutDensity;
+  workspaceWidth?: WorkspaceWidthMode; // Adjust blank workspace area on pages: 'fluid' (100% full-bleed), 'maximized' (97% wide), 'standard' (1500px boxed)
+  smallAreaFeaturesEnabled?: boolean; // System-wide small area micro-footprint, collapsible strips, and condensed chips
   showAnnouncementTicker: boolean;
   tickerText?: string;
   highContrastMode: boolean;

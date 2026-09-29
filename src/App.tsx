@@ -31,7 +31,8 @@ import {
   FactoryIndustryProfile,
   UserDailyBackupSettings,
   DailyBackupRecord,
-  AppPageLayoutConfig
+  AppPageLayoutConfig,
+  WorkspaceWidthMode
 } from './types';
 import {
   DEFAULT_DAILY_BACKUP_SETTINGS,
@@ -40,7 +41,7 @@ import {
   pruneOldBackups,
   AppBackupState
 } from './utils/indexedDbBackup';
-import { getStoredAppPageLayout, applyLayoutStyling } from './utils/layoutManager';
+import { getStoredAppPageLayout, saveStoredAppPageLayout, applyLayoutStyling } from './utils/layoutManager';
 import { SystemUpdateReceiver } from './components/SystemUpdateReceiver';
 import {
   getStoredActiveFactory,
@@ -370,6 +371,53 @@ export default function App() {
     window.addEventListener('debonair:layout_changed', handler);
     return () => window.removeEventListener('debonair:layout_changed', handler);
   }, []);
+
+  const handleToggleDensity = () => {
+    const currentDensity = appPageLayout.density || 'comfortable';
+    const nextDensity: 'compact' | 'comfortable' = currentDensity === 'compact' ? 'comfortable' : 'compact';
+    const updated: AppPageLayoutConfig = {
+      ...appPageLayout,
+      density: nextDensity,
+      lastUpdated: new Date().toISOString()
+    };
+    setAppPageLayout(updated);
+    saveStoredAppPageLayout(updated);
+    applyLayoutStyling(updated);
+  };
+
+  const handleSelectDensity = (newDensity: 'compact' | 'comfortable' | 'spacious') => {
+    const updated: AppPageLayoutConfig = {
+      ...appPageLayout,
+      density: newDensity,
+      lastUpdated: new Date().toISOString()
+    };
+    setAppPageLayout(updated);
+    saveStoredAppPageLayout(updated);
+    applyLayoutStyling(updated);
+  };
+
+  const handleSelectWorkspaceWidth = (newWidth: WorkspaceWidthMode) => {
+    const updated: AppPageLayoutConfig = {
+      ...appPageLayout,
+      workspaceWidth: newWidth,
+      lastUpdated: new Date().toISOString()
+    };
+    setAppPageLayout(updated);
+    saveStoredAppPageLayout(updated);
+    applyLayoutStyling(updated);
+  };
+
+  const handleToggleSmallAreaFeatures = () => {
+    const next = appPageLayout.smallAreaFeaturesEnabled === false ? true : false;
+    const updated: AppPageLayoutConfig = {
+      ...appPageLayout,
+      smallAreaFeaturesEnabled: next,
+      lastUpdated: new Date().toISOString()
+    };
+    setAppPageLayout(updated);
+    saveStoredAppPageLayout(updated);
+    applyLayoutStyling(updated);
+  };
 
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
 
@@ -2202,6 +2250,13 @@ export default function App() {
         <Header
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        density={appPageLayout.density}
+        onToggleDensity={handleToggleDensity}
+        onSelectDensity={handleSelectDensity}
+        workspaceWidth={appPageLayout.workspaceWidth || 'maximized'}
+        onSelectWorkspaceWidth={handleSelectWorkspaceWidth}
+        smallAreaFeaturesEnabled={appPageLayout.smallAreaFeaturesEnabled !== false}
+        onToggleSmallAreaFeatures={handleToggleSmallAreaFeatures}
         unreadCount={unreadNotificationsCount}
         onOpenNotifications={() => setIsNotificationsOpen(true)}
         onLogoClick={() => handleNavigate('dashboard')}
@@ -2233,8 +2288,21 @@ export default function App() {
         }}
       />
 
-      {/* Main Content Area: Responsive padding with safe-area spacing for mobile bottom navigation */}
-      <main className="flex-1 max-w-[1500px] w-full mx-auto px-2.5 sm:px-6 py-4 sm:py-7 pb-24 md:pb-8">
+      {/* Main Content Area: Responsive padding with safe-area spacing and compact density footprint */}
+      <main
+        id="app-workspace-main"
+        className={`flex-1 w-full mx-auto transition-all ${
+          (appPageLayout.workspaceWidth === 'fluid' || (appPageLayout.density === 'compact' && appPageLayout.workspaceWidth !== 'standard'))
+            ? 'max-w-none px-2 sm:px-4 lg:px-6'
+            : appPageLayout.workspaceWidth === 'maximized'
+            ? 'max-w-[97vw] 2xl:max-w-[1850px] px-2 sm:px-4 lg:px-5'
+            : 'max-w-[1500px] px-2.5 sm:px-5'
+        } ${
+          appPageLayout.density === 'compact'
+            ? 'py-1.5 sm:py-2.5 pb-18 md:pb-4'
+            : 'py-3 sm:py-4.5 pb-22 md:pb-8'
+        }`}
+      >
         <Suspense fallback={<TabLoadingSkeleton />}>
           {/* Page 1: Home */}
           {currentTab === 'dashboard' && (
@@ -2278,6 +2346,12 @@ export default function App() {
               onUpdateProfile={(updated) => setProfile(prev => ({ ...prev, ...updated }))}
               currentTheme={theme}
               onSelectTheme={setTheme}
+              density={appPageLayout.density}
+              onSelectDensity={handleSelectDensity}
+              workspaceWidth={appPageLayout.workspaceWidth || 'maximized'}
+              onSelectWorkspaceWidth={handleSelectWorkspaceWidth}
+              smallAreaFeaturesEnabled={appPageLayout.smallAreaFeaturesEnabled !== false}
+              onToggleSmallAreaFeatures={handleToggleSmallAreaFeatures}
               layout={layout}
               onUpdateLayout={setLayout}
               auditoryAlertsEnabled={auditoryAlertsEnabled}
@@ -2356,8 +2430,14 @@ export default function App() {
       </main>
 
       {/* Industrial Engineering Footer */}
-      <footer className="mt-auto border-t border-[#d9d2c2] bg-[#fbfaf6] py-4 pb-20 md:pb-18 text-xs text-[#527078] cockpit-footer">
-        <div className="max-w-[1500px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+      <footer className="mt-auto border-t border-[#d9d2c2] bg-[#fbfaf6] py-3.5 pb-20 md:pb-16 text-xs text-[#527078] cockpit-footer">
+        <div className={`mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left ${
+          appPageLayout.workspaceWidth === 'fluid'
+            ? 'w-full max-w-none'
+            : appPageLayout.workspaceWidth === 'maximized'
+            ? 'w-full max-w-[97vw] 2xl:max-w-[1850px]'
+            : 'max-w-[1500px]'
+        }`}>
           <div className="flex items-center gap-2">
             <span className="font-bold text-[#17343a]">IE Daily Control</span>
             <span>•</span>

@@ -42,10 +42,7 @@ import {
   AlertCircle,
   ExternalLink,
   Laptop,
-  Layout,
   LayoutGrid,
-  Monitor,
-  Tablet,
   Radio,
   Tv,
   Sliders,
@@ -59,8 +56,16 @@ import {
   DownloadCloud,
   Palette,
   Shield,
-  Award
+  Award,
+  Minimize2,
+  SlidersHorizontal,
+  Maximize2
 } from 'lucide-react';
+import {
+  getStoredAppPageLayout,
+  saveStoredAppPageLayout,
+  applyLayoutStyling
+} from '../utils/layoutManager';
 import { TIER_0_MODULES } from './tier0/Tier0CommandHub';
 import {
   UserProfile,
@@ -76,17 +81,8 @@ import {
   ScheduleItem,
   LeanActionItem,
   AppPageLayoutConfig,
-  LayoutPresetId,
-  NavBarStyle,
-  FloorGridColumns
+  WorkspaceWidthMode
 } from '../types';
-import {
-  getStoredAppPageLayout,
-  saveStoredAppPageLayout,
-  applyLayoutStyling,
-  DEFAULT_APP_PAGE_LAYOUT,
-  BUILT_IN_LAYOUT_PRESETS
-} from '../utils/layoutManager';
 import {
   StationData,
   HourlyOutput,
@@ -120,7 +116,6 @@ export type SettingsPageSection =
 
 type SettingsCategory =
   | 'all'
-  | 'architecture'
   | 'factory'
   | 'display'
   | 'alerts'
@@ -233,6 +228,14 @@ interface SettingsControlCenterPageProps {
 
   // Auto-Refresh Engine
   onOpenAutoRefreshCustomizer?: () => void;
+
+  // Global Density & Small Area Modes
+  density?: 'compact' | 'comfortable' | 'spacious';
+  onSelectDensity?: (density: 'compact' | 'comfortable' | 'spacious') => void;
+  workspaceWidth?: WorkspaceWidthMode;
+  onSelectWorkspaceWidth?: (width: WorkspaceWidthMode) => void;
+  smallAreaFeaturesEnabled?: boolean;
+  onToggleSmallAreaFeatures?: () => void;
 }
 
 export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps> = ({
@@ -240,6 +243,12 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   onUpdateProfile,
   currentTheme,
   onSelectTheme,
+  density: propDensity,
+  onSelectDensity,
+  workspaceWidth: propWorkspaceWidth,
+  onSelectWorkspaceWidth,
+  smallAreaFeaturesEnabled: propSmallAreaEnabled,
+  onToggleSmallAreaFeatures,
   layout,
   onUpdateLayout,
   auditoryAlertsEnabled = true,
@@ -336,38 +345,6 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
     }
   }, [controlledSection]);
 
-  // Alive Layout Architecture State
-  const [appLayout, setAppLayout] = useState<AppPageLayoutConfig>(() => getStoredAppPageLayout());
-  const [layoutNotice, setLayoutNotice] = useState<string | null>(null);
-  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('tablet');
-
-  // Synchronize layout if updated externally
-  useEffect(() => {
-    const handler = (e: any) => {
-      if (e.detail) {
-        setAppLayout(e.detail);
-      }
-    };
-    window.addEventListener('debonair:layout_changed', handler);
-    return () => window.removeEventListener('debonair:layout_changed', handler);
-  }, []);
-
-  const handleApplyLayoutConfig = (newConfig: AppPageLayoutConfig, feedbackMessage?: string) => {
-    setAppLayout(newConfig);
-    saveStoredAppPageLayout(newConfig);
-    applyLayoutStyling(newConfig);
-    setLayoutNotice(feedbackMessage || `Applied ${newConfig.presetName || 'custom architecture'} live!`);
-    setTimeout(() => setLayoutNotice(null), 3500);
-  };
-
-  const handleRestoreDefaultArchitecture = () => {
-    const defaultConfig: AppPageLayoutConfig = {
-      ...DEFAULT_APP_PAGE_LAYOUT,
-      lastUpdated: new Date().toISOString()
-    };
-    handleApplyLayoutConfig(defaultConfig, 'Default Architecture "Debonair RMG Floor Standard" Restored!');
-  };
-
   // Search filter query across all settings & modules
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -376,6 +353,97 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
     if (activeSection === 'preferences') return 'display';
     return 'all';
   });
+
+  // Global Compact Density & Small Area Mode state
+  const [currentDensity, setCurrentDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
+    if (propDensity) return propDensity;
+    try {
+      const cfg = getStoredAppPageLayout();
+      return cfg.density || 'comfortable';
+    } catch {
+      return 'comfortable';
+    }
+  });
+
+  useEffect(() => {
+    if (propDensity) setCurrentDensity(propDensity);
+  }, [propDensity]);
+
+  const handleApplyDensity = (newDensity: 'compact' | 'comfortable' | 'spacious') => {
+    setCurrentDensity(newDensity);
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = {
+        ...cfg,
+        density: newDensity,
+        lastUpdated: new Date().toISOString()
+      };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+    if (onSelectDensity) onSelectDensity(newDensity);
+  };
+
+  // Workspace Width (Adjust blank workspace area on the pages)
+  const [currentWorkspaceWidth, setCurrentWorkspaceWidth] = useState<WorkspaceWidthMode>(() => {
+    if (propWorkspaceWidth) return propWorkspaceWidth;
+    try {
+      const cfg = getStoredAppPageLayout();
+      return cfg.workspaceWidth || (cfg.density === 'compact' ? 'fluid' : 'maximized');
+    } catch {
+      return 'maximized';
+    }
+  });
+
+  useEffect(() => {
+    if (propWorkspaceWidth) setCurrentWorkspaceWidth(propWorkspaceWidth);
+  }, [propWorkspaceWidth]);
+
+  const handleApplyWorkspaceWidth = (newWidth: WorkspaceWidthMode) => {
+    setCurrentWorkspaceWidth(newWidth);
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = {
+        ...cfg,
+        workspaceWidth: newWidth,
+        lastUpdated: new Date().toISOString()
+      };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+    if (onSelectWorkspaceWidth) onSelectWorkspaceWidth(newWidth);
+  };
+
+  // Small Area Features Suite
+  const [currentSmallArea, setCurrentSmallArea] = useState<boolean>(() => {
+    if (typeof propSmallAreaEnabled === 'boolean') return propSmallAreaEnabled;
+    try {
+      const cfg = getStoredAppPageLayout();
+      return cfg.smallAreaFeaturesEnabled !== false;
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    if (typeof propSmallAreaEnabled === 'boolean') setCurrentSmallArea(propSmallAreaEnabled);
+  }, [propSmallAreaEnabled]);
+
+  const handleToggleSmallArea = () => {
+    const next = !currentSmallArea;
+    setCurrentSmallArea(next);
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = {
+        ...cfg,
+        smallAreaFeaturesEnabled: next,
+        lastUpdated: new Date().toISOString()
+      };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+    if (onToggleSmallAreaFeatures) onToggleSmallAreaFeatures();
+  };
 
   useEffect(() => {
     if (activeSection === 'preferences') {
@@ -483,14 +551,6 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
       badge: 'Hub'
     },
     {
-      id: 'architecture' as SettingsCategory,
-      label: 'Architecture & Alive Design',
-      description: 'Default architecture, layout presets & ergonomics',
-      icon: Layout,
-      color: 'bg-[#5856d6]',
-      badge: appLayout.presetId === 'debonair-floor-default' ? 'Default' : 'Preset'
-    },
-    {
       id: 'factory' as SettingsCategory,
       label: 'Plant Identity & Floors',
       description: 'Enterprise name, operating floors, shift lines',
@@ -501,10 +561,10 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
     {
       id: 'display' as SettingsCategory,
       label: 'Display & Ergonomics',
-      description: 'Daylight Cockpit vs Dark Studio themes',
+      description: 'Daylight Cockpit vs Dark Studio, Compact Density & Small Area modes',
       icon: Sun,
       color: 'bg-[#af52de]',
-      badge: currentTheme === 'dark' ? 'Night Shift' : 'Light'
+      badge: currentDensity === 'compact' ? 'Compact' : currentTheme === 'dark' ? 'Night Shift' : 'Light'
     },
     {
       id: 'alerts' as SettingsCategory,
@@ -532,11 +592,11 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
     },
     {
       id: 'android' as SettingsCategory,
-      label: 'Mobile & PWA App',
-      description: 'Offline service worker and APK package',
-      icon: Smartphone,
+      label: 'System Updates',
+      description: 'Platform version, OTA hotfixes, & PWA offline cache',
+      icon: DownloadCloud,
       color: 'bg-[#ff9500]',
-      badge: 'PWA Ready'
+      badge: 'Up to Date'
     },
     {
       id: 'hubs' as SettingsCategory,
@@ -784,18 +844,10 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
         </div>
       </header>
 
-      {/* 2. Main Settings Workspace (Full-Width Card-Style System) */}
-      <div className="w-full max-w-5xl mx-auto">
+      {/* 2. Main Settings Workspace (Full-Width Card-Style System without blank workspace voids) */}
+      <div className="w-full max-w-[1500px] mx-auto">
         {/* Settings Content Area */}
-        <main className="w-full bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-2xs">
-          {/* Layout Change Feedback Notification */}
-          {layoutNotice && (
-            <div className="mb-5 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold text-emerald-900 dark:text-emerald-200 flex items-center gap-2.5 animate-fadeIn">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span>{layoutNotice}</span>
-            </div>
-          )}
-
+        <main className="w-full bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl sm:rounded-3xl p-4 sm:p-5.5 shadow-2xs">
           {/* Backup Msg Banner */}
           {backupMsg && (
             <div className="mb-5 p-3.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-xs font-semibold text-teal-900 dark:text-teal-200 flex items-center gap-2.5 animate-fadeIn">
@@ -828,7 +880,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                   { id: 'capacity-calc', title: 'Line Capacity & Pitch Calculator', subtitle: 'Takt time balancing, pitch time, and SAM allocation', icon: Calculator, color: 'bg-[#10b981]', action: () => handleSetSection('capacity'), badge: 'IE Engine' },
                   { id: 'reports-hub', title: 'Shift End Summary & Analytics Reports', subtitle: 'Compile final WIP status, total achieved output, and bottleneck stage names', icon: FileSpreadsheet, color: 'bg-[#007aff]', action: () => handleSetSection('reports'), badge: 'PDF Ready' },
                   { id: 'db-backup', title: 'IndexedDB Vault Snapshot', subtitle: 'Local indexed storage backup and data restore', icon: Database, color: 'bg-[#34c759]', action: handleManualBackupClick, badge: 'IndexedDB' },
-                  { id: 'pwa-android', title: 'Mobile PWA App & Android APK', subtitle: 'Offline service worker and standalone installation package', icon: Smartphone, color: 'bg-[#ff9500]', action: () => setActiveCategory('android'), badge: 'PWA' }
+                  { id: 'pwa-android', title: 'System Updates & PWA Offline', subtitle: 'OTA hotfixes, service worker precache, and installation package', icon: DownloadCloud, color: 'bg-[#ff9500]', action: () => setActiveCategory('android'), badge: 'Up to Date' }
                 ].filter(a => a.title.toLowerCase().includes(query) || a.subtitle.toLowerCase().includes(query));
 
                 const totalMatches = matchedCategories.length + quickActions.length;
@@ -1174,41 +1226,15 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
               {/* 4. GROUPED CARD SECTIONS (Flutter / Jetpack Compose / React Native Card System) */}
               <div className="space-y-5">
                 
-                {/* Section 1: Architecture & Design */}
+                {/* Section 1: Display & Ergonomics */}
                 <div>
                   <div className="px-1 mb-2 flex items-center justify-between">
                     <span className="text-xs font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider font-mono">
-                      System Architecture &amp; Ergonomics
+                      Display &amp; Ergonomics
                     </span>
                   </div>
                   <div className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
-                    {/* Row 1: Alive Design Studio */}
-                    <div
-                      onClick={() => setActiveCategory('architecture')}
-                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <SquircleIcon bgColor="bg-[#5856d6]">
-                          <Layout className="w-4 h-4 text-white" />
-                        </SquircleIcon>
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
-                            Architecture &amp; &ldquo;Alive Design&rdquo; Studio
-                          </div>
-                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
-                            Factory topology, responsive layout presets &amp; live ergonomics
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-[#5856d6]/10 text-[#5856d6] dark:text-indigo-300 border border-[#5856d6]/20">
-                          {appLayout.presetName || 'Default Preset'}
-                        </span>
-                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
-                      </div>
-                    </div>
-
-                    {/* Row 2: Display & Appearance */}
+                    {/* Display & Appearance */}
                     <div
                       onClick={() => setActiveCategory('display')}
                       className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
@@ -1228,7 +1254,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                       </div>
                       <div className="flex items-center gap-2.5 shrink-0">
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-[#af52de]/10 text-[#af52de] dark:text-purple-300 border border-[#af52de]/20">
-                          {currentTheme === 'dark' ? 'Night Shift' : 'Warm Cream'}
+                          {currentTheme === 'dark' ? 'Night Shift' : 'Warm Cream'} · {currentDensity === 'compact' ? 'Compact' : 'Standard'}
                         </span>
                         <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
                       </div>
@@ -1462,35 +1488,35 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                   </div>
                 </div>
 
-                {/* Section 6: Mobile & Frontline Workspaces */}
+                {/* Section 6: System Updates & Workspaces */}
                 <div>
                   <div className="px-1 mb-2 flex items-center justify-between">
                     <span className="text-xs font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider font-mono">
-                      Mobile &amp; Operational Workspaces
+                      System Updates &amp; Workspaces
                     </span>
                   </div>
                   <div className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
-                    {/* Row 1: Mobile App & PWA */}
+                    {/* Row 1: System Updates */}
                     <div
                       onClick={() => setActiveCategory('android')}
                       className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
                     >
                       <div className="flex items-center gap-3.5 min-w-0">
                         <SquircleIcon bgColor="bg-[#ff9500]">
-                          <Smartphone className="w-4 h-4 text-white" />
+                          <DownloadCloud className="w-4 h-4 text-white" />
                         </SquircleIcon>
                         <div className="min-w-0">
                           <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
-                            Mobile PWA App &amp; Android Deployment
+                            System Updates
                           </div>
                           <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
-                            Offline service worker cache, manifest, &amp; APK package identifier
+                            Offline service worker cache, OTA updates, &amp; APK package
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2.5 shrink-0">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">
-                          PWA Ready
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                          Up to Date
                         </span>
                         <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
                       </div>
@@ -1549,547 +1575,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
             </div>
           )}
 
-          {/* ========================================================
-              CATEGORY 0: ARCHITECTURE & ALIVE DESIGN
-          ======================================================== */}
-          {activeCategory === 'architecture' && (
-            <section className="space-y-6">
-              {/* Header Zone */}
-              <div className="border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
-                      <Layout className="w-4 h-4 text-[#176f78]" />
-                      <span>Default Architecture &amp; &ldquo;Alive Design&rdquo; Studio</span>
-                    </h2>
-                    <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
-                      Configure factory layout topology, responsive navigation geometry, and real-time floor ergonomics for Debonair Unit-02.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] text-[#527078] dark:text-slate-400 font-mono shrink-0">
-                    <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-bold">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Alive Engine Active
-                    </span>
-                  </div>
-                </div>
 
-                {/* Clean Unboxed Metadata (Zero-Pill Discipline) */}
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#527078] dark:text-slate-400 font-mono mt-3">
-                  <span className="font-semibold text-[#17343a] dark:text-slate-200">
-                    {appLayout.presetName || 'Debonair RMG Floor Standard'}
-                  </span>
-                  <span aria-hidden="true">·</span>
-                  <span>Nav: {appLayout.navBarStyle}</span>
-                  <span aria-hidden="true">·</span>
-                  <span>Grid: {appLayout.floorGridColumns} Cols</span>
-                  <span aria-hidden="true">·</span>
-                  <span>Density: {appLayout.density}</span>
-                  <span aria-hidden="true">·</span>
-                  <span>Font: {appLayout.fontScalePct}%</span>
-                </div>
-              </div>
-
-              {/* 1. Official Default Architecture Spotlight */}
-              <div className="p-5 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] relative overflow-hidden">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="space-y-1.5 max-w-xl">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#176f78] dark:text-teal-400">
-                        Factory Baseline Architecture
-                      </span>
-                      {appLayout.presetId === 'debonair-floor-default' && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                          <Check className="w-3 h-3" /> Default Active
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="text-sm sm:text-base font-bold text-[#17343a] dark:text-slate-100">
-                      Debonair RMG Floor Standard (Unit-02)
-                    </h3>
-                    <p className="text-xs text-[#527078] dark:text-slate-400 leading-relaxed">
-                      The certified industrial baseline configured for Debonair Unit-02: 2-column card view, Cupertino navigation dock, balanced 34-line telemetry, comfortable ergonomic spacing, and high-legibility tabular figures.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleRestoreDefaultArchitecture}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#176f78] hover:bg-[#135c64] text-white text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 self-start md:self-center"
-                    title="Reset all viewport geometry, navigation dock, and density settings to factory standard"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Restore Default Architecture</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. Alive Presets Gallery */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#17343a] dark:text-slate-200">
-                    Architectural Layout Presets
-                  </h3>
-                  <span className="text-[11px] text-[#527078] dark:text-slate-400">
-                    Click any preset to apply live across the plant
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {BUILT_IN_LAYOUT_PRESETS.map(preset => {
-                    const isActive = appLayout.presetId === preset.id;
-                    const isDefault = preset.id === 'debonair-floor-default';
-                    return (
-                      <div
-                        key={preset.id}
-                        onClick={() =>
-                          handleApplyLayoutConfig(
-                            {
-                              ...appLayout,
-                              ...preset.config,
-                              presetId: preset.id,
-                              presetName: preset.name,
-                              lastUpdated: new Date().toISOString()
-                            } as AppPageLayoutConfig,
-                            `Applied "${preset.name}" architecture live!`
-                          )
-                        }
-                        className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between relative group ${
-                          isActive
-                            ? 'border-[#176f78] bg-white dark:bg-[#1c222b] shadow-xs ring-2 ring-[#176f78]/25'
-                            : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white dark:hover:bg-[#1f2732]'
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <div className="font-bold text-xs text-[#17343a] dark:text-slate-100 flex items-center gap-1.5">
-                              <span>{preset.name}</span>
-                              {isDefault && (
-                                <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-[#176f78]/10 text-[#176f78] dark:text-teal-300">
-                                  Default
-                                </span>
-                              )}
-                            </div>
-                            {isActive && (
-                              <CheckCircle2 className="w-4 h-4 text-[#176f78] shrink-0" />
-                            )}
-                          </div>
-                          <p className="text-[11px] text-[#527078] dark:text-slate-400 line-clamp-2 leading-relaxed">
-                            {preset.desc}
-                          </p>
-                        </div>
-
-                        {/* Quiet unboxed metadata */}
-                        <div className="mt-3 pt-2.5 border-t border-[#e7e1d5] dark:border-[#2e3846] flex items-center justify-between text-[10px] font-mono text-[#527078] dark:text-slate-400">
-                          <span>{preset.config.floorGridColumns || 2} Cols</span>
-                          <span aria-hidden="true">·</span>
-                          <span>{preset.config.navBarStyle || 'cupertino'}</span>
-                          <span aria-hidden="true">·</span>
-                          <span>{preset.config.floorCardStyle === 'row' ? 'Rows' : 'Cards'}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 3. Alive Ergonomics & Custom Viewport Controls */}
-              <div className="space-y-4 pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846]">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#17343a] dark:text-slate-200">
-                  Ergonomics &amp; Viewport Geometry
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Navigation Architecture */}
-                  <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] space-y-2">
-                    <label className="block text-xs font-bold text-[#17343a] dark:text-slate-200">
-                      Navigation Architecture
-                    </label>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {[
-                        { id: 'bottom-cupertino' as NavBarStyle, label: 'Cupertino Dock', sub: 'Bottom standard' },
-                        { id: 'floating-dock' as NavBarStyle, label: 'Floating Dock', sub: 'Tablet pill' },
-                        { id: 'top-header' as NavBarStyle, label: 'Top Header', sub: 'Overhead TVs' },
-                        { id: 'kiosk-minimal' as NavBarStyle, label: 'Kiosk Minimal', sub: 'Floor terminal' }
-                      ].map(item => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() =>
-                            handleApplyLayoutConfig({
-                              ...appLayout,
-                              navBarStyle: item.id,
-                              presetId: 'custom',
-                              presetName: 'Custom Architecture'
-                            })
-                          }
-                          className={`p-2 rounded-lg text-left transition-all border cursor-pointer ${
-                            appLayout.navBarStyle === item.id
-                              ? 'bg-white dark:bg-[#252e3a] border-[#176f78] shadow-2xs text-[#17343a] dark:text-white ring-1 ring-[#176f78]'
-                              : 'bg-transparent border-transparent hover:bg-white/60 dark:hover:bg-[#202732] text-[#527078] dark:text-slate-400'
-                          }`}
-                        >
-                          <div className="text-xs font-bold">{item.label}</div>
-                          <div className="text-[10px] text-[#527078] dark:text-slate-400">{item.sub}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Shop Floor Grid Columns */}
-                  <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] space-y-2">
-                    <label className="block text-xs font-bold text-[#17343a] dark:text-slate-200">
-                      Shop Floor Grid Geometry
-                    </label>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {([1, 2, 3, 4] as FloorGridColumns[]).map(cols => (
-                        <button
-                          key={cols}
-                          type="button"
-                          onClick={() =>
-                            handleApplyLayoutConfig({
-                              ...appLayout,
-                              floorGridColumns: cols,
-                              presetId: 'custom',
-                              presetName: 'Custom Architecture'
-                            })
-                          }
-                          className={`py-2 px-1 text-center rounded-lg border transition-all cursor-pointer ${
-                            appLayout.floorGridColumns === cols
-                              ? 'bg-[#176f78] border-[#176f78] text-white shadow-2xs font-bold'
-                              : 'bg-white dark:bg-[#252e3a] border-[#d9d2c2] dark:border-[#2e3846] text-[#17343a] dark:text-slate-300 hover:bg-[#f1eee6]'
-                          }`}
-                        >
-                          <div className="text-xs">{cols} Col{cols > 1 ? 's' : ''}</div>
-                          <div className="text-[9px] opacity-80 font-mono">
-                            {cols === 1 ? 'Focus' : cols === 2 ? 'Default' : cols === 3 ? 'Dense' : 'Wide'}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Floor Card Representation Style */}
-                  <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] space-y-2">
-                    <label className="block text-xs font-bold text-[#17343a] dark:text-slate-200">
-                      Floor Card Presentation
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleApplyLayoutConfig({
-                            ...appLayout,
-                            floorCardStyle: 'card',
-                            presetId: 'custom',
-                            presetName: 'Custom Architecture'
-                          })
-                        }
-                        className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
-                          appLayout.floorCardStyle === 'card'
-                            ? 'bg-white dark:bg-[#252e3a] border-[#176f78] text-[#17343a] dark:text-white ring-1 ring-[#176f78]'
-                            : 'bg-transparent border-transparent hover:bg-white/60 dark:hover:bg-[#202732] text-[#527078] dark:text-slate-400'
-                        }`}
-                      >
-                        <div className="text-xs font-bold flex items-center gap-1.5">
-                          <Grid className="w-3.5 h-3.5" /> Visual Cards (Default)
-                        </div>
-                        <div className="text-[10px] text-[#527078] dark:text-slate-400 mt-0.5">
-                          Tactile gauges, sparklines &amp; DHU meters
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleApplyLayoutConfig({
-                            ...appLayout,
-                            floorCardStyle: 'row',
-                            presetId: 'custom',
-                            presetName: 'Custom Architecture'
-                          })
-                        }
-                        className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
-                          appLayout.floorCardStyle === 'row'
-                            ? 'bg-white dark:bg-[#252e3a] border-[#176f78] text-[#17343a] dark:text-white ring-1 ring-[#176f78]'
-                            : 'bg-transparent border-transparent hover:bg-white/60 dark:hover:bg-[#202732] text-[#527078] dark:text-slate-400'
-                        }`}
-                      >
-                        <div className="text-xs font-bold flex items-center gap-1.5">
-                          <List className="w-3.5 h-3.5" /> Compact Rows
-                        </div>
-                        <div className="text-[10px] text-[#527078] dark:text-slate-400 mt-0.5">
-                          Dense high-throughput tabular strips
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* UI Density & Tactile Scale */}
-                  <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] space-y-2">
-                    <label className="block text-xs font-bold text-[#17343a] dark:text-slate-200">
-                      Shop Floor Density
-                    </label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {[
-                        { id: 'compact' as const, label: 'Compact', sub: 'Max density' },
-                        { id: 'comfortable' as const, label: 'Comfortable', sub: 'Default' },
-                        { id: 'spacious' as const, label: 'Spacious', sub: 'Tablet touch' }
-                      ].map(d => (
-                        <button
-                          key={d.id}
-                          type="button"
-                          onClick={() =>
-                            handleApplyLayoutConfig({
-                              ...appLayout,
-                              density: d.id,
-                              presetId: 'custom',
-                              presetName: 'Custom Architecture'
-                            })
-                          }
-                          className={`p-2 rounded-lg text-center border transition-all cursor-pointer ${
-                            appLayout.density === d.id
-                              ? 'bg-[#176f78] border-[#176f78] text-white shadow-2xs font-bold'
-                              : 'bg-white dark:bg-[#252e3a] border-[#d9d2c2] dark:border-[#2e3846] text-[#17343a] dark:text-slate-300 hover:bg-[#f1eee6]'
-                          }`}
-                        >
-                          <div className="text-xs">{d.label}</div>
-                          <div className="text-[9px] opacity-80">{d.sub}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Announcement Ribbon & Broadcast Ticker */}
-                <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-bold text-[#17343a] dark:text-slate-200 flex items-center gap-1.5">
-                        <Radio className="w-3.5 h-3.5 text-[#176f78]" />
-                        <span>Floor Announcement Ticker Ribbon</span>
-                      </div>
-                      <div className="text-[11px] text-[#527078] dark:text-slate-400">
-                        Broadcast shift directives, quality alerts, or targets at the top of the floor
-                      </div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={appLayout.showAnnouncementTicker !== false}
-                        onChange={e =>
-                          handleApplyLayoutConfig({
-                            ...appLayout,
-                            showAnnouncementTicker: e.target.checked
-                          })
-                        }
-                        className="sr-only peer"
-                      />
-                      <div className="w-10 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#176f78]" />
-                    </label>
-                  </div>
-
-                  {appLayout.showAnnouncementTicker !== false && (
-                    <div className="space-y-2 pt-1">
-                      <input
-                        type="text"
-                        value={appLayout.tickerText || ''}
-                        onChange={e =>
-                          handleApplyLayoutConfig({
-                            ...appLayout,
-                            tickerText: e.target.value
-                          })
-                        }
-                        placeholder="Enter floor announcement..."
-                        className="w-full text-xs px-3 py-2 rounded-xl bg-white dark:bg-[#252e3a] border border-[#d9d2c2] dark:border-[#2e3846] text-[#17343a] dark:text-slate-100 font-medium"
-                      />
-
-                      {/* Quick preset suggestions */}
-                      <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                        <span className="text-[#527078] dark:text-slate-400">Quick Directives:</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleApplyLayoutConfig({
-                              ...appLayout,
-                              tickerText: 'Debonair LTD Unit-02 • 34 Active Sewing Lines • Standard Shift Running'
-                            })
-                          }
-                          className="px-2 py-0.5 rounded-md bg-white dark:bg-[#252e3a] border border-[#d9d2c2] dark:border-[#2e3846] hover:border-[#176f78] text-[#17343a] dark:text-slate-300 cursor-pointer"
-                        >
-                          Standard Shift
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleApplyLayoutConfig({
-                              ...appLayout,
-                              tickerText: '★ SHIFT TARGET: Green Wing 86.5% Eff • Benchmark Line 18 in Stability'
-                            })
-                          }
-                          className="px-2 py-0.5 rounded-md bg-white dark:bg-[#252e3a] border border-[#d9d2c2] dark:border-[#2e3846] hover:border-[#176f78] text-[#17343a] dark:text-slate-300 cursor-pointer"
-                        >
-                          Green Wing Target
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleApplyLayoutConfig({
-                              ...appLayout,
-                              tickerText: 'AUDIT ALERT: 7/0 Traffic Light System active across All 6 Floors'
-                            })
-                          }
-                          className="px-2 py-0.5 rounded-md bg-white dark:bg-[#252e3a] border border-[#d9d2c2] dark:border-[#2e3846] hover:border-[#176f78] text-[#17343a] dark:text-slate-300 cursor-pointer"
-                        >
-                          Quality Audit
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 4. Alive Interactive Architectural Blueprint Preview */}
-              <div className="p-5 rounded-2xl bg-slate-900 text-white border border-slate-800 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-teal-400" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                      Alive Architectural Blueprint (Interactive Live Wireframe)
-                    </span>
-                  </div>
-
-                  {/* Device Preview Switcher */}
-                  <div className="flex items-center gap-1 p-0.5 bg-slate-800 rounded-lg border border-slate-700">
-                    <button
-                      type="button"
-                      onClick={() => setPreviewDevice('desktop')}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold transition-colors cursor-pointer ${
-                        previewDevice === 'desktop' ? 'bg-[#176f78] text-white' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <Monitor className="w-3 h-3" />
-                      <span>Desktop</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreviewDevice('tablet')}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold transition-colors cursor-pointer ${
-                        previewDevice === 'tablet' ? 'bg-[#176f78] text-white' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <Tablet className="w-3 h-3" />
-                      <span>Tablet</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreviewDevice('mobile')}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold transition-colors cursor-pointer ${
-                        previewDevice === 'mobile' ? 'bg-[#176f78] text-white' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <Smartphone className="w-3 h-3" />
-                      <span>Mobile</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Wireframe Box */}
-                <div className="flex justify-center p-3 bg-slate-950 rounded-xl border border-slate-800">
-                  <div
-                    className={`transition-all duration-300 bg-slate-900 border border-slate-700 rounded-lg overflow-hidden flex flex-col ${
-                      previewDevice === 'desktop'
-                        ? 'w-full max-w-xl h-52'
-                        : previewDevice === 'tablet'
-                        ? 'w-80 h-52'
-                        : 'w-48 h-56'
-                    }`}
-                  >
-                    {/* Top Ticker wireframe */}
-                    {appLayout.showAnnouncementTicker !== false && (
-                      <div className="bg-[#176f78] text-[9px] px-2 py-0.5 text-white flex items-center justify-between font-mono shrink-0">
-                        <span className="truncate">{appLayout.tickerText || 'Debonair Unit-02'}</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                      </div>
-                    )}
-
-                    {/* Top Header wireframe if top-header */}
-                    {appLayout.navBarStyle === 'top-header' && (
-                      <div className="bg-slate-800 border-b border-slate-700 px-2 py-1 flex items-center justify-between shrink-0">
-                        <span className="text-[9px] font-bold text-teal-300">DGU-02</span>
-                        <div className="flex gap-1 text-[8px] text-slate-300">
-                          <span className="px-1 bg-slate-700 rounded">Dash</span>
-                          <span className="px-1">Lines</span>
-                          <span className="px-1">Lean</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Center area with optional sidebar */}
-                    <div className="flex-1 flex overflow-hidden">
-                      {appLayout.navBarStyle === 'kiosk-minimal' && (
-                        <div className="w-10 bg-slate-800 border-r border-slate-700 p-1 flex flex-col items-center gap-1 shrink-0">
-                          <div className="w-3 h-3 rounded bg-teal-500/40" />
-                          <div className="w-4 h-1.5 rounded bg-slate-700" />
-                          <div className="w-4 h-1.5 rounded bg-slate-700" />
-                        </div>
-                      )}
-
-                      {/* Content grid */}
-                      <div className="flex-1 p-2 overflow-y-auto space-y-1.5">
-                        <div className="h-3 rounded bg-slate-800 border border-slate-700/50 flex items-center px-1">
-                          <div className="w-1/3 h-1.5 bg-slate-600 rounded" />
-                        </div>
-
-                        {/* Columns simulation */}
-                        <div
-                          className="grid gap-1"
-                          style={{
-                            gridTemplateColumns: `repeat(${appLayout.floorGridColumns}, minmax(0, 1fr))`
-                          }}
-                        >
-                          {Array.from({ length: appLayout.floorGridColumns * 2 }, (_, i) => (
-                            <div
-                              key={i}
-                              className={`rounded border border-slate-700/60 p-1 bg-slate-800/80 ${
-                                appLayout.floorCardStyle === 'row' ? 'h-4 flex items-center justify-between' : 'h-10 flex flex-col justify-between'
-                              }`}
-                            >
-                              <div className="w-10 h-1.5 bg-slate-600 rounded" />
-                              <div className="w-5 h-1.5 bg-teal-500/60 rounded" />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Bottom Nav wireframe if cupertino or floating */}
-                    {appLayout.navBarStyle === 'bottom-cupertino' && (
-                      <div className="bg-slate-800/90 border-t border-slate-700 px-3 py-1 flex items-center justify-around shrink-0">
-                        <div className="w-3 h-3 rounded bg-teal-500" />
-                        <div className="w-3 h-3 rounded bg-slate-600" />
-                        <div className="w-3 h-3 rounded bg-slate-600" />
-                        <div className="w-3 h-3 rounded bg-slate-600" />
-                      </div>
-                    )}
-                    {appLayout.navBarStyle === 'floating-dock' && (
-                      <div className="p-1 flex justify-center shrink-0">
-                        <div className="bg-slate-800 border border-slate-700 px-3 py-1 rounded-full flex items-center gap-2 shadow-md">
-                          <div className="w-2.5 h-2.5 rounded-full bg-teal-500" />
-                          <div className="w-2.5 h-2.5 rounded-full bg-slate-600" />
-                          <div className="w-2.5 h-2.5 rounded-full bg-slate-600" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-slate-400 text-center font-mono">
-                  Alive Architecture Engine • Instant live updates dispatched to all plant clients
-                </div>
-              </div>
-            </section>
-          )}
 
           {/* ========================================================
               CATEGORY 1: PLANT IDENTITY & OPERATING FLOORS
@@ -2366,26 +1852,258 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                 </button>
               </div>
 
-              {/* Layout Density Controls */}
-              <div className="pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846]">
-                <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider mb-2">
-                  Shop Floor Viewport Density
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="p-3.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24]">
-                    <div className="font-bold text-xs text-[#17343a] dark:text-slate-200">
-                      Standard Tablet Ergonomics
-                    </div>
+              {/* Shop Floor Density & Small Area Mode Selector */}
+              <div className="pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846] space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-[#176f78]" />
+                      <span>Shop Floor Density &amp; Small Area Modes</span>
+                    </h3>
                     <p className="text-[11px] text-[#527078] dark:text-slate-400 mt-0.5">
-                      Touch targets 44px and above optimized for floor operators and tablet gloves.
+                      Adjust workspace density, eliminate empty blank voids, and enable small area features for multi-line tracking.
                     </p>
                   </div>
-                  <div className="p-3.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24]">
-                    <div className="font-bold text-xs text-[#17343a] dark:text-slate-200">
-                      High Contrast Numerals
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#176f78]/10 text-[#176f78] dark:text-teal-300 border border-[#176f78]/25 self-start sm:self-auto">
+                    Active: {currentDensity === 'compact' ? 'Compact / Small Area' : currentDensity === 'spacious' ? 'Spacious / Wall TV' : 'Standard Comfortable'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Mode 1: Compact Density (Small Area View) */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplyDensity('compact')}
+                    className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                      currentDensity === 'compact'
+                        ? 'border-[#176f78] bg-[#176f78]/10 dark:bg-teal-950/40 text-[#17343a] dark:text-white ring-2 ring-[#176f78]/30 shadow-xs'
+                        : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white dark:hover:bg-[#202732] text-[#527078] dark:text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-[#17343a] dark:text-slate-100">
+                        <Minimize2 className="w-3.5 h-3.5 text-[#176f78] dark:text-teal-400" />
+                        <span>Compact (Small Area)</span>
+                      </div>
+                      {currentDensity === 'compact' && (
+                        <CheckCircle2 className="w-4 h-4 text-[#176f78] dark:text-teal-400 shrink-0" />
+                      )}
                     </div>
+                    <p className="text-[11px] leading-relaxed text-[#527078] dark:text-slate-400">
+                      Tight padding, zero wasted blank space, compact multi-station micro-meters, condensed tables, and 34-line single-screen oversight.
+                    </p>
+                    <div className="mt-2.5 pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] flex items-center gap-1.5 text-[10px] font-mono text-[#176f78] dark:text-teal-300 font-bold">
+                      <span>• Tight Margins</span>
+                      <span>• Small Area</span>
+                    </div>
+                  </button>
+
+                  {/* Mode 2: Comfortable Standard */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplyDensity('comfortable')}
+                    className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                      currentDensity === 'comfortable'
+                        ? 'border-[#176f78] bg-[#176f78]/10 dark:bg-teal-950/40 text-[#17343a] dark:text-white ring-2 ring-[#176f78]/30 shadow-xs'
+                        : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white dark:hover:bg-[#202732] text-[#527078] dark:text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-[#17343a] dark:text-slate-100">
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-[#176f78] dark:text-teal-400" />
+                        <span>Standard Comfortable</span>
+                      </div>
+                      {currentDensity === 'comfortable' && (
+                        <CheckCircle2 className="w-4 h-4 text-[#176f78] dark:text-teal-400 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-[#527078] dark:text-slate-400">
+                      Balanced spatial rhythm, standard touch target padding (44px), comfortable spacing for frontline tablet operations.
+                    </p>
+                    <div className="mt-2.5 pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] flex items-center gap-1.5 text-[10px] font-mono text-slate-500">
+                      <span>• Balanced Touch</span>
+                      <span>• 44px Targets</span>
+                    </div>
+                  </button>
+
+                  {/* Mode 3: Spacious */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplyDensity('spacious')}
+                    className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                      currentDensity === 'spacious'
+                        ? 'border-[#176f78] bg-[#176f78]/10 dark:bg-teal-950/40 text-[#17343a] dark:text-white ring-2 ring-[#176f78]/30 shadow-xs'
+                        : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white dark:hover:bg-[#202732] text-[#527078] dark:text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-[#17343a] dark:text-slate-100">
+                        <Maximize2 className="w-3.5 h-3.5 text-[#176f78] dark:text-teal-400" />
+                        <span>Spacious (Wall Display)</span>
+                      </div>
+                      {currentDensity === 'spacious' && (
+                        <CheckCircle2 className="w-4 h-4 text-[#176f78] dark:text-teal-400 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-[#527078] dark:text-slate-400">
+                      Expanded padding and large metric numerals tailored for high-mounted shop floor TV screens and executive briefings.
+                    </p>
+                    <div className="mt-2.5 pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] flex items-center gap-1.5 text-[10px] font-mono text-slate-500">
+                      <span>• Overhead TVs</span>
+                      <span>• Large Text</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Adjust Blank Workspace Area on Pages Section */}
+              <div className="pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846] space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <LayoutGrid className="w-3.5 h-3.5 text-[#176f78]" />
+                      <span>Adjust Blank Workspace Area on Pages</span>
+                    </h3>
                     <p className="text-[11px] text-[#527078] dark:text-slate-400 mt-0.5">
-                      Tabular figures (`font-mono tabular-nums`) enabled across all production tables.
+                      Control page width and margins to eliminate empty dead space on laptops, monitors, and shop displays.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 self-start sm:self-auto">
+                    Layout: {currentWorkspaceWidth === 'fluid' ? 'Full Width Fluid (Zero Blank Margins)' : currentWorkspaceWidth === 'maximized' ? 'Maximized (97% Screen Width)' : 'Centered Standard (1500px Boxed)'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Option 1: Full Width Fluid */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplyWorkspaceWidth('fluid')}
+                    className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                      currentWorkspaceWidth === 'fluid'
+                        ? 'border-[#176f78] bg-[#176f78]/10 dark:bg-teal-950/40 text-[#17343a] dark:text-white ring-2 ring-[#176f78]/30 shadow-xs'
+                        : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white dark:hover:bg-[#202732] text-[#527078] dark:text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-[#17343a] dark:text-slate-100">
+                        <Maximize2 className="w-3.5 h-3.5 text-[#176f78] dark:text-teal-400" />
+                        <span>Full Width Fluid</span>
+                      </div>
+                      {currentWorkspaceWidth === 'fluid' && (
+                        <CheckCircle2 className="w-4 h-4 text-[#176f78] dark:text-teal-400 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-[#527078] dark:text-slate-400">
+                      100% Edge-to-edge layout. Completely eliminates empty left and right blank borders. Ideal for multi-column data grids and line plans.
+                    </p>
+                    <div className="mt-2.5 pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] flex items-center gap-1.5 text-[10px] font-mono text-[#176f78] dark:text-teal-300 font-bold">
+                      <span>• Zero Blank Margins</span>
+                      <span>• 100% Screen</span>
+                    </div>
+                  </button>
+
+                  {/* Option 2: Maximized Ultra-Wide */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplyWorkspaceWidth('maximized')}
+                    className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                      currentWorkspaceWidth === 'maximized'
+                        ? 'border-[#176f78] bg-[#176f78]/10 dark:bg-teal-950/40 text-[#17343a] dark:text-white ring-2 ring-[#176f78]/30 shadow-xs'
+                        : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white dark:hover:bg-[#202732] text-[#527078] dark:text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-[#17343a] dark:text-slate-100">
+                        <Sliders className="w-3.5 h-3.5 text-[#176f78] dark:text-teal-400" />
+                        <span>Maximized (97% Wide)</span>
+                      </div>
+                      {currentWorkspaceWidth === 'maximized' && (
+                        <CheckCircle2 className="w-4 h-4 text-[#176f78] dark:text-teal-400 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-[#527078] dark:text-slate-400">
+                      Slim micro-gutters with 97% width coverage. Expansive layout that removes dead space while maintaining clean visual framing.
+                    </p>
+                    <div className="mt-2.5 pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] flex items-center gap-1.5 text-[10px] font-mono text-slate-500">
+                      <span>• Slim Gutters</span>
+                      <span>• Optimal Cockpit</span>
+                    </div>
+                  </button>
+
+                  {/* Option 3: Centered Standard */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplyWorkspaceWidth('standard')}
+                    className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                      currentWorkspaceWidth === 'standard'
+                        ? 'border-[#176f78] bg-[#176f78]/10 dark:bg-teal-950/40 text-[#17343a] dark:text-white ring-2 ring-[#176f78]/30 shadow-xs'
+                        : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white dark:hover:bg-[#202732] text-[#527078] dark:text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-[#17343a] dark:text-slate-100">
+                        <Minimize2 className="w-3.5 h-3.5 text-[#176f78] dark:text-teal-400" />
+                        <span>Centered Standard</span>
+                      </div>
+                      {currentWorkspaceWidth === 'standard' && (
+                        <CheckCircle2 className="w-4 h-4 text-[#176f78] dark:text-teal-400 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-[#527078] dark:text-slate-400">
+                      Traditional 1500px centered canvas with standard side gutters. Suitable for smaller laptop displays or reading workflows.
+                    </p>
+                    <div className="mt-2.5 pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] flex items-center gap-1.5 text-[10px] font-mono text-slate-500">
+                      <span>• 1500px Boxed</span>
+                      <span>• Classic Margins</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Small Area Features System-Wide Suite */}
+              <div className="pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846] space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Small Area Features System-Wide Suite</span>
+                    </h3>
+                    <p className="text-[11px] text-[#527078] dark:text-slate-400 mt-0.5">
+                      Enable collapsible line selectors, micro-chips, and dense data cards to minimize spatial footprint across all pages.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleSmallArea}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold border transition-all cursor-pointer self-start sm:self-auto flex items-center gap-1.5 ${
+                      currentSmallArea
+                        ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/35 ring-1 ring-emerald-500/20'
+                        : 'bg-slate-100 dark:bg-[#181d24] text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${currentSmallArea ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                    <span>{currentSmallArea ? 'Small Area Suite Active' : 'Enable Small Area Suite'}</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-[#17343a] dark:text-slate-200">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Collapsible Small Area Selector Bar</span>
+                    </div>
+                    <p className="text-[11px] text-[#527078] dark:text-slate-400 leading-relaxed">
+                      Merges plant scope, wings, blocks, and 34 line tags into an expandable 28px micro-strip that folds away to preserve screen space.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-[#17343a] dark:text-slate-200">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Zero Void &amp; Blank Space Reduction</span>
+                    </div>
+                    <p className="text-[11px] text-[#527078] dark:text-slate-400 leading-relaxed">
+                      Removes empty margins between widgets, tightens table cell paddings to 0.3rem, and compresses headers so 34 lines fit without excessive scrolling.
                     </p>
                   </div>
                 </div>
@@ -2691,18 +2409,18 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
           )}
 
           {/* ========================================================
-              CATEGORY 6: MOBILE & ANDROID PWA INSTALL
+              CATEGORY 6: SYSTEM UPDATES
           ======================================================== */}
           {activeCategory === 'android' && (
             <section className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4">
                 <div>
                   <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
-                    <Smartphone className="w-4 h-4 text-[#176f78]" />
-                    <span>Mobile PWA &amp; Android Tablet Deployment</span>
+                    <DownloadCloud className="w-4 h-4 text-[#176f78]" />
+                    <span>System Updates</span>
                   </h2>
                   <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
-                    Offline capabilities, service worker precache, and Android TWA packaging.
+                    Platform version, OTA hotfixes, service worker cache, and Android deployment.
                   </p>
                 </div>
                 {onOpenAndroidPackage && (

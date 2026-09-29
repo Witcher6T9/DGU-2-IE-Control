@@ -364,6 +364,8 @@ export interface WingBlockLineSelectorProps {
   onSelectionChange?: (selection: WingBlockLineSelection) => void;
   lines?: LineEntry[];
   variant?: 'inline' | 'compact' | 'card' | 'bar';
+  density?: 'compact' | 'comfortable' | 'spacious';
+  smallAreaFeaturesEnabled?: boolean;
   showLines?: boolean;
   showBlocks?: boolean;
   showWings?: boolean;
@@ -391,6 +393,8 @@ export const WingBlockLineSelector: React.FC<WingBlockLineSelectorProps> = ({
   showLines = true,
   showBlocks = true,
   showWings = true,
+  density,
+  smallAreaFeaturesEnabled,
   className = '',
   onClose
 }) => {
@@ -399,7 +403,18 @@ export const WingBlockLineSelector: React.FC<WingBlockLineSelectorProps> = ({
 
   // Small Area Features: Compact density & Collapse/Expand toggle
   const [isCollapsed, setIsCollapsed] = useState<boolean>(variant === 'bar');
-  const [displayDensity, setDisplayDensity] = useState<'compact' | 'full'>('compact');
+  const [displayDensity, setDisplayDensity] = useState<'compact' | 'full'>(() => {
+    if (density === 'spacious') return 'full';
+    return 'compact';
+  });
+
+  useEffect(() => {
+    if (density === 'compact') {
+      setDisplayDensity('compact');
+    } else if (density === 'spacious') {
+      setDisplayDensity('full');
+    }
+  }, [density]);
 
   // Local state synced with props
   const [localWing, setLocalWing] = useState<WingId>(selectedWing);
