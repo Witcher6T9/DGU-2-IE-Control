@@ -59,13 +59,23 @@ import {
   Award,
   Minimize2,
   SlidersHorizontal,
-  Maximize2
+  Maximize2,
+  GitBranch,
+  Terminal,
+  Rocket,
+  Type,
+  Vibrate,
+  Contrast,
+  Eye,
+  Hash,
+  Zap
 } from 'lucide-react';
 import {
   getStoredAppPageLayout,
   saveStoredAppPageLayout,
   applyLayoutStyling
 } from '../utils/layoutManager';
+import { triggerHaptic, setHapticsEnabled } from '../utils/haptics';
 import { TIER_0_MODULES } from './tier0/Tier0CommandHub';
 import {
   UserProfile,
@@ -81,7 +91,12 @@ import {
   ScheduleItem,
   LeanActionItem,
   AppPageLayoutConfig,
-  WorkspaceWidthMode
+  WorkspaceWidthMode,
+  FontFamilyStyle,
+  CardRadiusMode,
+  SurfaceStyleMode,
+  ClickPhysicsMode,
+  FontWeightMode
 } from '../types';
 import {
   StationData,
@@ -123,7 +138,8 @@ type SettingsCategory =
   | 'backup'
   | 'security'
   | 'android'
-  | 'hubs';
+  | 'hubs'
+  | 'cicd';
 
 const SquircleIcon: React.FC<{
   bgColor: string;
@@ -446,6 +462,263 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
     if (onToggleSmallAreaFeatures) onToggleSmallAreaFeatures();
   };
 
+  // ==========================================
+  // UI, UX & FONT DESIGN CUSTOMIZATION SUITE
+  // ==========================================
+  const [fontFamily, setFontFamily] = useState<FontFamilyStyle>(() => {
+    try {
+      const cfg = getStoredAppPageLayout();
+      return cfg.fontFamily || 'sans';
+    } catch {
+      return 'sans';
+    }
+  });
+
+  const [fontScale, setFontScale] = useState<number>(() => {
+    try {
+      const cfg = getStoredAppPageLayout();
+      return cfg.fontScalePct || 100;
+    } catch {
+      return 100;
+    }
+  });
+
+  const [fontWeightMode, setFontWeightMode] = useState<FontWeightMode>(() => {
+    try {
+      const cfg = getStoredAppPageLayout();
+      return cfg.fontWeightMode || 'regular';
+    } catch {
+      return 'regular';
+    }
+  });
+
+  const [tabularNumerals, setTabularNumerals] = useState<boolean>(() => {
+    try {
+      const cfg = getStoredAppPageLayout();
+      return cfg.tabularNumerals !== false;
+    } catch {
+      return true;
+    }
+  });
+
+  const [brandAccent, setBrandAccent] = useState<string>(() => {
+    try {
+      const cfg = getStoredAppPageLayout();
+      return cfg.brandColor || '#176f78';
+    } catch {
+      return '#176f78';
+    }
+  });
+
+  const [cardRadius, setCardRadius] = useState<CardRadiusMode>(() => {
+    try {
+      const cfg = getStoredAppPageLayout();
+      return cfg.cardRadius || 'squircle';
+    } catch {
+      return 'squircle';
+    }
+  });
+
+  const [surfaceStyle, setSurfaceStyle] = useState<SurfaceStyleMode>(() => {
+    try {
+      const cfg = getStoredAppPageLayout();
+      return cfg.surfaceStyle || 'opaque';
+    } catch {
+      return 'opaque';
+    }
+  });
+
+  const [hapticFeedback, setHapticFeedback] = useState<boolean>(() => {
+    try {
+      const cfg = getStoredAppPageLayout();
+      return cfg.hapticFeedback !== false;
+    } catch {
+      return true;
+    }
+  });
+
+  const [clickPhysics, setClickPhysics] = useState<ClickPhysicsMode>(() => {
+    try {
+      const cfg = getStoredAppPageLayout();
+      return cfg.clickPhysics || 'smooth';
+    } catch {
+      return 'smooth';
+    }
+  });
+
+  const [scannerFocusRing, setScannerFocusRing] = useState<boolean>(() => {
+    try {
+      const cfg = getStoredAppPageLayout();
+      return !!cfg.scannerFocusRing;
+    } catch {
+      return false;
+    }
+  });
+
+  const [liveAlertPulses, setLiveAlertPulses] = useState<boolean>(() => {
+    try {
+      const cfg = getStoredAppPageLayout();
+      return cfg.liveAlertPulses !== false;
+    } catch {
+      return true;
+    }
+  });
+
+  const [oneHandedMobileReach, setOneHandedMobileReach] = useState<boolean>(() => {
+    try {
+      const cfg = getStoredAppPageLayout();
+      return !!cfg.oneHandedMobileReach;
+    } catch {
+      return false;
+    }
+  });
+
+  const [hapticTested, setHapticTested] = useState(false);
+
+  const handleApplyFontFamily = (f: FontFamilyStyle) => {
+    setFontFamily(f);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, fontFamily: f, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleApplyFontScale = (scale: number) => {
+    setFontScale(scale);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, fontScalePct: scale, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleApplyFontWeightMode = (w: FontWeightMode) => {
+    setFontWeightMode(w);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, fontWeightMode: w, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleToggleTabularNumerals = () => {
+    const next = !tabularNumerals;
+    setTabularNumerals(next);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, tabularNumerals: next, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleApplyBrandAccent = (color: string) => {
+    setBrandAccent(color);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, brandColor: color, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleApplyCardRadius = (r: CardRadiusMode) => {
+    setCardRadius(r);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, cardRadius: r, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleApplySurfaceStyle = (s: SurfaceStyleMode) => {
+    setSurfaceStyle(s);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, surfaceStyle: s, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleToggleHaptics = () => {
+    const next = !hapticFeedback;
+    setHapticFeedback(next);
+    setHapticsEnabled(next);
+    if (next) triggerHaptic('success');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, hapticFeedback: next, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleTestHapticClick = () => {
+    triggerHaptic('medium');
+    setHapticTested(true);
+    setTimeout(() => setHapticTested(false), 900);
+  };
+
+  const handleApplyClickPhysics = (p: ClickPhysicsMode) => {
+    setClickPhysics(p);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, clickPhysics: p, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleToggleScannerFocus = () => {
+    const next = !scannerFocusRing;
+    setScannerFocusRing(next);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, scannerFocusRing: next, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleToggleLivePulses = () => {
+    const next = !liveAlertPulses;
+    setLiveAlertPulses(next);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, liveAlertPulses: next, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleToggleOneHandedReach = () => {
+    const next = !oneHandedMobileReach;
+    setOneHandedMobileReach(next);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, oneHandedMobileReach: next, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
   useEffect(() => {
     if (activeSection === 'preferences') {
       setActiveCategory('display');
@@ -561,11 +834,11 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
     },
     {
       id: 'display' as SettingsCategory,
-      label: 'Display & Ergonomics',
-      description: 'Daylight Cockpit vs Dark Studio, Compact Density & Small Area modes',
-      icon: Sun,
+      label: 'UI, UX, Fonts & Display',
+      description: '7 themes, engineered typography, font scaling, UI accents & haptics',
+      icon: Palette,
       color: 'bg-[#af52de]',
-      badge: currentDensity === 'compact' ? 'Compact' : currentTheme === 'dark' ? 'Night Shift' : 'Light'
+      badge: `${fontFamily.toUpperCase()} • ${fontScale}%`
     },
     {
       id: 'alerts' as SettingsCategory,
@@ -606,6 +879,14 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
       icon: Layers,
       color: 'bg-[#007aff]',
       badge: '6 Hubs'
+    },
+    {
+      id: 'cicd' as SettingsCategory,
+      label: 'CI/CD & DevOps Pipeline',
+      description: 'Witcher6T9/DGU-2-IE-Control GitHub Actions: automated build, test & deploy',
+      icon: GitBranch,
+      color: 'bg-[#176f78]',
+      badge: 'Automated'
     }
   ];
 
@@ -1548,6 +1829,32 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                         <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
                       </div>
                     </div>
+
+                    {/* Row 3: CI/CD & DevOps Pipeline */}
+                    <div
+                      onClick={() => setActiveCategory('cicd')}
+                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <SquircleIcon bgColor="bg-[#176f78]">
+                          <GitBranch className="w-4 h-4 text-white" />
+                        </SquircleIcon>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                            CI/CD &amp; DevOps Pipeline
+                          </div>
+                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                            Witcher6T9/DGU-2-IE-Control GitHub Actions: automated build, test &amp; deploy
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-teal-500/10 text-[#176f78] dark:text-teal-300 border border-[#176f78]/20">
+                          Automated
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1786,71 +2093,705 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
           )}
 
           {/* ========================================================
-              CATEGORY 2: DISPLAY & VISUAL ERGONOMICS
+              CATEGORY 2: DISPLAY, UI, UX & FONT ERGONOMICS
           ======================================================== */}
           {activeCategory === 'display' && (
-            <section className="space-y-6">
+            <section className="space-y-8">
               <div className="border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4">
-                <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
-                  <Sun className="w-4 h-4 text-[#176f78]" />
-                  <span>Display &amp; Visual Ergonomics</span>
-                </h2>
-                <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
-                  Select interface contrast mode tailored for daylight shop floors or night control rooms.
-                </p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
+                      <Palette className="w-4 h-4 text-[#176f78]" />
+                      <span>UI, UX, Fonts &amp; Visual Ergonomics</span>
+                    </h2>
+                    <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
+                      Tailor the workspace design: 7 industrial themes, engineered font families, tactile haptics, UI accents, and density.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#176f78]/10 text-[#176f78] dark:text-teal-300 border border-[#176f78]/25">
+                      {fontFamily.toUpperCase()} • {fontScale}% SCALE
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              {/* Theme Choice Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => onSelectTheme('light')}
-                  className={`p-5 rounded-2xl border text-left transition-all cursor-pointer relative ${
-                    currentTheme === 'light'
-                      ? 'border-[#176f78] bg-[#176f78]/5 ring-2 ring-[#176f78]/20 shadow-xs'
-                      : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center">
-                      <Sun className="w-4 h-4" />
-                    </div>
-                    {currentTheme === 'light' && (
-                      <CheckCircle2 className="w-5 h-5 text-[#176f78]" />
-                    )}
-                  </div>
-                  <div className="font-bold text-sm text-[#17343a] dark:text-slate-100">
-                    Light Cockpit (Default)
-                  </div>
-                  <p className="text-xs text-[#527078] dark:text-slate-400 mt-1 leading-relaxed">
-                    Warm architectural canvas with deep industrial teal accents. Glare-resistant under factory fluorescent lighting.
-                  </p>
-                </button>
+              {/* 1. SEVEN INDUSTRIAL THEMES MATRIX */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sun className="w-3.5 h-3.5 text-[#176f78]" />
+                    <span>Theme Palettes &amp; Shift Environments</span>
+                  </h3>
+                  <span className="text-[10px] font-mono text-[#527078] dark:text-slate-400">
+                    7 Tailored Industrial Profiles
+                  </span>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => onSelectTheme('dark')}
-                  className={`p-5 rounded-2xl border text-left transition-all cursor-pointer relative ${
-                    currentTheme === 'dark'
-                      ? 'border-[#176f78] bg-slate-900 text-white ring-2 ring-[#176f78]/20 shadow-xs'
-                      : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-900 text-indigo-200 flex items-center justify-center">
-                      <Moon className="w-4 h-4" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[
+                    {
+                      id: 'light' as ThemeType,
+                      name: 'Daylight Cockpit',
+                      badge: 'Standard RMG',
+                      desc: 'Warm cream architectural canvas with deep industrial teal accents. Anti-glare under bright fluorescent lights.',
+                      bgClass: 'bg-[#fbfaf6] text-[#17343a]',
+                      swatchColors: ['#fbfaf6', '#17343a', '#176f78', '#d9d2c2']
+                    },
+                    {
+                      id: 'dark' as ThemeType,
+                      name: 'Night Shift Dark Studio',
+                      badge: 'Low Fatigue',
+                      desc: 'Deep dark slate canvas designed for control room displays, night audits, and low-light workstations.',
+                      bgClass: 'bg-[#10141a] text-slate-100',
+                      swatchColors: ['#10141a', '#f1f5f9', '#1ea2af', '#2e3846']
+                    },
+                    {
+                      id: 'industrial' as ThemeType,
+                      name: 'Debonair Steel & Charcoal',
+                      badge: 'High Contrast',
+                      desc: 'Charcoal foundry background with high-visibility electric cyan accents inspired by CNC machinery.',
+                      bgClass: 'bg-[#161c24] text-white',
+                      swatchColors: ['#161c24', '#ffffff', '#14b8a6', '#374354']
+                    },
+                    {
+                      id: 'forest' as ThemeType,
+                      name: 'Eco Evergreen Kaizen',
+                      badge: 'Sustainable Lean',
+                      desc: 'Deep emerald pine aesthetic symbolizing continuous 5S improvement, green factory metrics, and zero waste.',
+                      bgClass: 'bg-[#0d1f18] text-emerald-100',
+                      swatchColors: ['#0d1f18', '#f0fdf4', '#10b981', '#27483b']
+                    },
+                    {
+                      id: 'sunset' as ThemeType,
+                      name: 'Warm Copper & Foundry',
+                      badge: 'Warm Spectrum',
+                      desc: 'Amber gold and copper foundry palette tailored for high-density sewing floor management.',
+                      bgClass: 'bg-[#1f140e] text-amber-100',
+                      swatchColors: ['#1f140e', '#fffbeb', '#f59e0b', '#4a3427']
+                    },
+                    {
+                      id: 'nordic' as ThemeType,
+                      name: 'Nordic Glacier Frost',
+                      badge: 'Executive Briefing',
+                      desc: 'Titanium steel with crisp ice blue accents designed for executive dashboards and boardroom projectors.',
+                      bgClass: 'bg-[#0d1527] text-sky-100',
+                      swatchColors: ['#0d1527', '#f0f9ff', '#0ea5e9', '#2a3b63']
+                    },
+                    {
+                      id: 'oled' as ThemeType,
+                      name: 'True Black OLED Minimalist',
+                      badge: 'Max Battery Saver',
+                      desc: 'Pure #000000 true black background. Disables dark pixels on OLED tablets to extend shift battery life.',
+                      bgClass: 'bg-black text-white',
+                      swatchColors: ['#000000', '#ffffff', '#ffffff', '#2e2e2e']
+                    }
+                  ].map((thm) => {
+                    const isSelected = currentTheme === thm.id;
+                    return (
+                      <button
+                        key={thm.id}
+                        type="button"
+                        onClick={() => {
+                          onSelectTheme(thm.id);
+                          triggerHaptic('selection');
+                        }}
+                        className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${
+                          isSelected
+                            ? 'border-[#176f78] dark:border-teal-400 bg-[#176f78]/5 dark:bg-teal-950/40 ring-2 ring-[#176f78]/30 shadow-xs'
+                            : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white dark:hover:bg-[#202732]'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              {/* Quad Swatch Preview */}
+                              <div className="flex items-center -space-x-1 shrink-0">
+                                {thm.swatchColors.map((c, idx) => (
+                                  <span
+                                    key={idx}
+                                    style={{ backgroundColor: c }}
+                                    className="w-3.5 h-3.5 rounded-full border border-black/20 shadow-2xs"
+                                  />
+                                ))}
+                              </div>
+                              <span className="font-bold text-xs text-[#17343a] dark:text-slate-100">
+                                {thm.name}
+                              </span>
+                            </div>
+                            {isSelected && (
+                              <CheckCircle2 className="w-4 h-4 text-[#176f78] dark:text-teal-400 shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-[11px] leading-relaxed text-[#527078] dark:text-slate-400">
+                            {thm.desc}
+                          </p>
+                        </div>
+                        <div className="mt-3 pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] flex items-center justify-between text-[10px] font-mono text-[#527078] dark:text-slate-400">
+                          <span className="font-bold uppercase text-[#176f78] dark:text-teal-300">{thm.badge}</span>
+                          <span>{isSelected ? 'Active Profile' : 'Select'}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. TYPOGRAPHY & FONT DESIGNS SUITE */}
+              <div className="pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846] space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <Type className="w-3.5 h-3.5 text-[#176f78]" />
+                      <span>Typography &amp; Industrial Font Designs</span>
+                    </h3>
+                    <p className="text-[11px] text-[#527078] dark:text-slate-400 mt-0.5">
+                      Select engineered typefaces tailored for machine vibration resistance, tabular time studies, and reading ergonomics.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 self-start sm:self-auto">
+                    Typeface: {fontFamily === 'sans' ? 'Inter Sans' : fontFamily === 'mono' ? 'JetBrains Mono' : fontFamily === 'dyslexic' ? 'Factory ClearView' : fontFamily === 'grotesk' ? 'Space Grotesk' : 'Editorial Serif'}
+                  </span>
+                </div>
+
+                {/* 5 Font Family Selection Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[
+                    {
+                      id: 'sans' as FontFamilyStyle,
+                      name: 'Inter & Dynamic Sans',
+                      badge: 'Modern UI (Default)',
+                      desc: 'Clean, balanced geometric sans-serif engineered for maximum legibility on laptops and digital displays.',
+                      sample: 'Debonair Unit-02 • Line 14 Target: 1,450 pcs • OEE 88.5%',
+                      fontStyle: 'font-sans'
+                    },
+                    {
+                      id: 'mono' as FontFamilyStyle,
+                      name: 'JetBrains Industrial Monospace',
+                      badge: 'High Precision / IE',
+                      desc: 'Fixed-width character spacing with perfect vertical alignment for time studies, SMV cycles, and pacing data.',
+                      sample: 'SMV: 24.50s | TAKT: 36.40s | VAR: +0.02s | PITCH: OK',
+                      fontStyle: 'font-mono'
+                    },
+                    {
+                      id: 'dyslexic' as FontFamilyStyle,
+                      name: 'High-Legibility Factory ClearView',
+                      badge: 'Anti-Vibration / Glare',
+                      desc: 'Enlarged apertures and heavier bottom strokes for operators reading handheld tablets during sewing machine vibration.',
+                      sample: '34 Lines Active • Critical Bottleneck Stage: Sleeve Hemming',
+                      fontStyle: 'tracking-wide'
+                    },
+                    {
+                      id: 'grotesk' as FontFamilyStyle,
+                      name: 'Geometric Modern Grotesk',
+                      badge: 'Command Hub',
+                      desc: 'Sharp, architectural character proportions tailored for control center dashboards and multi-monitor setups.',
+                      sample: 'TOTAL ATTAINMENT: 94.2% • HOURLY PACING: 182 UPH',
+                      fontStyle: 'tracking-tight'
+                    },
+                    {
+                      id: 'serif' as FontFamilyStyle,
+                      name: 'Editorial Executive Serif',
+                      badge: 'Executive / Boardroom',
+                      desc: 'Refined serif typography tailored for shift export documents, PDF dossiers, and executive committee reviews.',
+                      sample: 'Debonair RMG Operations • Daily Executive Production Ledger',
+                      fontStyle: 'font-serif'
+                    }
+                  ].map((f) => {
+                    const isSelected = fontFamily === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => handleApplyFontFamily(f.id)}
+                        className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${
+                          isSelected
+                            ? 'border-[#176f78] dark:border-teal-400 bg-[#176f78]/10 dark:bg-teal-950/40 text-[#17343a] dark:text-white ring-2 ring-[#176f78]/30 shadow-xs'
+                            : 'border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white dark:hover:bg-[#202732] text-[#527078] dark:text-slate-300'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="font-bold text-xs text-[#17343a] dark:text-slate-100">
+                              {f.name}
+                            </span>
+                            {isSelected && (
+                              <CheckCircle2 className="w-4 h-4 text-[#176f78] dark:text-teal-400 shrink-0" />
+                            )}
+                          </div>
+                          <span className="text-[10px] font-mono text-[#176f78] dark:text-teal-300 font-semibold">
+                            {f.badge}
+                          </span>
+                          <p className="text-[11px] leading-relaxed text-[#527078] dark:text-slate-400 mt-1">
+                            {f.desc}
+                          </p>
+                        </div>
+                        {/* Live Font Sample Strip */}
+                        <div className="mt-3 p-2 rounded-xl bg-white dark:bg-[#12161c] border border-[#e7e1d5] dark:border-[#2e3846]">
+                          <div className="text-[9px] uppercase tracking-wider font-mono text-slate-400 mb-0.5">Live Typeface Preview</div>
+                          <div className={`text-[11px] text-[#17343a] dark:text-slate-100 ${f.fontStyle} truncate`}>
+                            {f.sample}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Font Scaling & Ergonomics Sliders */}
+                <div className="p-4 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-bold text-[#17343a] dark:text-slate-200 flex items-center gap-1.5">
+                        <Sliders className="w-3.5 h-3.5 text-[#176f78]" />
+                        <span>Interactive Typography Scaling: <span className="font-mono text-[#176f78] dark:text-teal-300">{fontScale}%</span></span>
+                      </div>
+                      <p className="text-[11px] text-[#527078] dark:text-slate-400 mt-0.5">
+                        Scales the entire application text scale dynamically without clipping layouts.
+                      </p>
                     </div>
-                    {currentTheme === 'dark' && (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                    )}
+
+                    {/* Stepped Scale Buttons */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {[85, 90, 95, 100, 105, 110, 115].map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => handleApplyFontScale(pct)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer ${
+                            fontScale === pct
+                              ? 'bg-[#176f78] text-white border-[#176f78] shadow-xs'
+                              : 'bg-white dark:bg-[#202732] text-slate-700 dark:text-slate-300 border-[#d9d2c2] dark:border-[#2e3846] hover:border-[#176f78]'
+                          }`}
+                        >
+                          {pct}%
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="font-bold text-sm text-[#17343a] dark:text-slate-100">
-                    Dark Studio (Night Shift)
+
+                  {/* Range Slider */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-mono text-slate-500 font-bold shrink-0">85% Compact</span>
+                    <input
+                      type="range"
+                      min={85}
+                      max={115}
+                      step={5}
+                      value={fontScale}
+                      onChange={(e) => handleApplyFontScale(parseInt(e.target.value, 10))}
+                      className="w-full accent-[#176f78] cursor-pointer"
+                    />
+                    <span className="text-[10px] font-mono text-slate-500 font-bold shrink-0">115% Wall TV</span>
                   </div>
-                  <p className="text-xs text-[#527078] dark:text-slate-400 mt-1 leading-relaxed">
-                    Low-fatigue dark slate canvas designed for control room displays, night audits, and low-light environments.
-                  </p>
-                </button>
+
+                  {/* Tabular Numerals & Crisp Contrast Dual Toggles */}
+                  <div className="pt-3 border-t border-[#e7e1d5] dark:border-[#2e3846] grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Tabular Numerals Switch */}
+                    <div className="p-3 rounded-xl bg-white dark:bg-[#12161c] border border-[#e7e1d5] dark:border-[#2e3846] flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-1.5">
+                          <Hash className="w-3.5 h-3.5 text-[#176f78]" />
+                          <span>Tabular Numerals (TNUM)</span>
+                        </div>
+                        <p className="text-[10px] text-[#527078] dark:text-slate-400 mt-0.5">
+                          Monospaces all digits in tables for perfect vertical decimal column alignment.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleToggleTabularNumerals}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                          tabularNumerals ? 'bg-[#176f78]' : 'bg-slate-300 dark:bg-slate-700'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                            tabularNumerals ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Crisp High-Glare Contrast Switch */}
+                    <div className="p-3 rounded-xl bg-white dark:bg-[#12161c] border border-[#e7e1d5] dark:border-[#2e3846] flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-1.5">
+                          <Contrast className="w-3.5 h-3.5 text-[#176f78]" />
+                          <span>High-Glare Crisp Weight</span>
+                        </div>
+                        <p className="text-[10px] text-[#527078] dark:text-slate-400 mt-0.5">
+                          Enhances stroke weights to prevent light washout from overhead factory lamps.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyFontWeightMode(fontWeightMode === 'crisp-contrast' ? 'regular' : 'crisp-contrast')}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                          fontWeightMode === 'crisp-contrast' ? 'bg-[#176f78]' : 'bg-slate-300 dark:bg-slate-700'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                            fontWeightMode === 'crisp-contrast' ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. UI COLOR ACCENTS & SURFACE GEOMETRY */}
+              <div className="pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846] space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <Palette className="w-3.5 h-3.5 text-[#176f78]" />
+                      <span>UI Color Accents &amp; Surface Geometry</span>
+                    </h3>
+                    <p className="text-[11px] text-[#527078] dark:text-slate-400 mt-0.5">
+                      Configure brand accents, card corner radius ergonomics, and GPU rendering surface performance.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#176f78]/10 text-[#176f78] dark:text-teal-300 border border-[#176f78]/25 self-start sm:self-auto">
+                    Radius: {cardRadius.toUpperCase()} • Surface: {surfaceStyle.toUpperCase()}
+                  </span>
+                </div>
+
+                {/* 8 Curated Accent Colors */}
+                <div className="p-4 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#17343a] dark:text-slate-100">
+                      Brand Accent Color: <span className="font-mono text-[#176f78] dark:text-teal-300">{brandAccent}</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">8 Industrial Accents</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                    {[
+                      { hex: '#176f78', name: 'Debonair Teal', bgDot: 'bg-[#176f78]' },
+                      { hex: '#1e40af', name: 'Royal Blue', bgDot: 'bg-[#1e40af]' },
+                      { hex: '#059669', name: 'Emerald Kaizen', bgDot: 'bg-[#059669]' },
+                      { hex: '#d97706', name: 'Foundry Amber', bgDot: 'bg-[#d97706]' },
+                      { hex: '#dc2626', name: 'Crimson Alert', bgDot: 'bg-[#dc2626]' },
+                      { hex: '#0891b2', name: 'Electric Cyan', bgDot: 'bg-[#0891b2]' },
+                      { hex: '#7c3aed', name: 'Amethyst Tech', bgDot: 'bg-[#7c3aed]' },
+                      { hex: '#475569', name: 'Titanium Slate', bgDot: 'bg-[#475569]' }
+                    ].map((col) => {
+                      const isSelected = brandAccent.toLowerCase() === col.hex.toLowerCase();
+                      return (
+                        <button
+                          key={col.hex}
+                          type="button"
+                          onClick={() => handleApplyBrandAccent(col.hex)}
+                          className={`p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
+                            isSelected
+                              ? 'border-[#176f78] bg-white dark:bg-[#202732] ring-2 ring-[#176f78]/30 shadow-xs'
+                              : 'border-[#d9d2c2] dark:border-[#2e3846] bg-white/70 dark:bg-[#12161c] hover:bg-white'
+                          }`}
+                        >
+                          <span
+                            style={{ backgroundColor: col.hex }}
+                            className="w-5 h-5 rounded-full border border-black/15 shadow-2xs shrink-0 flex items-center justify-center text-white"
+                          >
+                            {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                          </span>
+                          <span className="text-[10px] font-bold text-[#17343a] dark:text-slate-200 truncate w-full">
+                            {col.name}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Card Corner Radius & Surface Style Dual Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Card Corner Radius */}
+                  <div className="p-4 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#17343a] dark:text-slate-100">
+                        Card Corner Radius Geometry
+                      </span>
+                      <span className="text-[10px] font-mono text-[#176f78] dark:text-teal-300 font-bold">
+                        {cardRadius === 'sharp' ? '6px' : cardRadius === 'modern' ? '12px' : cardRadius === 'squircle' ? '16px' : '24px'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'sharp' as CardRadiusMode, name: 'Sharp (6px)', desc: 'Technical Industrial' },
+                        { id: 'modern' as CardRadiusMode, name: 'Modern (12px)', desc: 'Clean Contemporary' },
+                        { id: 'squircle' as CardRadiusMode, name: 'Squircle (16px)', desc: 'Apple-Grade Standard' },
+                        { id: 'soft' as CardRadiusMode, name: 'Pillowed (24px)', desc: 'Soft Touch Comfort' }
+                      ].map((r) => {
+                        const isSelected = cardRadius === r.id;
+                        return (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => handleApplyCardRadius(r.id)}
+                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-[#176f78] bg-[#176f78]/10 dark:bg-teal-950/40 text-[#17343a] dark:text-white ring-2 ring-[#176f78]/30 shadow-xs'
+                                : 'border-[#d9d2c2] dark:border-[#2e3846] bg-white dark:bg-[#12161c] hover:bg-white text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            <div className="font-bold text-xs flex items-center justify-between">
+                              <span>{r.name}</span>
+                              {isSelected && <Check className="w-3.5 h-3.5 text-[#176f78] dark:text-teal-400 stroke-[3]" />}
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">{r.desc}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Surface Finish / Glassmorphism */}
+                  <div className="p-4 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#17343a] dark:text-slate-100">
+                        Card Surface &amp; Rendering Style
+                      </span>
+                      <span className="text-[10px] font-mono text-[#176f78] dark:text-teal-300 font-bold uppercase">
+                        {surfaceStyle}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {[
+                        { id: 'opaque' as SurfaceStyleMode, name: 'Solid Opaque (Ultra-Fast FPS)', desc: 'Zero transparency overhead. Maximum speed on frontline factory tablets.' },
+                        { id: 'glass' as SurfaceStyleMode, name: 'Frosted Glassmorphism', desc: 'Subtle backdrop blur with translucent floating depth.' },
+                        { id: 'high-contrast' as SurfaceStyleMode, name: 'High-Contrast 2px Outlines', desc: 'Bold 2px outlines around every card to resist factory glare.' }
+                      ].map((s) => {
+                        const isSelected = surfaceStyle === s.id;
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => handleApplySurfaceStyle(s.id)}
+                            className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                              isSelected
+                                ? 'border-[#176f78] bg-[#176f78]/10 dark:bg-teal-950/40 text-[#17343a] dark:text-white ring-2 ring-[#176f78]/30 shadow-xs'
+                                : 'border-[#d9d2c2] dark:border-[#2e3846] bg-white dark:bg-[#12161c] hover:bg-white text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            <div>
+                              <div className="font-bold text-xs">{s.name}</div>
+                              <div className="text-[10px] text-slate-400 mt-0.5 leading-tight">{s.desc}</div>
+                            </div>
+                            {isSelected && <Check className="w-4 h-4 text-[#176f78] dark:text-teal-400 stroke-[3] shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. FRONTLINE UX, TOUCH ERGONOMICS & HAPTICS */}
+              <div className="pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846] space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <Vibrate className="w-3.5 h-3.5 text-[#176f78]" />
+                      <span>Frontline UX, Touch Ergonomics &amp; Haptics</span>
+                    </h3>
+                    <p className="text-[11px] text-[#527078] dark:text-slate-400 mt-0.5">
+                      Tactile physical feedback, click physics, scanner focus rings, and single-handed touch accessibility.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/25 self-start sm:self-auto">
+                    {hapticFeedback ? 'Haptics Enabled' : 'Haptics Muted'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {/* UX Control 1: Haptic Touch Vibration */}
+                  <div className="p-4 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-1.5">
+                          <Vibrate className="w-3.5 h-3.5 text-[#176f78]" />
+                          <span>Tactile Haptic Feedback</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleToggleHaptics}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                            hapticFeedback ? 'bg-[#176f78]' : 'bg-slate-300 dark:bg-slate-700'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                              hapticFeedback ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-[#527078] dark:text-slate-400 leading-relaxed">
+                        Emits subtle vibration pulses upon button clicks, checklist taps, and floor alert triggers.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleTestHapticClick}
+                      className={`mt-3 w-full py-1.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        hapticTested
+                          ? 'bg-emerald-500 text-white border-emerald-500 scale-98'
+                          : 'bg-white dark:bg-[#12161c] text-[#17343a] dark:text-slate-200 border-[#d9d2c2] dark:border-[#2e3846] hover:bg-[#f1eee6]'
+                      }`}
+                    >
+                      <Vibrate className={`w-3.5 h-3.5 ${hapticTested ? 'animate-bounce' : ''}`} />
+                      <span>{hapticTested ? 'Vibration Pulse Fired!' : 'Test Haptic Tap'}</span>
+                    </button>
+                  </div>
+
+                  {/* UX Control 2: Click Animation Physics */}
+                  <div className="p-4 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5 text-[#176f78]" />
+                          <span>Click Physics &amp; Motion</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-[#176f78] dark:text-teal-300 font-bold uppercase">
+                          {clickPhysics}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#527078] dark:text-slate-400 leading-relaxed">
+                        Choose between bouncy touch micro-spring animation or instant rigid industrial response.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      <button
+                        type="button"
+                        onClick={() => handleApplyClickPhysics('smooth')}
+                        className={`py-1.5 px-2 rounded-xl text-xs font-bold border text-center transition-all cursor-pointer ${
+                          clickPhysics === 'smooth'
+                            ? 'bg-[#176f78] text-white border-[#176f78]'
+                            : 'bg-white dark:bg-[#12161c] text-slate-700 dark:text-slate-300 border-[#d9d2c2] dark:border-[#2e3846]'
+                        }`}
+                      >
+                        Smooth Spring
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyClickPhysics('instant')}
+                        className={`py-1.5 px-2 rounded-xl text-xs font-bold border text-center transition-all cursor-pointer ${
+                          clickPhysics === 'instant'
+                            ? 'bg-[#176f78] text-white border-[#176f78]'
+                            : 'bg-white dark:bg-[#12161c] text-slate-700 dark:text-slate-300 border-[#d9d2c2] dark:border-[#2e3846]'
+                        }`}
+                      >
+                        Instant Rigid
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* UX Control 3: Barcode Scanner / Stylus Focus Outline */}
+                  <div className="p-4 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-1.5">
+                          <Eye className="w-3.5 h-3.5 text-[#176f78]" />
+                          <span>Scanner Stylus Focus Ring</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleToggleScannerFocus}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                            scannerFocusRing ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                              scannerFocusRing ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-[#527078] dark:text-slate-400 leading-relaxed">
+                        Thick neon-green outline for barcode scanner terminals, stylus taps, and keyboard tab navigation.
+                      </p>
+                    </div>
+
+                    <div className="mt-3 text-[10px] font-mono text-slate-500 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>{scannerFocusRing ? 'High-Vis Focus Active' : 'Standard Focus Ring'}</span>
+                    </div>
+                  </div>
+
+                  {/* UX Control 4: Live Status Alert Pulses */}
+                  <div className="p-4 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Status Pulse Animations</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleToggleLivePulses}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                            liveAlertPulses ? 'bg-[#176f78]' : 'bg-slate-300 dark:bg-slate-700'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                              liveAlertPulses ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-[#527078] dark:text-slate-400 leading-relaxed">
+                        Toggle live breathing pulses on floor alerts, heartbeat indicators, and active sync sentinels.
+                      </p>
+                    </div>
+
+                    <div className="mt-3 text-[10px] font-mono text-slate-500 flex items-center gap-1">
+                      <span className={`w-2 h-2 rounded-full ${liveAlertPulses ? 'bg-amber-500 animate-pulse' : 'bg-slate-400'}`} />
+                      <span>{liveAlertPulses ? 'Animations Running' : 'Reduced Motion (Static)'}</span>
+                    </div>
+                  </div>
+
+                  {/* UX Control 5: One-Handed Mobile Reach Mode */}
+                  <div className="p-4 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-1.5">
+                          <Smartphone className="w-3.5 h-3.5 text-[#176f78]" />
+                          <span>One-Handed Mobile Reach</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleToggleOneHandedReach}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                            oneHandedMobileReach ? 'bg-[#176f78]' : 'bg-slate-300 dark:bg-slate-700'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                              oneHandedMobileReach ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-[#527078] dark:text-slate-400 leading-relaxed">
+                        Optimizes phone touch targets so primary actions and modals stay anchored within bottom thumb range.
+                      </p>
+                    </div>
+
+                    <div className="mt-3 text-[10px] font-mono text-slate-500 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-teal-500" />
+                      <span>{oneHandedMobileReach ? 'Thumb Reach Active' : 'Standard Mobile Layout'}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Shop Floor Density & Small Area Mode Selector */}
@@ -2571,6 +3512,256 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                     </button>
                   );
                 })}
+              </div>
+            </section>
+          )}
+
+          {/* ========================================================
+              CATEGORY 8: CI/CD & DEVOPS PIPELINE (Witcher6T9/DGU-2-IE-Control)
+          ======================================================== */}
+          {activeCategory === 'cicd' && (
+            <section className="space-y-6">
+              <div className="border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-[#17343a] dark:text-slate-100 flex items-center gap-2">
+                    <GitBranch className="w-4.5 h-4.5 text-[#176f78] dark:text-teal-400" />
+                    <span>Continuous Integration &amp; Continuous Deployment (CI/CD)</span>
+                  </h2>
+                  <p className="text-xs text-[#527078] dark:text-slate-400 mt-0.5">
+                    Automated GitHub Actions build, test, and multi-target deployment pipeline for <strong>Witcher6T9/DGU-2-IE-Control</strong>.
+                  </p>
+                </div>
+                <a
+                  href="https://github.com/Witcher6T9/DGU-2-IE-Control/actions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#176f78] hover:bg-[#125860] text-white text-xs font-semibold shadow-xs transition-colors self-start sm:self-auto"
+                >
+                  <span>View GitHub Actions</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+
+              {/* Status Header Banner */}
+              <div className="p-4 sm:p-5 rounded-2xl border border-teal-500/25 bg-gradient-to-r from-teal-500/10 via-emerald-500/5 to-transparent dark:from-teal-950/30 dark:via-slate-900/50 dark:to-transparent">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start sm:items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-[#176f78] text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Rocket className="w-5 h-5 text-teal-200" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-bold text-[#17343a] dark:text-slate-100 font-mono">
+                          Witcher6T9/DGU-2-IE-Control
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                          CI/CD Active
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#527078] dark:text-slate-400 mt-1">
+                        Triggered automatically on every <code>git push</code> to <code>main</code>, <code>master</code>, tags <code>v*</code>, and Pull Requests.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href="https://github.com/Witcher6T9/DGU-2-IE-Control"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-xl border border-[#d9d2c2] dark:border-[#384454] bg-white dark:bg-[#181d24] text-xs font-semibold text-[#17343a] dark:text-slate-200 hover:text-[#176f78] hover:border-[#176f78] transition-colors flex items-center gap-1.5"
+                    >
+                      <GitBranch className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Repository</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4 Pipeline Stages Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Stage 1 */}
+                <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-teal-500/10 text-[#176f78] dark:text-teal-400 flex items-center justify-center font-bold text-xs">
+                          1
+                        </div>
+                        <span className="text-xs font-bold text-[#17343a] dark:text-slate-200">
+                          Code Quality &amp; Lint
+                        </span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                        Passing
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#527078] dark:text-slate-400 leading-relaxed mb-3">
+                      Strict TypeScript compiler verification without emitting artifacts. Catches syntax, interface mismatches, and broken imports before deployment.
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] font-mono text-[11px] text-slate-600 dark:text-slate-300 bg-white/60 dark:bg-black/20 px-2.5 py-1.5 rounded-lg flex items-center justify-between">
+                    <span>$ npm run lint</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">0 errors</span>
+                  </div>
+                </div>
+
+                {/* Stage 2 */}
+                <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-teal-500/10 text-[#176f78] dark:text-teal-400 flex items-center justify-center font-bold text-xs">
+                          2
+                        </div>
+                        <span className="text-xs font-bold text-[#17343a] dark:text-slate-200">
+                          Automated Unit Tests
+                        </span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                        10 / 10 Passed
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#527078] dark:text-slate-400 leading-relaxed mb-3">
+                      Node 22 native test runner executing math calculations: 8-hour line balancing curve, line efficiency formulas, Friday factory holiday calendar, and auto-refresh intervals.
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] font-mono text-[11px] text-slate-600 dark:text-slate-300 bg-white/60 dark:bg-black/20 px-2.5 py-1.5 rounded-lg flex items-center justify-between">
+                    <span>$ npm run test:ci</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">4 suites / 10 tests</span>
+                  </div>
+                </div>
+
+                {/* Stage 3 */}
+                <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-teal-500/10 text-[#176f78] dark:text-teal-400 flex items-center justify-center font-bold text-xs">
+                          3
+                        </div>
+                        <span className="text-xs font-bold text-[#17343a] dark:text-slate-200">
+                          Production Build &amp; PWA
+                        </span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                        Verified
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#527078] dark:text-slate-400 leading-relaxed mb-3">
+                      Vite 8 production compilation with manual vendor chunking (Recharts, jsPDF, Lucide, XLSX), Workbox offline service worker, and webmanifest verification.
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] font-mono text-[11px] text-slate-600 dark:text-slate-300 bg-white/60 dark:bg-black/20 px-2.5 py-1.5 rounded-lg flex items-center justify-between">
+                    <span>$ npm run build</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">dist/ ready</span>
+                  </div>
+                </div>
+
+                {/* Stage 4 */}
+                <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-teal-500/10 text-[#176f78] dark:text-teal-400 flex items-center justify-center font-bold text-xs">
+                          4
+                        </div>
+                        <span className="text-xs font-bold text-[#17343a] dark:text-slate-200">
+                          Continuous Deployment (CD)
+                        </span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20">
+                        Multi-Target
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#527078] dark:text-slate-400 leading-relaxed mb-3">
+                      Deploys instantly to GitHub Pages on every push to main. Also syncs Firebase Hosting and Firestore rules when secrets are configured, plus multi-stage Docker container.
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-[#e7e1d5] dark:border-[#2e3846] font-mono text-[11px] text-slate-600 dark:text-slate-300 bg-white/60 dark:bg-black/20 px-2.5 py-1.5 rounded-lg flex items-center justify-between">
+                    <span>Targets</span>
+                    <span className="text-blue-600 dark:text-blue-400 font-bold">GitHub Pages + Firebase</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Deployment Targets Table */}
+              <div className="p-4 sm:p-5 rounded-2xl border border-[#d9d2c2] dark:border-[#2e3846] bg-white dark:bg-[#181d24]">
+                <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-100 uppercase tracking-wider font-mono mb-3">
+                  Configured Deployment Environments
+                </h3>
+                <div className="divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
+                  <div className="py-2.5 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-bold text-[#17343a] dark:text-slate-200">
+                        1. GitHub Pages (Native Web Preview)
+                      </div>
+                      <div className="text-[11px] text-[#527078] dark:text-slate-400">
+                        Zero external token required. Deploys using GitHub official <code>actions/deploy-pages@v4</code>.
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                      Automated
+                    </span>
+                  </div>
+
+                  <div className="py-2.5 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-bold text-[#17343a] dark:text-slate-200">
+                        2. Firebase Hosting &amp; Firestore Security Rules
+                      </div>
+                      <div className="text-[11px] text-[#527078] dark:text-slate-400">
+                        Deploys production build and pushes <code>firestore.rules</code> via <code>firebase.json</code>.
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                      Secret Optional
+                    </span>
+                  </div>
+
+                  <div className="py-2.5 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-bold text-[#17343a] dark:text-slate-200">
+                        3. Multi-Stage Docker Container
+                      </div>
+                      <div className="text-[11px] text-[#527078] dark:text-slate-400">
+                        Multi-stage Alpine Node 22 container, non-root user security, and HTTP health check.
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-500/20 shrink-0">
+                      Dockerfile Ready
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Secrets Setup Documentation */}
+              <div className="p-4 sm:p-5 rounded-2xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#151a21]">
+                <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-100 uppercase tracking-wider font-mono mb-2 flex items-center gap-2">
+                  <Terminal className="w-3.5 h-3.5 text-[#176f78]" />
+                  <span>GitHub Repository Secrets Configuration</span>
+                </h3>
+                <p className="text-xs text-[#527078] dark:text-slate-400 mb-3">
+                  In your repository at <strong>Settings &gt; Secrets and variables &gt; Actions</strong>, you can configure these optional credentials:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-white dark:bg-[#181d24]">
+                    <span className="font-mono font-bold text-[#17343a] dark:text-slate-200 block mb-1">
+                      FIREBASE_TOKEN
+                    </span>
+                    <p className="text-[#527078] dark:text-slate-400 text-[11px]">
+                      Generate via <code>npx firebase login:ci</code> to enable automatic Firebase Hosting &amp; Security Rules deployments.
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-white dark:bg-[#181d24]">
+                    <span className="font-mono font-bold text-[#17343a] dark:text-slate-200 block mb-1">
+                      GEMINI_API_KEY
+                    </span>
+                    <p className="text-[#527078] dark:text-slate-400 text-[11px]">
+                      Your Google Gemini API key to enable server-side line optimization and AI audit assistant features in CI environments.
+                    </p>
+                  </div>
+                </div>
               </div>
             </section>
           )}

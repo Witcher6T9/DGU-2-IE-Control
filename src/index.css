@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Theme Tokens: Daylight Cockpit vs Night Shift Dark Studio */
+/* Theme Tokens: Daylight Cockpit vs Night Shift Dark Studio & Specialty Themes */
 :root {
   --background: 44 26% 96%; /* #fbfaf6 Warm Cream Daylight */
   --foreground: 189 43% 16%; /* #17343a Dark Teal */
@@ -23,6 +23,182 @@
   --primary-foreground: 0 0% 100%;
   --muted: 217 24% 18%;
   --muted-foreground: 215 16% 65%;
+}
+
+[data-theme="industrial"] {
+  --background: 215 25% 12%; /* #161c24 Charcoal Foundry */
+  --foreground: 210 40% 98%;
+  --card: 215 28% 16%; /* #1d2530 */
+  --card-foreground: 210 40% 98%;
+  --border: 215 20% 28%; /* #374354 */
+  --primary: 174 72% 42%; /* #14b8a6 Electric Cyan */
+  --primary-foreground: 215 25% 12%;
+  --muted: 215 22% 20%;
+  --muted-foreground: 215 16% 70%;
+}
+
+[data-theme="forest"] {
+  --background: 160 35% 8%; /* #0d1f18 Deep Evergreen */
+  --foreground: 150 40% 96%;
+  --card: 160 30% 12%; /* #142a22 */
+  --card-foreground: 150 40% 96%;
+  --border: 160 25% 22%; /* #27483b */
+  --primary: 158 64% 45%; /* #10b981 Eco Emerald */
+  --primary-foreground: 0 0% 100%;
+  --muted: 160 20% 16%;
+  --muted-foreground: 150 18% 68%;
+}
+
+[data-theme="sunset"] {
+  --background: 24 35% 9%; /* #1f140e Copper Foundry */
+  --foreground: 36 60% 96%;
+  --card: 24 30% 14%; /* #2c1e16 */
+  --card-foreground: 36 60% 96%;
+  --border: 24 25% 25%; /* #4a3427 */
+  --primary: 38 92% 50%; /* #f59e0b Amber Gold */
+  --primary-foreground: 24 35% 9%;
+  --muted: 24 20% 18%;
+  --muted-foreground: 36 20% 70%;
+}
+
+[data-theme="nordic"] {
+  --background: 222 47% 10%; /* #0d1527 Glacier Steel */
+  --foreground: 210 40% 98%;
+  --card: 222 40% 14%; /* #15203b */
+  --card-foreground: 210 40% 98%;
+  --border: 222 30% 26%; /* #2a3b63 */
+  --primary: 199 89% 48%; /* #0ea5e9 Ice Blue */
+  --primary-foreground: 0 0% 100%;
+  --muted: 222 30% 18%;
+  --muted-foreground: 215 25% 72%;
+}
+
+[data-theme="oled"] {
+  --background: 0 0% 0%; /* #000000 True OLED Black */
+  --foreground: 0 0% 100%;
+  --card: 0 0% 4%; /* #0a0a0a */
+  --card-foreground: 0 0% 100%;
+  --border: 0 0% 18%; /* #2e2e2e */
+  --primary: 0 0% 100%;
+  --primary-foreground: 0 0% 0%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 0 0% 65%;
+}
+
+/* =========================================================================
+   TYPOGRAPHY & FONT DESIGN SUITE
+   ========================================================================= */
+
+/* Font Family 1: Sans (Inter & Modern Dynamic Sans) */
+[data-font-family="sans"] {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", Helvetica, Arial, sans-serif;
+}
+
+/* Font Family 2: Monospace (JetBrains & Industrial Tech) */
+[data-font-family="mono"] {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  letter-spacing: -0.01em;
+}
+
+/* Font Family 3: Dyslexic / High-Legibility Factory ClearView */
+[data-font-family="dyslexic"] {
+  font-family: "OpenDyslexic", "Comic Sans MS", "Trebuchet MS", "Arial Rounded MT Bold", -apple-system, sans-serif;
+  letter-spacing: 0.035em;
+  word-spacing: 0.08em;
+  line-height: 1.6;
+}
+
+/* Font Family 4: Grotesk (Geometric Modern Tech) */
+[data-font-family="grotesk"] {
+  font-family: "Space Grotesk", "Outfit", "Trebuchet MS", "Lucida Grande", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* Font Family 5: Editorial Serif (Executive Boardroom) */
+[data-font-family="serif"] {
+  font-family: "Charter", "Georgia", "Cambria", "Times New Roman", serif;
+}
+
+/* Tabular Numerals System-Wide (Vertical Alignment for Production Numbers) */
+[data-tabular-nums="true"],
+[data-tabular-nums="true"] table,
+[data-tabular-nums="true"] .font-mono-numbers,
+[data-tabular-nums="true"] [role="table"] {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+/* High-Glare Crisp Contrast Mode (Overhead fluorescent light readability) */
+[data-font-weight="crisp-contrast"] {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-shadow: 0 0 0.4px currentColor;
+}
+
+/* =========================================================================
+   CARD SURFACE GEOMETRY & CORNER RADIUS MODES
+   ========================================================================= */
+
+/* Sharp Technical (6px) */
+[data-card-radius="sharp"] .rounded-2xl,
+[data-card-radius="sharp"] .rounded-3xl,
+[data-card-radius="sharp"] .rounded-xl {
+  border-radius: 6px !important;
+}
+
+/* Modern Clean (12px) */
+[data-card-radius="modern"] .rounded-2xl,
+[data-card-radius="modern"] .rounded-3xl {
+  border-radius: 12px !important;
+}
+
+/* Apple Squircle (16px - Default) */
+[data-card-radius="squircle"] .rounded-2xl {
+  border-radius: 16px !important;
+}
+
+/* Soft Pillowed (24px) */
+[data-card-radius="soft"] .rounded-2xl,
+[data-card-radius="soft"] .rounded-xl {
+  border-radius: 24px !important;
+}
+
+/* Surface Styles */
+[data-surface-style="opaque"] .backdrop-blur-md,
+[data-surface-style="opaque"] .backdrop-blur-lg,
+[data-surface-style="opaque"] .backdrop-blur-sm {
+  backdrop-filter: none !important;
+}
+
+[data-surface-style="glass"] .bg-white\/90,
+[data-surface-style="glass"] .bg-white\/95,
+[data-surface-style="glass"] .bg-white {
+  backdrop-filter: blur(12px);
+}
+
+[data-surface-style="high-contrast"] .border {
+  border-width: 2px !important;
+}
+
+/* Frontline Click Physics */
+[data-click-physics="instant"] * {
+  transition-duration: 0ms !important;
+  transform: none !important;
+}
+
+/* High-Visibility Scanner Stylus Focus Rings */
+[data-scanner-focus="true"] :focus-visible {
+  outline: 3px solid #10b981 !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.35) !important;
+}
+
+/* Disable Live Pulses for Low Motion / Battery Conservation */
+[data-live-pulses="false"] .animate-pulse,
+[data-live-pulses="false"] .animate-spin,
+[data-live-pulses="false"] .animate-subtle-breathe,
+[data-live-pulses="false"] .animate-ai-pulse-aura {
+  animation: none !important;
 }
 
 /* Safe area inset utilities for iOS Safari & Android PWAs */

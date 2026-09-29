@@ -57,7 +57,10 @@ import {
   Info,
   SmartphoneNfc,
   DownloadCloud,
-  RotateCcw
+  RotateCcw,
+  Type,
+  Vibrate,
+  Hash
 } from 'lucide-react';
 import { AndroidLogoIcon } from './AndroidLogoIcon';
 import {
@@ -68,8 +71,11 @@ import {
   DailyBackupRecord,
   UserProfile,
   LineEntry,
-  RoleTier
+  RoleTier,
+  FontFamilyStyle
 } from '../types';
+import { getStoredAppPageLayout, saveStoredAppPageLayout, applyLayoutStyling } from '../utils/layoutManager';
+import { triggerHaptic, setHapticsEnabled } from '../utils/haptics';
 import { DEFAULT_DAILY_BACKUP_SETTINGS } from '../utils/indexedDbBackup';
 import { DEFAULT_DASHBOARD_LAYOUT, SYSTEM_ADMIN_PROFILE } from '../mockData';
 import { playWipAlertSound, playBottleneckAlertSound } from '../utils/audioAlert';
@@ -253,6 +259,83 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setUpdateStatusMsg('DGU-2 IE Control is up to date (Version 2.4.0).');
       setTimeout(() => setUpdateStatusMsg(null), 4500);
     }, 1200);
+  };
+
+  const [modalFontFamily, setModalFontFamily] = useState<FontFamilyStyle>(() => {
+    try {
+      return getStoredAppPageLayout().fontFamily || 'sans';
+    } catch {
+      return 'sans';
+    }
+  });
+
+  const [modalFontScale, setModalFontScale] = useState<number>(() => {
+    try {
+      return getStoredAppPageLayout().fontScalePct || 100;
+    } catch {
+      return 100;
+    }
+  });
+
+  const [modalTabularNums, setModalTabularNums] = useState<boolean>(() => {
+    try {
+      return getStoredAppPageLayout().tabularNumerals !== false;
+    } catch {
+      return true;
+    }
+  });
+
+  const [modalHaptics, setModalHaptics] = useState<boolean>(() => {
+    try {
+      return getStoredAppPageLayout().hapticFeedback !== false;
+    } catch {
+      return true;
+    }
+  });
+
+  const handleModalApplyFontFamily = (f: FontFamilyStyle) => {
+    setModalFontFamily(f);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, fontFamily: f, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleModalApplyFontScale = (scale: number) => {
+    setModalFontScale(scale);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, fontScalePct: scale, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleModalToggleTabularNums = (enabled: boolean) => {
+    setModalTabularNums(enabled);
+    triggerHaptic('selection');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, tabularNumerals: enabled, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
+  };
+
+  const handleModalToggleHaptics = (enabled: boolean) => {
+    setModalHaptics(enabled);
+    setHapticsEnabled(enabled);
+    if (enabled) triggerHaptic('success');
+    try {
+      const cfg = getStoredAppPageLayout();
+      const updated = { ...cfg, hapticFeedback: enabled, lastUpdated: new Date().toISOString() };
+      saveStoredAppPageLayout(updated);
+      applyLayoutStyling(updated);
+    } catch {}
   };
 
   // Sync initial tab when opened
@@ -694,6 +777,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       colorDot: 'bg-[#182026] border-teal-500'
     },
     {
+      id: 'industrial',
+      label: 'Industrial Steel & Monolith',
+      desc: 'Technical steel and graphite theme inspired by modern machinery',
+      previewClass: 'bg-[#eef2f5] border-slate-700 text-slate-900',
+      colorDot: 'bg-[#475569] border-slate-700'
+    },
+    {
       id: 'forest',
       label: 'Lean Emerald Kaizen',
       desc: 'Crisp green hues highlighting continuous improvement and zero defects',
@@ -708,11 +798,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       colorDot: 'bg-[#ff9500] border-amber-600'
     },
     {
-      id: 'industrial',
-      label: 'Industrial Steel & Monolith',
-      desc: 'Technical steel and graphite theme inspired by modern machinery',
-      previewClass: 'bg-[#eef2f5] border-slate-700 text-slate-900',
-      colorDot: 'bg-[#475569] border-slate-700'
+      id: 'nordic',
+      label: 'Nordic Glacier Frost',
+      desc: 'Titanium steel with crisp ice blue accents for executive review',
+      previewClass: 'bg-[#0d1527] border-sky-500 text-sky-100',
+      colorDot: 'bg-[#0ea5e9] border-sky-500'
+    },
+    {
+      id: 'oled',
+      label: 'True Black OLED Minimalist',
+      desc: 'Pure black battery saver for frontline mobile terminals',
+      previewClass: 'bg-black border-white text-white',
+      colorDot: 'bg-black border-white'
     }
   ];
 
@@ -1758,6 +1855,111 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Typography & Engineered Fonts Suite */}
+              <div className="pt-2 px-3">
+                <h4 className="text-[13px] font-bold text-[#6e6e73] dark:text-[#8e8e93] uppercase tracking-wider flex items-center gap-1.5">
+                  <Type className="w-4 h-4 text-[#007aff]" />
+                  <span>Typography &amp; Engineered Font Families</span>
+                </h4>
+                <p className="text-[12px] text-[#8e8e93] mt-0.5">
+                  Optimized character legibility for factory vibration, tabular alignment, and reading comfort.
+                </p>
+              </div>
+
+              <div className="bg-white dark:bg-[#1c1c1e] rounded-2xl sm:rounded-3xl border border-[#e5e5ea] dark:border-[#2c2c2e] shadow-2xs overflow-hidden divide-y divide-[#e5e5ea] dark:divide-[#2c2c2e]">
+                {[
+                  { id: 'sans' as FontFamilyStyle, name: 'Inter & Dynamic Sans', desc: 'Modern high-legibility geometric UI sans-serif' },
+                  { id: 'mono' as FontFamilyStyle, name: 'JetBrains Industrial Monospace', desc: 'Precision tabular alignment for SMV & pacing numbers' },
+                  { id: 'dyslexic' as FontFamilyStyle, name: 'Factory ClearView (Anti-Glare)', desc: 'Weighted bottom apertures to resist machinery vibration' },
+                  { id: 'grotesk' as FontFamilyStyle, name: 'Geometric Modern Grotesk', desc: 'Command hub aesthetic with sharp architectural lines' },
+                  { id: 'serif' as FontFamilyStyle, name: 'Editorial Executive Serif', desc: 'Formal executive ledger and audit dossier typography' }
+                ].map(f => {
+                  const isSelected = modalFontFamily === f.id;
+                  return (
+                    <div
+                      key={f.id}
+                      onClick={() => handleModalApplyFontFamily(f.id)}
+                      className="px-4 py-3.5 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#252528] active:bg-[#e5e5ea] dark:active:bg-[#2c2c2e] transition-colors cursor-pointer touch-manipulation min-h-[52px]"
+                    >
+                      <div>
+                        <div className="text-[15px] text-[#1c1c1e] dark:text-white font-medium leading-tight">
+                          {f.name}
+                        </div>
+                        <div className="text-[12px] text-[#8e8e93] mt-0.5">{f.desc}</div>
+                      </div>
+
+                      {isSelected && (
+                        <div className="w-6 h-6 rounded-full bg-[#007aff] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                          <Check className="w-4 h-4 stroke-[3]" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Font Scaling Row */}
+                <div className="px-4 py-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[15px] text-[#1c1c1e] dark:text-white font-medium">
+                      App Text Scale
+                    </div>
+                    <span className="text-[12px] font-mono font-bold text-[#007aff]">
+                      {modalFontScale}%
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    {[85, 90, 95, 100, 105, 110, 115].map(scale => (
+                      <button
+                        key={scale}
+                        type="button"
+                        onClick={() => handleModalApplyFontScale(scale)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer ${
+                          modalFontScale === scale
+                            ? 'bg-[#007aff] text-white border-[#007aff]'
+                            : 'bg-[#f2f2f7] dark:bg-[#2c2c2e] text-[#1c1c1e] dark:text-white border-transparent'
+                        }`}
+                      >
+                        {scale}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tabular Numerals Switch */}
+                <div className="px-4 py-3.5 flex items-center justify-between min-h-[56px]">
+                  <div>
+                    <div className="text-[15px] text-[#1c1c1e] dark:text-white font-medium leading-tight">
+                      Tabular Numerals (TNUM)
+                    </div>
+                    <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                      Aligns table digits vertically with uniform column spacing
+                    </div>
+                  </div>
+                  <CupertinoSwitch
+                    checked={modalTabularNums}
+                    onChange={handleModalToggleTabularNums}
+                    ariaLabel="Toggle Tabular Numerals"
+                  />
+                </div>
+
+                {/* Tactile Haptics Switch */}
+                <div className="px-4 py-3.5 flex items-center justify-between min-h-[56px]">
+                  <div>
+                    <div className="text-[15px] text-[#1c1c1e] dark:text-white font-medium leading-tight">
+                      Tactile Haptic Vibration
+                    </div>
+                    <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                      Vibrates mobile devices on touch clicks and floor alerts
+                    </div>
+                  </div>
+                  <CupertinoSwitch
+                    checked={modalHaptics}
+                    onChange={handleModalToggleHaptics}
+                    ariaLabel="Toggle Tactile Haptics"
+                  />
+                </div>
               </div>
             </div>
           )}

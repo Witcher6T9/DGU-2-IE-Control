@@ -1,0 +1,221 @@
+name: CI/CD Pipeline - Witcher6T9/DGU-2-IE-Control
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'Deployment Target'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - github-pages
+          - firebase
+          - dry-run-only
+
+# Prevent duplicate workflow executions when rapid commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+env:
+  NODE_VERSION: '22.x'
+
+jobs:
+  # =========================================================================
+  # 1. Code Quality & TypeScript Type Check
+  # =========================================================================
+  lint-and-typecheck:
+    name: Code Quality & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Run TypeScript Linter & Type Check
+        run: npm run lint
+
+  # =========================================================================
+  # 2. Automated Unit Tests (IE Calculations, Balancing, Metrics, Config)
+  # =========================================================================
+  test:
+    name: Automated Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Execute Unit Test Suite
+        run: npm run test:ci
+
+  # =========================================================================
+  # 3. Production Build & Asset Packaging
+  # =========================================================================
+  build:
+    name: Build Application & Package PWA
+    needs: [lint-and-typecheck, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Build Production Distribution
+        env:
+          NODE_ENV: production
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: npm run build
+
+      - name: Validate Build Outputs
+        run: |
+          echo "Verifying production build output directory..."
+          test -d dist || { echo "dist directory does not exist!"; exit 1; }
+          test -f dist/index.html || { echo "dist/index.html is missing!"; exit 1; }
+          test -f dist/manifest.webmanifest || { echo "dist/manifest.webmanifest is missing!"; exit 1; }
+          echo "✓ Build artifacts successfully verified."
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dgu2-ie-production-dist
+          path: dist/
+          retention-days: 14
+
+      # Prepare GitHub Pages Artifact if pushing to main/master
+      - name: Configure GitHub Pages Artifact
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+  # =========================================================================
+  # 4. Continuous Deployment: GitHub Pages (Automatic Live Preview)
+  # =========================================================================
+  deploy-github-pages:
+    name: Deploy to GitHub Pages
+    needs: [build]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && (github.event.inputs.deploy_target == null || github.event.inputs.deploy_target == 'all' || github.event.inputs.deploy_target == 'github-pages')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages Web App
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # =========================================================================
+  # 5. Continuous Deployment: Firebase Hosting & Firestore Rules
+  # =========================================================================
+  deploy-firebase:
+    name: Deploy to Firebase Hosting & Rules
+    needs: [build]
+    if: |
+      github.event_name == 'push' && 
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
+      (github.event.inputs.deploy_target == null || github.event.inputs.deploy_target == 'all' || github.event.inputs.deploy_target == 'firebase')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Built Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dgu2-ie-production-dist
+          path: dist/
+
+      - name: Deploy to Firebase
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -n "$FIREBASE_TOKEN" ] || [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "Deploying to Firebase project..."
+            npx firebase-tools deploy --only hosting,firestore:rules --token "$FIREBASE_TOKEN" --non-interactive
+          else
+            echo "Firebase secret (FIREBASE_TOKEN or FIREBASE_SERVICE_ACCOUNT) is not configured. Skipping Firebase live deploy."
+            echo "To enable Firebase CD, add FIREBASE_TOKEN in repo Settings > Secrets and variables > Actions."
+          fi
+
+  # =========================================================================
+  # 6. CI/CD Run Summary & Pipeline Status Card
+  # =========================================================================
+  pipeline-summary:
+    name: CI/CD Pipeline Summary
+    needs: [lint-and-typecheck, test, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Pipeline Markdown Summary
+        run: |
+          echo "### 🚀 CI/CD Pipeline Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** \`Witcher6T9/DGU-2-IE-Control\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Ref / Branch:** \`${{ github.ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger Event:** \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔍 Lint & Type Check | \`${{ needs.lint-and-typecheck.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🧪 Automated Unit Tests | \`${{ needs.test.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📦 Build & PWA Packaging | \`${{ needs.build.result }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All checks completed for \`Witcher6T9/DGU-2-IE-Control\`." >> $GITHUB_STEP_SUMMARY

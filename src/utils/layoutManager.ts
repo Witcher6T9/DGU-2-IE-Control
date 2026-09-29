@@ -52,6 +52,16 @@ export const DEFAULT_APP_PAGE_LAYOUT: AppPageLayoutConfig = {
   floorCardStyle: 'card',
   brandColor: '#176f78',
   fontScalePct: 100,
+  fontFamily: 'sans',
+  fontWeightMode: 'regular',
+  tabularNumerals: true,
+  cardRadius: 'squircle',
+  surfaceStyle: 'opaque',
+  hapticFeedback: true,
+  clickPhysics: 'smooth',
+  scannerFocusRing: false,
+  liveAlertPulses: true,
+  oneHandedMobileReach: false,
   density: 'comfortable',
   workspaceWidth: 'maximized',
   smallAreaFeaturesEnabled: true,
@@ -235,6 +245,45 @@ export function applyLayoutStyling(config: AppPageLayoutConfig): void {
     } else {
       root.classList.remove('high-contrast-mode');
     }
+
+    // Typography & Font Family Engine
+    const fontFamily = config.fontFamily || 'sans';
+    root.setAttribute('data-font-family', fontFamily);
+    if (document.body) document.body.setAttribute('data-font-family', fontFamily);
+
+    const fontWeight = config.fontWeightMode || 'regular';
+    root.setAttribute('data-font-weight', fontWeight);
+    if (document.body) document.body.setAttribute('data-font-weight', fontWeight);
+
+    const tabularNums = config.tabularNumerals !== false ? 'true' : 'false';
+    root.setAttribute('data-tabular-nums', tabularNums);
+    if (document.body) document.body.setAttribute('data-tabular-nums', tabularNums);
+
+    // Card Surface & Geometry Customization
+    const cardRadius = config.cardRadius || 'squircle';
+    root.setAttribute('data-card-radius', cardRadius);
+    if (document.body) document.body.setAttribute('data-card-radius', cardRadius);
+
+    const surfaceStyle = config.surfaceStyle || 'opaque';
+    root.setAttribute('data-surface-style', surfaceStyle);
+    if (document.body) document.body.setAttribute('data-surface-style', surfaceStyle);
+
+    // Frontline UX & Ergonomics Customization
+    const clickPhysics = config.clickPhysics || 'smooth';
+    root.setAttribute('data-click-physics', clickPhysics);
+    if (document.body) document.body.setAttribute('data-click-physics', clickPhysics);
+
+    const scannerFocus = config.scannerFocusRing ? 'true' : 'false';
+    root.setAttribute('data-scanner-focus', scannerFocus);
+    if (document.body) document.body.setAttribute('data-scanner-focus', scannerFocus);
+
+    const livePulses = config.liveAlertPulses !== false ? 'true' : 'false';
+    root.setAttribute('data-live-pulses', livePulses);
+    if (document.body) document.body.setAttribute('data-live-pulses', livePulses);
+
+    const mobileReach = config.oneHandedMobileReach ? 'true' : 'false';
+    root.setAttribute('data-mobile-reach', mobileReach);
+    if (document.body) document.body.setAttribute('data-mobile-reach', mobileReach);
   } catch (e) {
     console.warn('Failed to apply layout styling:', e);
   }

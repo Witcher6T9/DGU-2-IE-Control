@@ -3,9 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type ThemeType = 'light' | 'dark' | 'forest' | 'sunset' | 'industrial';
+export type ThemeType = 'light' | 'dark' | 'forest' | 'sunset' | 'industrial' | 'nordic' | 'oled';
 export type DensityType = 'normal' | 'compact';
 export type SaveStatus = 'idle' | 'saving' | 'saved';
+
+export type FontFamilyStyle = 'sans' | 'mono' | 'dyslexic' | 'grotesk' | 'serif';
+export type CardRadiusMode = 'sharp' | 'modern' | 'squircle' | 'soft';
+export type SurfaceStyleMode = 'opaque' | 'glass' | 'high-contrast';
+export type ClickPhysicsMode = 'smooth' | 'instant';
+export type FontWeightMode = 'regular' | 'crisp-contrast';
 
 export interface DayWiseSummary {
   date: string;
@@ -103,9 +109,19 @@ export interface AppPageLayoutConfig {
   floorGridColumns: FloorGridColumns;
   floorCardStyle: 'card' | 'row' | 'compact-chip';
   
-  // Visual & Ergonomics
+  // Visual, Typography & Ergonomics Suite
   brandColor: string; // hex color e.g. '#176f78'
-  fontScalePct: number; // 90, 100, 115
+  fontScalePct: number; // 85, 90, 95, 100, 105, 110, 115
+  fontFamily?: FontFamilyStyle;
+  fontWeightMode?: FontWeightMode;
+  tabularNumerals?: boolean;
+  cardRadius?: CardRadiusMode;
+  surfaceStyle?: SurfaceStyleMode;
+  hapticFeedback?: boolean;
+  clickPhysics?: ClickPhysicsMode;
+  scannerFocusRing?: boolean;
+  liveAlertPulses?: boolean;
+  oneHandedMobileReach?: boolean;
   density: LayoutDensity;
   workspaceWidth?: WorkspaceWidthMode; // Adjust blank workspace area on pages: 'fluid' (100% full-bleed), 'maximized' (97% wide), 'standard' (1500px boxed)
   smallAreaFeaturesEnabled?: boolean; // System-wide small area micro-footprint, collapsible strips, and condensed chips

@@ -879,7 +879,8 @@ export default function App() {
   useEffect(() => {
     if (typeof document !== 'undefined') {
       document.documentElement.classList.add('theme-transitioning');
-      document.documentElement.classList.toggle('dark', theme === 'dark');
+      document.documentElement.classList.toggle('dark', theme !== 'light');
+      document.documentElement.setAttribute('data-theme', theme);
       document.body.setAttribute('data-theme', theme);
       try {
         localStorage.setItem('ie_theme', theme);
