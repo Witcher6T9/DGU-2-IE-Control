@@ -79,7 +79,7 @@ interface DatabaseModalProps {
   onLoadDebonairData?: () => void;
   onImportLines?: (importedLines: LineEntry[], mode?: 'upsert' | 'append' | 'replace') => void;
   activeDate?: string;
-  initialTab?: 'backup' | 'csv-import' | 'offline-log';
+  initialTab?: 'backup' | 'csv-import' | 'cloud-vault' | 'offline-log';
   dailyBackupSettings?: UserDailyBackupSettings;
   onUpdateDailyBackupSettings?: (updated: UserDailyBackupSettings) => void;
   onOpenSettingsBackup?: () => void;
@@ -105,7 +105,7 @@ export const DatabaseModal: React.FC<DatabaseModalProps> = ({
   onOpenSettingsBackup,
   onTriggerManualBackup
 }) => {
-  const [activeTab, setActiveTab] = useState<'backup' | 'csv-import' | 'offline-log'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'backup' | 'csv-import' | 'cloud-vault' | 'offline-log'>(initialTab);
   const jsonFileInputRef = useRef<HTMLInputElement>(null);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
 

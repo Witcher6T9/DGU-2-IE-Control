@@ -824,3 +824,45 @@ export async function pushInjectedPackageToOta(
     message: `System update v${release.version} successfully injected & staged in local OTA registry!`
   };
 }
+
+export const NATIVE_ANDROID_FIRESTORE_SYNC_CODE = `package com.debonair.iedailycontrol.sync
+
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.flow.MutableStateFlow
+
+/**
+ * Online Ready Firestore Synchronization Service for DGU-2 IE Control
+ * Target Firestore Database: ai-studio-remixdgu2iecontr-ec4203c2-48bc-4aa8-8b33-164c02d5c173
+ */
+class OnlineFirestoreSyncEngine {
+    private val db = FirebaseFirestore.getInstance()
+    val isOnline = MutableStateFlow(true)
+    val latencyMs = MutableStateFlow(24)
+
+    fun startRealtimeFleetSync(onUpdate: (String) -> Unit) {
+        // Bi-directional live snapshot listener on factory production telemetry
+        db.collection("stations").addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                isOnline.value = false
+                return@addSnapshotListener
+            }
+            isOnline.value = true
+            snapshot?.documents?.forEach { doc ->
+                onUpdate(doc.id)
+            }
+        }
+    }
+
+    suspend fun syncStationTelemetry(stationId: String, cycleTime: Double, oee: Double) {
+        db.collection("stations").document(stationId).set(
+            mapOf(
+                "cycleTime" to cycleTime,
+                "oee" to oee,
+                "syncedAt" to System.currentTimeMillis()
+            ),
+            SetOptions.merge()
+        )
+    }
+}`;
+

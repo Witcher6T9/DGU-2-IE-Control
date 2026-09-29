@@ -99,7 +99,8 @@ import {
   CardRadiusMode,
   SurfaceStyleMode,
   ClickPhysicsMode,
-  FontWeightMode
+  FontWeightMode,
+  TopBarConfig
 } from '../types';
 import {
   StationData,
@@ -259,6 +260,11 @@ interface SettingsControlCenterPageProps {
   onSelectWorkspaceWidth?: (width: WorkspaceWidthMode) => void;
   smallAreaFeaturesEnabled?: boolean;
   onToggleSmallAreaFeatures?: () => void;
+
+  // Top Bar & Mobile UX Polish
+  topBarConfig?: TopBarConfig;
+  onSaveTopBarConfig?: (config: TopBarConfig) => void;
+  onOpenTopBarCustomizer?: () => void;
 }
 
 export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps> = ({
@@ -272,6 +278,9 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   onSelectWorkspaceWidth,
   smallAreaFeaturesEnabled: propSmallAreaEnabled,
   onToggleSmallAreaFeatures,
+  topBarConfig,
+  onSaveTopBarConfig,
+  onOpenTopBarCustomizer,
   layout,
   onUpdateLayout,
   auditoryAlertsEnabled = true,
@@ -3139,6 +3148,66 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                   </div>
                 </div>
               </div>
+
+              {/* Top Bar & Mobile UX Polish Suite */}
+              <div className="pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846] space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sliders className="w-3.5 h-3.5 text-[#176f78] dark:text-teal-400" />
+                      <span>Top Bar &amp; Mobile UX Polish Suite</span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase font-mono bg-[#176f78]/15 text-[#176f78] dark:text-teal-300 border border-[#176f78]/30">
+                        Frontline Mobile
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-[#527078] dark:text-slate-400 mt-0.5">
+                      Configure mobile header height (56px standard, 46px compact, 38px micro), enable the ergonomic Date &amp; Floor sub-strip, and tailor pinned telemetry buttons.
+                    </p>
+                  </div>
+                  {onOpenTopBarCustomizer && (
+                    <button
+                      type="button"
+                      onClick={onOpenTopBarCustomizer}
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#176f78] hover:bg-[#135d65] text-white transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 self-start sm:self-auto active:scale-95"
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5" />
+                      <span>Open Top Bar Studio</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-[#17343a] dark:text-slate-200">
+                      <Smartphone className="w-3.5 h-3.5 text-[#176f78] dark:text-teal-400" />
+                      <span>Mobile Ergonomic Sub-Strip</span>
+                    </div>
+                    <p className="text-[11px] text-[#527078] dark:text-slate-400 leading-relaxed">
+                      Instant day jump arrows (&lt; Date &gt;) and floor selector right under the top bar for fast shop floor mobile review.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-[#17343a] dark:text-slate-200">
+                      <Minimize2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Adaptive Responsive Form Factor</span>
+                    </div>
+                    <p className="text-[11px] text-[#527078] dark:text-slate-400 leading-relaxed">
+                      Switch between Standard 56px, Compact 46px, Minimalist 38px, and Floating Island pill with live preview.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846] space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-[#17343a] dark:text-slate-200">
+                      <Palette className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Custom Pinned Action Shortcuts</span>
+                    </div>
+                    <p className="text-[11px] text-[#527078] dark:text-slate-400 leading-relaxed">
+                      Toggle Online/Offline live telemetry pill, IE Scorecard attainment badge, Auto-Save indicator, and dark/light mode toggle.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </section>
           )}
 
@@ -3608,13 +3677,14 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24]">
                   <div className="text-[11px] font-semibold text-[#527078] dark:text-slate-400 uppercase">
-                    Service Worker Precache
+                    Service Worker Precache &amp; Cloud Telemetry
                   </div>
                   <div className="text-sm font-bold text-[#17343a] dark:text-slate-200 mt-1 font-mono">
-                    68 Assets Precached
+                    68 Assets Precached • Firestore Active
                   </div>
-                  <div className="text-xs text-emerald-700 dark:text-emerald-400 font-bold mt-1">
-                    Zero-Network Offline Ready
+                  <div className="text-xs text-emerald-700 dark:text-emerald-400 font-bold mt-1 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Online Ready Android App (Cloud Sync)
                   </div>
                 </div>
 

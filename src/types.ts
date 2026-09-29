@@ -64,6 +64,27 @@ export type NavBarStyle = 'bottom-cupertino' | 'floating-dock' | 'top-header' | 
 export type FloorGridColumns = 1 | 2 | 3 | 4;
 export type LayoutDensity = 'compact' | 'comfortable' | 'spacious';
 export type WorkspaceWidthMode = 'fluid' | 'maximized' | 'standard';
+export type TopBarMobileStyle = 'standard' | 'compact' | 'minimal' | 'floating';
+export type TopBarAccentTheme = 'brand' | 'slate' | 'emerald' | 'amber' | 'indigo' | 'dark';
+
+export interface TopBarConfig {
+  mobileStyle: TopBarMobileStyle; // 'standard' (56px), 'compact' (46px), 'minimal' (38px), 'floating' (island dock)
+  sticky: boolean; // Sticky at top of viewport
+  showSubHeaderOnMobile: boolean; // Mobile ergonomic sub-strip for quick Date & Floor switching
+  showDateSelectorOnMobile: boolean; // Render date selector on mobile
+  showFloorSelectorOnMobile: boolean; // Render floor dropdown on mobile
+  showOnlinePill: boolean; // Real-time telemetry connection pill
+  showScorecard: boolean; // IE Performance Scorecard badge
+  showAutoSaveIndicator: boolean; // Micro save state indicator
+  showNotifications: boolean; // Notifications bell
+  showUserProfile: boolean; // User profile & tier avatar
+  showTeamChat: boolean; // Quick floor communications launcher
+  showQuickSettings: boolean; // Settings gear button
+  showThemeToggle: boolean; // Dark/light mode switcher
+  accentTheme: TopBarAccentTheme; // Subtle accent highlight on header borders
+  brandDisplayMode: 'full' | 'compact' | 'badge-only'; // Brand identity mode on mobile
+}
+
 export type LayoutPresetId =
   | 'debonair-floor-default'
   | 'executive-attainment'
@@ -130,6 +151,7 @@ export interface AppPageLayoutConfig {
   highContrastMode: boolean;
   kioskLockEnabled: boolean;
   kioskAllowedLine?: string;
+  topBar?: TopBarConfig;
 }
 
 export type UpdateCategory =

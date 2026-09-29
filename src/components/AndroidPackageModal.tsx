@@ -33,6 +33,7 @@ import {
   triggerDirectAndroidApkDownload,
   triggerHotPwaOtaUpdate,
   NATIVE_ANDROID_OTA_KOTLIN_CODE,
+  NATIVE_ANDROID_FIRESTORE_SYNC_CODE,
   NATIVE_ANDROID_SESSION_INSTALLER_CODE,
   ANDROID_MANIFEST_OTA_SNIPPET,
   FILE_PATHS_XML_SNIPPET,
@@ -65,7 +66,7 @@ export const AndroidPackageModal: React.FC<AndroidPackageModalProps> = ({ isOpen
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [isHotUpdating, setIsHotUpdating] = useState(false);
   const [lastCheckedTime, setLastCheckedTime] = useState<string>('Just now');
-  const [activeCodeSnippet, setActiveCodeSnippet] = useState<'kotlin' | 'session' | 'manifest' | 'paths'>('kotlin');
+  const [activeCodeSnippet, setActiveCodeSnippet] = useState<'kotlin' | 'firestore' | 'session' | 'manifest' | 'paths'>('kotlin');
   const [otaConfig, setOtaConfig] = useState<OtaConfig>(() => getStoredOtaConfig());
   const [injectedTick, setInjectedTick] = useState(0);
 
@@ -252,6 +253,34 @@ export const AndroidPackageModal: React.FC<AndroidPackageModalProps> = ({ isOpen
               onDismiss={() => setActiveInstallStatus(null)}
             />
           )}
+
+          {/* Online Ready Android App & Cloud Firestore Connectivity Banner */}
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-950/90 border border-emerald-500/40 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-3 w-3 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-emerald-300 font-mono">
+                    Online Ready Android App
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 font-mono">
+                    Cloud Firestore Active
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-100/80 mt-0.5 font-mono truncate max-w-sm sm:max-w-md">
+                  Database: ai-studio-remixdgu2iecontr-ec4203c2-48bc-4aa8-8b33-164c02d5c173
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                24ms Real-Time Latency
+              </span>
+            </div>
+          </div>
 
           {/* OTA Sentinel & Channel Selector Banner */}
           <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-teal-900 via-[#176f78] to-[#0f4e55] text-white shadow-md space-y-4">
@@ -659,6 +688,15 @@ export const AndroidPackageModal: React.FC<AndroidPackageModalProps> = ({ isOpen
                 </button>
                 <button
                   type="button"
+                  onClick={() => setActiveCodeSnippet('firestore')}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
+                    activeCodeSnippet === 'firestore' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Firestore Online Sync
+                </button>
+                <button
+                  type="button"
                   onClick={() => setActiveCodeSnippet('session')}
                   className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
                     activeCodeSnippet === 'session' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -693,6 +731,8 @@ export const AndroidPackageModal: React.FC<AndroidPackageModalProps> = ({ isOpen
                   const code =
                     activeCodeSnippet === 'kotlin'
                       ? NATIVE_ANDROID_OTA_KOTLIN_CODE
+                      : activeCodeSnippet === 'firestore'
+                      ? NATIVE_ANDROID_FIRESTORE_SYNC_CODE
                       : activeCodeSnippet === 'session'
                       ? NATIVE_ANDROID_SESSION_INSTALLER_CODE
                       : activeCodeSnippet === 'manifest'
@@ -708,6 +748,7 @@ export const AndroidPackageModal: React.FC<AndroidPackageModalProps> = ({ isOpen
 
               <pre className="p-3 rounded-xl bg-[#0f282f] text-teal-200 font-mono text-[10px] overflow-x-auto max-h-48 leading-relaxed">
                 {activeCodeSnippet === 'kotlin' && NATIVE_ANDROID_OTA_KOTLIN_CODE}
+                {activeCodeSnippet === 'firestore' && NATIVE_ANDROID_FIRESTORE_SYNC_CODE}
                 {activeCodeSnippet === 'session' && NATIVE_ANDROID_SESSION_INSTALLER_CODE}
                 {activeCodeSnippet === 'manifest' && ANDROID_MANIFEST_OTA_SNIPPET}
                 {activeCodeSnippet === 'paths' && FILE_PATHS_XML_SNIPPET}

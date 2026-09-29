@@ -28,22 +28,47 @@ export interface OfflineActivityLogEntry {
 
 const OFFLINE_MODE_KEY = 'ie_system_offline';
 const OFFLINE_LOGS_KEY = 'ie_offline_activity_log';
+const ONLINE_READY_MIGRATION_KEY = 'ie_online_ready_v2';
 
 /**
  * Check if the system is currently in Offline mode (Online Connection Off)
- * Defaults to true as requested.
+ * Online Ready: Defaults to false (Connected) whenever online.
  */
 export function isSystemOffline(): boolean {
   try {
+    // If the browser itself is offline, report offline
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return true;
+    }
+    // Migration check: Ensure the app defaults to Online Ready
+    const migrated = localStorage.getItem(ONLINE_READY_MIGRATION_KEY);
+    if (!migrated) {
+      localStorage.setItem(ONLINE_READY_MIGRATION_KEY, 'true');
+      localStorage.setItem(OFFLINE_MODE_KEY, 'false');
+      return false;
+    }
     const val = localStorage.getItem(OFFLINE_MODE_KEY);
     if (val === null) {
-      // Default to Offline (Online Connection Off)
-      localStorage.setItem(OFFLINE_MODE_KEY, 'true');
-      return true;
+      localStorage.setItem(OFFLINE_MODE_KEY, 'false');
+      return false;
     }
     return val === 'true';
   } catch {
-    return true;
+    return false;
+  }
+}
+
+/**
+ * Ensures the system boots in Online Ready mode and triggers sync
+ */
+export function ensureOnlineReady(): void {
+  try {
+    localStorage.setItem(ONLINE_READY_MIGRATION_KEY, 'true');
+    localStorage.setItem(OFFLINE_MODE_KEY, 'false');
+    window.dispatchEvent(new CustomEvent('ie_offline_status_change', { detail: { isOffline: false } }));
+    syncAllPendingLogs();
+  } catch (e) {
+    console.error('Failed to set online ready state:', e);
   }
 }
 
@@ -53,10 +78,28 @@ export function isSystemOffline(): boolean {
 export function setSystemOffline(offline: boolean): void {
   try {
     localStorage.setItem(OFFLINE_MODE_KEY, offline ? 'true' : 'false');
+    if (!offline) {
+      syncAllPendingLogs();
+    }
     window.dispatchEvent(new CustomEvent('ie_offline_status_change', { detail: { isOffline: offline } }));
   } catch (e) {
     console.error('Failed to set offline state:', e);
   }
+}
+
+// Auto-register browser online/offline listeners
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    const userPrefersOffline = localStorage.getItem(OFFLINE_MODE_KEY) === 'true';
+    if (!userPrefersOffline) {
+      syncAllPendingLogs();
+      window.dispatchEvent(new CustomEvent('ie_offline_status_change', { detail: { isOffline: false } }));
+    }
+  });
+
+  window.addEventListener('offline', () => {
+    window.dispatchEvent(new CustomEvent('ie_offline_status_change', { detail: { isOffline: true } }));
+  });
 }
 
 /**

@@ -3,11 +3,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AppPageLayoutConfig, LayoutPresetId, AppPageTabConfig, DashboardWidgetConfig } from '../types';
+import { AppPageLayoutConfig, LayoutPresetId, AppPageTabConfig, DashboardWidgetConfig, TopBarConfig } from '../types';
 import { DEFAULT_DASHBOARD_LAYOUT } from '../mockData';
 
 export const STORAGE_KEY_APP_LAYOUT = 'debonair_app_page_layout_v1';
 export const STORAGE_KEY_CUSTOM_PRESETS = 'debonair_app_layout_custom_presets_v1';
+export const STORAGE_KEY_TOP_BAR_CONFIG = 'ie_top_bar_config_v1';
+
+export const DEFAULT_TOP_BAR_CONFIG: TopBarConfig = {
+  mobileStyle: 'standard',
+  sticky: true,
+  showSubHeaderOnMobile: true,
+  showDateSelectorOnMobile: true,
+  showFloorSelectorOnMobile: true,
+  showOnlinePill: true,
+  showScorecard: true,
+  showAutoSaveIndicator: true,
+  showNotifications: true,
+  showUserProfile: true,
+  showTeamChat: false,
+  showQuickSettings: true,
+  showThemeToggle: true,
+  accentTheme: 'brand',
+  brandDisplayMode: 'compact'
+};
 
 export const DEFAULT_APP_TABS: AppPageTabConfig[] = [
   { id: 'overview', label: 'Dashboard', visible: true, order: 1, iconName: 'Activity' },
@@ -69,7 +88,8 @@ export const DEFAULT_APP_PAGE_LAYOUT: AppPageLayoutConfig = {
   tickerText: 'Debonair LTD Unit-02 • 34 Active Sewing Lines • Standard Shift Running',
   highContrastMode: false,
   kioskLockEnabled: false,
-  kioskAllowedLine: ''
+  kioskAllowedLine: '',
+  topBar: DEFAULT_TOP_BAR_CONFIG
 };
 
 export const BUILT_IN_LAYOUT_PRESETS: { id: LayoutPresetId; name: string; desc: string; config: Partial<AppPageLayoutConfig> }[] = [
@@ -374,4 +394,47 @@ export function toggleDensityMode(): 'compact' | 'comfortable' {
 export function resetToDefaultLayout(): AppPageLayoutConfig {
   saveStoredAppPageLayout(DEFAULT_APP_PAGE_LAYOUT);
   return DEFAULT_APP_PAGE_LAYOUT;
+}
+
+export function getStoredTopBarConfig(): TopBarConfig {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_TOP_BAR_CONFIG);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return { ...DEFAULT_TOP_BAR_CONFIG, ...parsed };
+    }
+    // Fallback: check appPageLayout config
+    const layout = getStoredAppPageLayout();
+    if (layout.topBar) {
+      return { ...DEFAULT_TOP_BAR_CONFIG, ...layout.topBar };
+    }
+  } catch (e) {
+    console.warn('Failed to load stored top bar config:', e);
+  }
+  return DEFAULT_TOP_BAR_CONFIG;
+}
+
+export function saveStoredTopBarConfig(config: TopBarConfig): void {
+  try {
+    const merged: TopBarConfig = { ...DEFAULT_TOP_BAR_CONFIG, ...config };
+    localStorage.setItem(STORAGE_KEY_TOP_BAR_CONFIG, JSON.stringify(merged));
+    
+    // Also sync into AppPageLayout
+    const currentLayout = getStoredAppPageLayout();
+    const updatedLayout: AppPageLayoutConfig = {
+      ...currentLayout,
+      topBar: merged,
+      lastUpdated: new Date().toISOString()
+    };
+    saveStoredAppPageLayout(updatedLayout);
+    
+    window.dispatchEvent(new CustomEvent('ie_top_bar_config_changed', { detail: merged }));
+  } catch (e) {
+    console.error('Failed to save top bar config:', e);
+  }
+}
+
+export function resetTopBarConfig(): TopBarConfig {
+  saveStoredTopBarConfig(DEFAULT_TOP_BAR_CONFIG);
+  return DEFAULT_TOP_BAR_CONFIG;
 }

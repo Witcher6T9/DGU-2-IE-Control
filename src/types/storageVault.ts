@@ -45,6 +45,7 @@ export interface StorageProviderConfig {
     nasUrl?: string;
     nasUsername?: string;
     driveFolderId?: string;
+    targetFolderPath?: string;
   };
 }
 

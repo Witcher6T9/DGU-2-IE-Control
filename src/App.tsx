@@ -32,7 +32,8 @@ import {
   UserDailyBackupSettings,
   DailyBackupRecord,
   AppPageLayoutConfig,
-  WorkspaceWidthMode
+  WorkspaceWidthMode,
+  TopBarConfig
 } from './types';
 import {
   DEFAULT_DAILY_BACKUP_SETTINGS,
@@ -41,7 +42,15 @@ import {
   pruneOldBackups,
   AppBackupState
 } from './utils/indexedDbBackup';
-import { getStoredAppPageLayout, saveStoredAppPageLayout, applyLayoutStyling, initAutomaticSmallAreaObserver } from './utils/layoutManager';
+import {
+  getStoredAppPageLayout,
+  saveStoredAppPageLayout,
+  applyLayoutStyling,
+  initAutomaticSmallAreaObserver,
+  getStoredTopBarConfig,
+  saveStoredTopBarConfig
+} from './utils/layoutManager';
+import { TopBarCustomizationModal } from './components/TopBarCustomizationModal';
 import { SystemUpdateReceiver } from './components/SystemUpdateReceiver';
 import {
   getStoredActiveFactory,
@@ -79,7 +88,7 @@ import {
   calculateStyleWipThreshold
 } from './utils';
 import { playAuditoryAlert } from './utils/audioAlert';
-import { isSystemOffline, logOfflineActivity } from './utils/offlineSyncManager';
+import { isSystemOffline, setSystemOffline, ensureOnlineReady, logOfflineActivity } from './utils/offlineSyncManager';
 import { lazyWithRetry } from './utils/lazyWithRetry';
 
 // Code-split secondary tabs for fast initial boot with automatic retry on stale chunks
@@ -460,7 +469,7 @@ export default function App() {
   const [userModalTab, setUserModalTab] = useState<'profile' | 'roles'>('profile');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isDatabaseOpen, setIsDatabaseOpen] = useState(false);
-  const [databaseInitialTab, setDatabaseInitialTab] = useState<'backup' | 'csv-import' | 'offline-log'>('backup');
+  const [databaseInitialTab, setDatabaseInitialTab] = useState<'backup' | 'csv-import' | 'cloud-vault' | 'offline-log'>('backup');
   const [isScorecardOpen, setIsScorecardOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isFloorSnapshotOpen, setIsFloorSnapshotOpen] = useState(false);
@@ -476,11 +485,32 @@ export default function App() {
   const [isPrivacySecurityOpen, setIsPrivacySecurityOpen] = useState(false);
   const [isAndroidPackageModalOpen, setIsAndroidPackageModalOpen] = useState(false);
   const [isAuthPageOpen, setIsAuthPageOpen] = useState(false);
+  const [topBarConfig, setTopBarConfig] = useState<TopBarConfig>(() => getStoredTopBarConfig());
+  const [isTopBarCustomizerOpen, setIsTopBarCustomizerOpen] = useState(false);
+
+  useEffect(() => {
+    const handleTopBarChanged = (e: any) => {
+      if (e.detail) {
+        setTopBarConfig(e.detail);
+      }
+    };
+    window.addEventListener('ie_top_bar_config_changed', handleTopBarChanged);
+    return () => window.removeEventListener('ie_top_bar_config_changed', handleTopBarChanged);
+  }, []);
+
+  const handleSaveTopBarConfig = (updated: TopBarConfig) => {
+    setTopBarConfig(updated);
+    saveStoredTopBarConfig(updated);
+  };
 
   // Enterprise Factory & Industry Profile State
   const [factoryProfile, setFactoryProfile] = useState<FactoryIndustryProfile>(() => getStoredActiveFactory());
   const [savedFactories, setSavedFactories] = useState<FactoryIndustryProfile[]>(() => getStoredSavedFactories());
   const [floorSetupInitialSubView, setFloorSetupInitialSubView] = useState<'floor-plan' | 'line-setup' | 'split-view' | 'factory'>('floor-plan');
+
+  useEffect(() => {
+    ensureOnlineReady();
+  }, []);
 
   useEffect(() => {
     setStoredActiveFactory(factoryProfile);
@@ -867,7 +897,7 @@ export default function App() {
     setIsUserModalOpen(true);
   };
 
-  const handleOpenDatabase = (tab: 'backup' | 'csv-import' = 'backup') => {
+  const handleOpenDatabase = (tab: 'backup' | 'csv-import' | 'cloud-vault' | 'offline-log' = 'backup') => {
     setDatabaseInitialTab(tab);
     setIsDatabaseOpen(true);
   };
@@ -2301,6 +2331,9 @@ export default function App() {
           setSettingsSection('control-center');
           setCurrentTab('settings');
         }}
+        syncState={syncState}
+        onToggleOnlineStatus={() => setSystemOffline(syncState.status === 'connected')}
+        topBarConfig={topBarConfig}
       />
 
       {/* Main Content Area: Responsive padding with safe-area spacing and compact density footprint */}
@@ -2367,6 +2400,9 @@ export default function App() {
               onSelectWorkspaceWidth={handleSelectWorkspaceWidth}
               smallAreaFeaturesEnabled={appPageLayout.smallAreaFeaturesEnabled !== false}
               onToggleSmallAreaFeatures={handleToggleSmallAreaFeatures}
+              topBarConfig={topBarConfig}
+              onSaveTopBarConfig={handleSaveTopBarConfig}
+              onOpenTopBarCustomizer={() => setIsTopBarCustomizerOpen(true)}
               layout={layout}
               onUpdateLayout={setLayout}
               auditoryAlertsEnabled={auditoryAlertsEnabled}
@@ -2982,6 +3018,18 @@ export default function App() {
           <AndroidPackageModal
             isOpen={isAndroidPackageModalOpen}
             onClose={() => setIsAndroidPackageModalOpen(false)}
+          />
+        )}
+
+        {/* Top Bar & Mobile UX Polish Customizer Modal */}
+        {isTopBarCustomizerOpen && (
+          <TopBarCustomizationModal
+            isOpen={isTopBarCustomizerOpen}
+            onClose={() => setIsTopBarCustomizerOpen(false)}
+            config={topBarConfig}
+            onSaveConfig={handleSaveTopBarConfig}
+            theme={theme}
+            onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
           />
         )}
       </Suspense>

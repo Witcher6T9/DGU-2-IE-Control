@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DGU-2 IE Control</string>
+    <string name="app_subname">Industrial Engineering Cockpit</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_hourly">Hourly</string>
+    <string name="nav_downtime">Downtime</string>
+    <string name="nav_centerline">Centerline</string>
+    <string name="nav_actions">Actions</string>
+    <string name="nav_five_why">5-Why</string>
+</resources>

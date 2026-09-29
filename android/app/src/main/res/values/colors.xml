@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary_teal">#0F766E</color>
+    <color name="primary_teal_dark">#115E59</color>
+    <color name="primary_teal_light">#14B8A6</color>
+    <color name="accent_amber">#D97706</color>
+    <color name="status_green">#16A34A</color>
+    <color name="status_red">#DC2626</color>
+    <color name="status_amber">#F59E0B</color>
+    <color name="bg_light">#F8FAFC</color>
+    <color name="bg_card_light">#FFFFFF</color>
+    <color name="text_main_light">#0F172A</color>
+    <color name="bg_dark">#0F172A</color>
+    <color name="bg_card_dark">#1E293B</color>
+    <color name="text_main_dark">#F8FAFC</color>
+</resources>
