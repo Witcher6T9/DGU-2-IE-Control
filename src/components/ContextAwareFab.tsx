@@ -231,6 +231,11 @@ export const ContextAwareFab: React.FC<ContextAwareFabProps> = ({
   };
 
   const handleMainFabClick = () => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(20);
+      } catch {}
+    }
     executeActionForTab(activeTabId);
   };
 
@@ -271,7 +276,7 @@ export const ContextAwareFab: React.FC<ContextAwareFabProps> = ({
                   <button
                     type="button"
                     onClick={() => handleSelectTab(item.id, true)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer border flex items-center gap-2 ${
+                    className={`px-3 py-1.5 min-h-[44px] rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer border flex items-center gap-2 ${
                       isSelected
                         ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent'
                         : 'bg-white/95 dark:bg-slate-900/95 text-slate-700 dark:text-slate-200 border-[#d9d2c2] dark:border-slate-700 hover:border-[#176f78]'
@@ -289,7 +294,7 @@ export const ContextAwareFab: React.FC<ContextAwareFabProps> = ({
                     type="button"
                     onClick={() => handleSelectTab(item.id, true)}
                     title={`${item.actionLabel} (${item.tabLabel})`}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer bg-gradient-to-br ${item.bgGradient} ${
+                    className={`w-11 h-11 min-h-[44px] min-w-[44px] rounded-full flex items-center justify-center text-white shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer bg-gradient-to-br ${item.bgGradient} ${
                       isSelected ? 'ring-2 ring-offset-2 ring-white dark:ring-offset-slate-950 scale-105' : 'opacity-85 hover:opacity-100'
                     }`}
                   >
@@ -311,7 +316,7 @@ export const ContextAwareFab: React.FC<ContextAwareFabProps> = ({
           onClick={handleMainFabClick}
           title={`${activeConfig.actionLabel} (${activeConfig.tabLabel}) • Faster access to primary floor actions`}
           aria-label={activeConfig.actionLabel}
-          className={`flex items-center gap-2 px-3.5 py-2.5 sm:px-4 sm:py-3 bg-gradient-to-r ${activeConfig.bgGradient} text-white font-bold transition-all duration-200 hover:brightness-110 active:scale-95 cursor-pointer touch-manipulation`}
+          className={`flex items-center gap-2 px-3.5 py-2.5 sm:px-4 sm:py-3 min-h-[48px] bg-gradient-to-r ${activeConfig.bgGradient} text-white font-bold transition-all duration-200 hover:brightness-110 active:scale-95 cursor-pointer touch-manipulation`}
         >
           {/* Animated Morphing Icon */}
           <motion.div
@@ -339,11 +344,16 @@ export const ContextAwareFab: React.FC<ContextAwareFabProps> = ({
         {/* Speed-Dial Menu Toggle Button */}
         <button
           type="button"
-          onClick={() => setIsOpen(prev => !prev)}
+          onClick={() => {
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              try { navigator.vibrate(12); } catch {}
+            }
+            setIsOpen(prev => !prev);
+          }}
           title="Switch Active Action Mode (Line Data, Downtime, Checklist, Kaizen, Reports)"
           aria-label="Toggle action options"
           aria-expanded={isOpen}
-          className={`h-full px-2 sm:px-2.5 py-3 sm:py-3.5 bg-black/20 hover:bg-black/35 active:bg-black/45 text-white/90 transition-all border-l border-white/15 cursor-pointer flex items-center justify-center`}
+          className={`h-full min-h-[48px] min-w-[44px] px-2.5 sm:px-3 py-3 sm:py-3.5 bg-black/20 hover:bg-black/35 active:bg-black/45 text-white/90 transition-all border-l border-white/15 cursor-pointer flex items-center justify-center`}
         >
           <motion.div
             animate={{ rotate: isOpen ? 180 : 0 }}

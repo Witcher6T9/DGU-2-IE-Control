@@ -121,6 +121,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   };
 
   const handleTabClick = (tabId: string) => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(10);
+      } catch {}
+    }
     onTabChange(tabId);
   };
 
@@ -147,8 +152,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       aria-label="Bottom Navigation"
       className={
         isFloating
-          ? "fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl bg-[#fbfaf6]/95 dark:bg-[#181d24]/95 backdrop-blur-xl border border-[#d9d2c2] dark:border-[#2e3846] rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.18)] px-2 pb-[env(safe-area-inset-bottom)]"
-          : "fixed bottom-0 inset-x-0 z-40 bg-[#fbfaf6]/95 dark:bg-[#181d24]/95 backdrop-blur-md border-t border-[#d9d2c2] dark:border-[#2e3846] shadow-[0_-4px_20px_rgba(12,28,45,0.10)] pb-[env(safe-area-inset-bottom)] cockpit-nav"
+          ? "fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl bg-[#fbfaf6]/95 dark:bg-[#181d24]/95 backdrop-blur-xl border border-[#d9d2c2] dark:border-[#2e3846] rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.18)] px-2 pb-[calc(env(safe-area-inset-bottom,0px)+4px)]"
+          : "fixed bottom-0 inset-x-0 z-40 bg-[#fbfaf6]/95 dark:bg-[#181d24]/95 backdrop-blur-md border-t border-[#d9d2c2] dark:border-[#2e3846] shadow-[0_-4px_20px_rgba(12,28,45,0.10)] pb-[calc(env(safe-area-inset-bottom,0px)+2px)] cockpit-nav"
       }
     >
       <div className={isFloating ? "w-full mx-auto" : "max-w-[1500px] mx-auto px-2 sm:px-6"}>

@@ -41,7 +41,7 @@ import {
   pruneOldBackups,
   AppBackupState
 } from './utils/indexedDbBackup';
-import { getStoredAppPageLayout, saveStoredAppPageLayout, applyLayoutStyling } from './utils/layoutManager';
+import { getStoredAppPageLayout, saveStoredAppPageLayout, applyLayoutStyling, initAutomaticSmallAreaObserver } from './utils/layoutManager';
 import { SystemUpdateReceiver } from './components/SystemUpdateReceiver';
 import {
   getStoredActiveFactory,
@@ -360,6 +360,7 @@ export default function App() {
 
   useEffect(() => {
     applyLayoutStyling(appPageLayout);
+    const cleanupAutoSmallArea = initAutomaticSmallAreaObserver();
     const handler = (e: any) => {
       if (e.detail) {
         setAppPageLayout(e.detail);
@@ -369,7 +370,10 @@ export default function App() {
       }
     };
     window.addEventListener('debonair:layout_changed', handler);
-    return () => window.removeEventListener('debonair:layout_changed', handler);
+    return () => {
+      cleanupAutoSmallArea();
+      window.removeEventListener('debonair:layout_changed', handler);
+    };
   }, []);
 
   const handleToggleDensity = () => {

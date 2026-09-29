@@ -401,12 +401,29 @@ export const WingBlockLineSelector: React.FC<WingBlockLineSelectorProps> = ({
   // Search query
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Small Area Features: Compact density & Collapse/Expand toggle
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(variant === 'bar');
+  // Small Area Features: Compact density & Collapse/Expand toggle (Automatic)
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    if (variant === 'bar') return true;
+    if (typeof window !== 'undefined' && window.innerWidth < 768) return true;
+    return false;
+  });
   const [displayDensity, setDisplayDensity] = useState<'compact' | 'full'>(() => {
     if (density === 'spacious') return 'full';
     return 'compact';
   });
+
+  // Automatically adapt Small Area micro-footprint on viewport changes
+  useEffect(() => {
+    const handleAutoSmallArea = () => {
+      if (typeof window !== 'undefined' && window.innerWidth < 768) {
+        setIsCollapsed(true);
+        setDisplayDensity('compact');
+      }
+    };
+    handleAutoSmallArea();
+    window.addEventListener('resize', handleAutoSmallArea, { passive: true });
+    return () => window.removeEventListener('resize', handleAutoSmallArea);
+  }, []);
 
   useEffect(() => {
     if (density === 'compact') {

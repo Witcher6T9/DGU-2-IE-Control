@@ -209,6 +209,11 @@ export const DailyChecklist: React.FC<DailyChecklistProps> = ({
 
   // 4. Update task handler for specific line
   const handleUpdateTask = (taskIndex: number, status: ChecklistStatus) => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(15);
+      } catch {}
+    }
     const lineKey = getLineChecklistKey(selectedDate, activeLineNo);
     onUpdateTaskStatus(lineKey, taskIndex, status);
 
@@ -1118,13 +1123,13 @@ export const DailyChecklist: React.FC<DailyChecklistProps> = ({
                       </div>
                     </div>
 
-                    {/* Status Toggle Buttons */}
+                    {/* Status Toggle Buttons with 44px mobile touch targets */}
                     <div className="flex items-center gap-1 shrink-0 bg-[#f1eee6] p-1 rounded-2xl border border-[#d9d2c2]">
                       <button
                         onClick={() => handleUpdateTask(idx, 'yes')}
                         title="Mark Done"
                         aria-label="Mark task Done"
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer touch-manipulation active:scale-95 ${
+                        className={`w-11 h-11 sm:w-10 sm:h-10 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-xl flex items-center justify-center transition-all cursor-pointer touch-manipulation active:scale-95 ${
                           status === 'yes'
                             ? 'bg-emerald-600 text-white shadow-xs font-bold ring-2 ring-emerald-600/30'
                             : 'text-slate-400 hover:text-emerald-700 hover:bg-white/60'
@@ -1136,7 +1141,7 @@ export const DailyChecklist: React.FC<DailyChecklistProps> = ({
                         onClick={() => handleUpdateTask(idx, 'pending')}
                         title="Mark Pending"
                         aria-label="Mark task Pending"
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer touch-manipulation active:scale-95 ${
+                        className={`w-11 h-11 sm:w-10 sm:h-10 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-xl flex items-center justify-center transition-all cursor-pointer touch-manipulation active:scale-95 ${
                           status === 'pending'
                             ? 'bg-amber-500 text-white shadow-xs font-bold ring-2 ring-amber-500/30'
                             : 'text-slate-400 hover:text-amber-700 hover:bg-white/60'
@@ -1148,7 +1153,7 @@ export const DailyChecklist: React.FC<DailyChecklistProps> = ({
                         onClick={() => handleUpdateTask(idx, 'no')}
                         title="Mark Not Met / Action Needed"
                         aria-label="Mark task Not Met"
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer touch-manipulation active:scale-95 ${
+                        className={`w-11 h-11 sm:w-10 sm:h-10 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-xl flex items-center justify-center transition-all cursor-pointer touch-manipulation active:scale-95 ${
                           status === 'no'
                             ? 'bg-rose-500 text-white shadow-xs font-bold ring-2 ring-rose-500/30'
                             : 'text-slate-400 hover:text-rose-700 hover:bg-white/60'

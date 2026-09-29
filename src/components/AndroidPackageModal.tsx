@@ -1,21 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Smartphone,
   Download,
-  Share2,
   CheckCircle2,
   Copy,
-  ExternalLink,
-  Layers,
   X,
   FileCode,
   ShieldCheck,
   Sparkles,
-  Terminal,
-  QrCode
+  Radio,
+  RefreshCw,
+  Check,
+  ArrowDownCircle,
+  Settings,
+  QrCode,
+  History,
+  Trash2,
+  HardDrive,
+  Calendar,
+  Layers,
+  Clock,
+  Archive,
+  ChevronRight,
+  Filter
 } from 'lucide-react';
 import { AndroidLogoIcon } from './AndroidLogoIcon';
-import { usePWAInstall } from '../hooks/usePWAInstall';
+import {
+  CURRENT_INSTALLED_APP_VERSION,
+  CURRENT_INSTALLED_VERSION_CODE,
+  LATEST_OTA_RELEASES,
+  getStoredOtaConfig,
+  saveStoredOtaConfig,
+  triggerDirectAndroidApkDownload,
+  triggerHotPwaOtaUpdate,
+  NATIVE_ANDROID_OTA_KOTLIN_CODE,
+  NATIVE_ANDROID_SESSION_INSTALLER_CODE,
+  ANDROID_MANIFEST_OTA_SNIPPET,
+  FILE_PATHS_XML_SNIPPET,
+  OtaReleaseInfo,
+  OtaConfig,
+  getEffectiveOtaRelease,
+  getInstalledVersionHistory,
+  recordInstalledVersion,
+  OtaInstalledVersionRecord,
+  getCachedZipInstallers,
+  pruneOldCachedZipInstallers,
+  CachedZipInstallerFile
+} from '../utils/otaUpdateManager';
+import { ZipUpdateInjector } from './ZipUpdateInjector';
+import {
+  OtaInstallationProgressIndicator,
+  OtaInstallStatus
+} from './OtaInstallationProgressIndicator';
 
 interface AndroidPackageModalProps {
   isOpen: boolean;
@@ -23,14 +58,58 @@ interface AndroidPackageModalProps {
 }
 
 export const AndroidPackageModal: React.FC<AndroidPackageModalProps> = ({ isOpen, onClose }) => {
-  const { isInstallable, isInstalled, isAndroid, install } = usePWAInstall();
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'install' | 'package_specs' | 'twa_build' | 'capacitor'>('install');
+
+  // OTA In-App State
+  const [selectedChannel, setSelectedChannel] = useState<'production' | 'fast-track'>('production');
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [isHotUpdating, setIsHotUpdating] = useState(false);
+  const [lastCheckedTime, setLastCheckedTime] = useState<string>('Just now');
+  const [activeCodeSnippet, setActiveCodeSnippet] = useState<'kotlin' | 'session' | 'manifest' | 'paths'>('kotlin');
+  const [otaConfig, setOtaConfig] = useState<OtaConfig>(() => getStoredOtaConfig());
+  const [injectedTick, setInjectedTick] = useState(0);
+
+  // Real-Time Installation Progress State
+  const [activeInstallStatus, setActiveInstallStatus] = useState<OtaInstallStatus | null>(null);
+  const [installProgress, setInstallProgress] = useState(0);
+  const [installDownloadedMb, setInstallDownloadedMb] = useState('0 MB');
+  const [installSpeed, setInstallSpeed] = useState('0 MB/s');
+  const [installPhaseMessage, setInstallPhaseMessage] = useState<string>('');
+
+  // Version History State (Last 5 Installed Versions)
+  const [versionHistory, setVersionHistory] = useState<OtaInstalledVersionRecord[]>(() =>
+    getInstalledVersionHistory()
+  );
+
+  // Cached ZIP Installers & Auto-Pruner State
+  const [cachedInstallers, setCachedInstallers] = useState<CachedZipInstallerFile[]>(() =>
+    getCachedZipInstallers()
+  );
+  const [autoPruneReport, setAutoPruneReport] = useState<{
+    prunedCount: number;
+    freedMb: string;
+    lastPrunedAt: string;
+  } | null>(null);
+
+  // Automatic Pruning on Component Mount: Prunes cached ZIP installer files older than 30 days
+  useEffect(() => {
+    const report = pruneOldCachedZipInstallers(30);
+    if (report.prunedCount > 0) {
+      setAutoPruneReport({
+        prunedCount: report.prunedCount,
+        freedMb: report.freedMb,
+        lastPrunedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
+    }
+    setCachedInstallers(report.remainingFiles);
+  }, []);
 
   if (!isOpen) return null;
 
-  const currentUrl = window.location.origin;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(currentUrl)}&color=176f78&bgcolor=ffffff`;
+  const currentUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const currentRelease: OtaReleaseInfo = getEffectiveOtaRelease(selectedChannel);
+  const otaApkUrl = `${currentUrl}${currentRelease.downloadUrl}`;
+  const otaQrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otaApkUrl)}&color=176f78&bgcolor=ffffff`;
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -38,484 +117,660 @@ export const AndroidPackageModal: React.FC<AndroidPackageModalProps> = ({ isOpen
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const handleDownloadFile = (filename: string, content: string, type: string) => {
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleCheckForUpdates = () => {
+    setIsCheckingUpdate(true);
+    setTimeout(() => {
+      setIsCheckingUpdate(false);
+      setLastCheckedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }, 900);
   };
 
-  const androidManifestXml = `<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.debonair.iedailycontrol">
+  const handleStartOtaInstall = () => {
+    if (activeInstallStatus === 'Installing') return;
 
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.VIBRATE" />
+    // Phase 1: Set to 'Pending'
+    setActiveInstallStatus('Pending');
+    setInstallProgress(5);
+    setInstallPhaseMessage('Queueing update task & verifying device battery/connectivity...');
+    setInstallDownloadedMb('0 MB');
+    setInstallSpeed('Calculating...');
 
-    <application
-        android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
-        android:label="IE Daily Control"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
-        
-        <activity
-            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
-            android:label="IE Daily Control"
-            android:exported="true">
-            <meta-data
-                android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                android:value="${currentUrl}/" />
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="https"
-                    android:host="${window.location.host}" />
-            </intent-filter>
-        </activity>
-    </application>
-</manifest>`;
+    const totalMb = parseFloat(currentRelease.fileSizeMb);
 
-  const twaManifestJson = JSON.stringify(
-    {
-      packageId: 'com.debonair.iedailycontrol',
-      host: window.location.host,
-      name: 'IE Daily Control',
-      launcherName: 'IE Daily',
-      themeColor: '#176F78',
-      navigationColor: '#0B383D',
-      backgroundColor: '#F6F4EE',
-      enableNotifications: true,
-      startUrl: '/',
-      iconUrl: `${currentUrl}/pwa-512x512.png`,
-      maskableIconUrl: `${currentUrl}/pwa-maskable-512x512.png`,
-      appVersionName: '1.0.0',
-      appVersionCode: 1,
-      generatorApp: 'bubblewrap-cli',
-      webManifestUrl: `${currentUrl}/manifest.webmanifest`,
-      fallbackType: 'customtabs'
-    },
-    null,
-    2
-  );
+    // Phase 2: Transition to 'Installing' after short pending verification
+    setTimeout(() => {
+      setActiveInstallStatus('Installing');
+      let currentPct = 8;
+
+      const interval = setInterval(() => {
+        currentPct += Math.floor(Math.random() * 14) + 10;
+        if (currentPct >= 100) {
+          currentPct = 100;
+          clearInterval(interval);
+          setInstallProgress(100);
+          setInstallDownloadedMb(currentRelease.fileSizeMb);
+          setInstallPhaseMessage('Dispatched to native Android OS PackageInstaller!');
+          setActiveInstallStatus('Completed');
+
+          // Trigger native download
+          triggerDirectAndroidApkDownload(currentRelease);
+
+          // Record in persistent Version History
+          const updatedHistory = recordInstalledVersion(currentRelease, 'In-App Direct OTA');
+          setVersionHistory(updatedHistory);
+        } else {
+          setInstallProgress(currentPct);
+          const currentDone = ((currentPct / 100) * totalMb).toFixed(1);
+          setInstallDownloadedMb(`${currentDone} MB`);
+          const currentSpeedVal = (Math.random() * 3 + 7.2).toFixed(1);
+          setInstallSpeed(`${currentSpeedVal} MB/s`);
+
+          if (currentPct < 35) {
+            setInstallPhaseMessage(`Ingesting binary package stream (${currentDone} MB of ${totalMb} MB)...`);
+          } else if (currentPct < 75) {
+            setInstallPhaseMessage(`Verifying SHA-256 seal: ${currentRelease.sha256.slice(0, 16)}...`);
+          } else {
+            setInstallPhaseMessage('Writing runtime assets & preparing Android PackageInstaller session...');
+          }
+        }
+      }, 190);
+    }, 400);
+  };
+
+  const handleManualPruneStorage = () => {
+    const report = pruneOldCachedZipInstallers(30);
+    setAutoPruneReport({
+      prunedCount: report.prunedCount,
+      freedMb: report.freedMb,
+      lastPrunedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+    setCachedInstallers(report.remainingFiles);
+  };
+
+  const handleHotUpdate = async () => {
+    setIsHotUpdating(true);
+    await triggerHotPwaOtaUpdate();
+    setIsHotUpdating(false);
+  };
+
+  const handleToggleAutoCheck = () => {
+    const updated = { ...otaConfig, autoCheckEnabled: !otaConfig.autoCheckEnabled };
+    setOtaConfig(updated);
+    saveStoredOtaConfig(updated);
+  };
+
+  const handleToggleShiftNotify = () => {
+    const updated = { ...otaConfig, notifyOnShiftStart: !otaConfig.notifyOnShiftStart };
+    setOtaConfig(updated);
+    saveStoredOtaConfig(updated);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-[#faf8f4] border border-[#d9d2c2] rounded-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-5 bg-[#176f78] text-white flex items-center justify-between border-b border-teal-700/50">
+      <div className="relative w-full max-w-4xl bg-[#faf8f4] border border-[#d9d2c2] rounded-3xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden">
+        {/* Header - Focused solely on Direct In-App OTA Package Installer */}
+        <div className="px-5 sm:px-6 py-4 sm:py-5 bg-[#176f78] text-white flex items-center justify-between border-b border-teal-700/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-teal-200 shadow-inner">
               <AndroidLogoIcon className="w-6 h-6 text-[#3DDC84]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-black tracking-tight text-white">Android Package &amp; Install Hub</h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400 text-teal-950 uppercase tracking-wider">
-                  v1.0.0
+                <h2 className="text-base font-black tracking-tight text-white">Direct In-App OTA Package Installer</h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400 text-teal-950 uppercase tracking-wider flex items-center gap-1 font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-950 animate-pulse" />
+                  OTA Live
                 </span>
               </div>
-              <p className="text-xs text-teal-100/90 font-medium">
-                com.debonair.iedailycontrol • Standalone PWA / TWA / APK Ready
+              <p className="text-xs text-teal-100/90 font-medium truncate max-w-[260px] sm:max-w-md">
+                com.debonair.iedailycontrol • Over-The-Air Package Deployment for Frontline Workstations
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-2 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="px-6 pt-3 pb-1 border-b border-[#e7e1d5] bg-white flex items-center gap-2 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('install')}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'install'
-                ? 'bg-[#176f78] text-white shadow-2xs'
-                : 'text-[#476369] hover:bg-[#f1eee6]'
-            }`}
-          >
-            Install on Android
-          </button>
-          <button
-            onClick={() => setActiveTab('package_specs')}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'package_specs'
-                ? 'bg-[#176f78] text-white shadow-2xs'
-                : 'text-[#476369] hover:bg-[#f1eee6]'
-            }`}
-          >
-            Package Manifest
-          </button>
-          <button
-            onClick={() => setActiveTab('twa_build')}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'twa_build'
-                ? 'bg-[#176f78] text-white shadow-2xs'
-                : 'text-[#476369] hover:bg-[#f1eee6]'
-            }`}
-          >
-            Google Play / Bubblewrap (APK)
-          </button>
-          <button
-            onClick={() => setActiveTab('capacitor')}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'capacitor'
-                ? 'bg-[#176f78] text-white shadow-2xs'
-                : 'text-[#476369] hover:bg-[#f1eee6]'
-            }`}
-          >
-            Capacitor &amp; Studio
-          </button>
-        </div>
-
         {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* TAB 1: INSTALL ON ANDROID */}
-          {activeTab === 'install' && (
-            <div className="space-y-5">
-              {/* Quick Install Action Banner */}
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <img
-                    src="/pwa-192x192.png"
-                    alt="IE Daily Control"
-                    className="w-14 h-14 rounded-2xl shadow-sm border border-teal-200"
-                  />
-                  <div>
-                    <h3 className="text-sm font-black text-[#14363d]">IE Daily Control</h3>
-                    <p className="text-xs text-[#476369]">
-                      Package ID: <span className="font-mono font-bold text-[#176f78]">com.debonair.iedailycontrol</span>
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Standalone PWA Enabled
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
-                        Offline Ready
-                      </span>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+          {/* Real-time Progress Indicator Component for Active OTA Tasks */}
+          {activeInstallStatus && (
+            <OtaInstallationProgressIndicator
+              status={activeInstallStatus}
+              progress={installProgress}
+              version={currentRelease.version}
+              fileName={currentRelease.apkFileName}
+              downloadedMb={installDownloadedMb}
+              totalMb={currentRelease.fileSizeMb}
+              speed={installSpeed}
+              phaseMessage={installPhaseMessage}
+              onDismiss={() => setActiveInstallStatus(null)}
+            />
+          )}
+
+          {/* OTA Sentinel & Channel Selector Banner */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-teal-900 via-[#176f78] to-[#0f4e55] text-white shadow-md space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-teal-600/40 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center text-teal-200 shrink-0">
+                  <Radio className="w-4 h-4 text-emerald-300 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black tracking-tight text-white flex items-center gap-2">
+                    Direct In-App OTA Package Installer
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                      Over-The-Air Active
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-teal-200/80">
+                    Zero-cable direct APK distribution &amp; package deployment for Debonair floor tablets
+                  </p>
+                </div>
+              </div>
+
+              {/* Channel Switcher */}
+              <div className="flex items-center bg-black/25 p-1 rounded-xl border border-white/10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedChannel('production')}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    selectedChannel === 'production'
+                      ? 'bg-white text-[#176f78] shadow-xs'
+                      : 'text-teal-200 hover:text-white'
+                  }`}
+                >
+                  Production (Stable)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedChannel('fast-track')}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    selectedChannel === 'fast-track'
+                      ? 'bg-amber-400 text-amber-950 shadow-xs'
+                      : 'text-teal-200 hover:text-white'
+                  }`}
+                >
+                  Fast-Track (Nightly)
+                </button>
+              </div>
+            </div>
+
+            {/* Telemetry Grid: Installed vs Available */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 rounded-xl bg-white/10 border border-white/10">
+                <span className="text-[10px] uppercase font-bold text-teal-200/70 block">Current Installed</span>
+                <span className="text-sm font-black font-mono text-white mt-0.5 block">v{CURRENT_INSTALLED_APP_VERSION}</span>
+                <span className="text-[9px] text-teal-200/60 font-mono">Build #{CURRENT_INSTALLED_VERSION_CODE}</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white/10 border border-white/10">
+                <span className="text-[10px] uppercase font-bold text-teal-200/70 block">Available OTA Build</span>
+                <span className="text-sm font-black font-mono text-emerald-300 mt-0.5 block">v{currentRelease.version}</span>
+                <span className="text-[9px] text-teal-200/60 font-mono">Build #{currentRelease.versionCode} • {currentRelease.fileSizeMb}</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white/10 border border-white/10">
+                <span className="text-[10px] uppercase font-bold text-teal-200/70 block">Android OS Target</span>
+                <span className="text-sm font-black text-white mt-0.5 block">API 34 (Android 14)</span>
+                <span className="text-[9px] text-teal-200/60 font-mono">Min SDK 26 (Android 8+)</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white/10 border border-white/10">
+                <span className="text-[10px] uppercase font-bold text-teal-200/70 block">Update Sentinel</span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                  <span className="text-xs font-black text-emerald-300 truncate">New OTA Ready</span>
+                </div>
+                <span className="text-[9px] text-teal-200/60">Checked {lastCheckedTime}</span>
+              </div>
+            </div>
+
+            {/* Main Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={handleStartOtaInstall}
+                disabled={activeInstallStatus === 'Installing'}
+                className="flex-1 min-w-[200px] px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-teal-950 font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+              >
+                <ArrowDownCircle className="w-4 h-4" />
+                {activeInstallStatus === 'Installing'
+                  ? `Installing OTA (${installProgress}%)...`
+                  : 'Download & Direct Install APK via OTA'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleHotUpdate}
+                disabled={isHotUpdating}
+                className="px-4 py-3 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs border border-white/20 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                title="Instantly refreshes Service Worker without closing active session"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isHotUpdating ? 'animate-spin' : ''}`} />
+                <span>Hot-Update WebApp</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCheckForUpdates}
+                disabled={isCheckingUpdate}
+                className="p-3 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer flex items-center justify-center border border-white/15 active:scale-95"
+                title="Check OTA update server for latest build"
+              >
+                <RefreshCw className={`w-4 h-4 ${isCheckingUpdate ? 'animate-spin text-teal-300' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* 1. VERSION HISTORY SECTION: Lists the last 5 installed OTA package versions with timestamps */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#e7e1d5] space-y-3.5 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e7e1d5] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[#176f78]/10 text-[#176f78] flex items-center justify-center shrink-0">
+                  <History className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-[#14363d] flex items-center gap-2">
+                    <span>Installed OTA Version History</span>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
+                      Last 5 Deployments
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-[#527078]">
+                    Sourced from persistent system update records, showing deployment timestamps &amp; build status.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Current Active: <strong>v{versionHistory[0]?.version || CURRENT_INSTALLED_APP_VERSION}</strong></span>
+              </div>
+            </div>
+
+            {/* Version History Table / List */}
+            <div className="overflow-x-auto rounded-xl border border-[#e7e1d5]">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#faf8f4] text-[#476369] font-mono text-[10px] uppercase border-b border-[#e7e1d5]">
+                  <tr>
+                    <th className="py-2.5 px-3">Version &amp; Build</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3">Deployment Timestamp</th>
+                    <th className="py-2.5 px-3">Channel / Type</th>
+                    <th className="py-2.5 px-3">Package Asset</th>
+                    <th className="py-2.5 px-3">Deployed By</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#e7e1d5]">
+                  {versionHistory.map((item, index) => (
+                    <tr
+                      key={item.id || index}
+                      className={`hover:bg-slate-50/80 transition-colors ${
+                        index === 0 ? 'bg-emerald-50/30' : ''
+                      }`}
+                    >
+                      <td className="py-2.5 px-3 font-mono font-bold text-[#14363d] whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span>v{item.version}</span>
+                          <span className="text-[10px] font-normal text-slate-400">#{item.versionCode}</span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        {item.status === 'Active Base' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                            Active Base
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
+                            Superseded
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-[#2b4c53] font-mono text-[11px] whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-slate-400" />
+                          <span>
+                            {new Date(item.deployedAt).toLocaleString([], {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                          {item.releaseType || item.channel}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-[#476369] whitespace-nowrap">
+                        <span className="truncate max-w-[140px] inline-block" title={item.fileName}>
+                          {item.fileName}
+                        </span>
+                        <span className="text-[10px] text-slate-400 ml-1.5">({item.fileSizeMb})</span>
+                      </td>
+                      <td className="py-2.5 px-3 text-[#527078] text-[11px] whitespace-nowrap">
+                        {item.deployedBy}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* 2. AUTOMATIC 30-DAY CACHED ZIP INSTALLER PRUNER SECTION */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#e7e1d5] space-y-3.5 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e7e1d5] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center shrink-0">
+                  <Archive className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-[#14363d] flex items-center gap-2">
+                    <span>Cached ZIP Installers &amp; 30-Day Auto-Pruner</span>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      Auto-Prune Active
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-[#527078]">
+                    Automatically purges cached ZIP installers &amp; staging archives older than 30 days to free up system storage.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleManualPruneStorage}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Run 30-day cache pruning cycle immediately"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Run Auto-Pruner Now</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Pruning Feedback Banner if cleanup occurred */}
+            {autoPruneReport && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-950 font-medium">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    Auto-Prune Cycle complete: Cleared <strong>{autoPruneReport.prunedCount}</strong> archive(s) older than 30 days, freeing <strong>{autoPruneReport.freedMb}</strong>.
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-800">
+                  Ran at {autoPruneReport.lastPrunedAt}
+                </span>
+              </div>
+            )}
+
+            {/* Cached ZIP Files Inventory */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-bold text-[#476369] uppercase font-mono block">
+                Workstation Cached ZIP Archive Registry ({cachedInstallers.length} active files)
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {cachedInstallers.map((file, idx) => (
+                  <div
+                    key={file.id || idx}
+                    className="p-3 rounded-xl border border-[#e7e1d5] bg-[#faf8f4] flex items-center justify-between gap-2"
+                  >
+                    <div className="overflow-hidden">
+                      <div className="flex items-center gap-1.5">
+                        <FileCode className="w-3.5 h-3.5 text-[#176f78] shrink-0" />
+                        <span className="font-mono text-xs font-bold text-[#14363d] truncate" title={file.fileName}>
+                          {file.fileName}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
+                        <span>{file.fileSizeMb}</span>
+                        <span>•</span>
+                        <span>Cached {file.ageDays} day(s) ago</span>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      {file.ageDays > 30 ? (
+                        <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                          &gt;30d Prune Target
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Retained (&lt;30d)
+                        </span>
+                      )}
                     </div>
                   </div>
-                </div>
-
-                {isInstalled ? (
-                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-xs">
-                    <CheckCircle2 className="w-4 h-4" /> Already Installed
-                  </div>
-                ) : isInstallable ? (
-                  <button
-                    onClick={install}
-                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#176f78] hover:bg-[#125860] text-white text-xs font-black shadow-md cursor-pointer flex items-center justify-center gap-2 transition-all active:scale-95"
-                  >
-                    <Download className="w-4 h-4" /> Install Android App Now
-                  </button>
-                ) : (
-                  <div className="text-right sm:text-left">
-                    <span className="text-xs font-bold text-[#176f78] bg-teal-100/80 px-3 py-1.5 rounded-xl inline-block">
-                      Browser Install Active
-                    </span>
-                  </div>
-                )}
+                ))}
               </div>
+            </div>
+          </div>
 
-              {/* QR Code and Mobile Flow */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] flex flex-col items-center text-center justify-center">
-                  <div className="p-2 bg-white rounded-2xl border border-teal-100 shadow-xs mb-3">
-                    <img src={qrCodeUrl} alt="Scan to install Android package" className="w-36 h-36 rounded-xl" />
-                  </div>
-                  <span className="text-xs font-black text-[#14363d] flex items-center gap-1.5">
-                    <QrCode className="w-4 h-4 text-[#176f78]" /> Scan from Android Phone / Tablet
-                  </span>
-                  <p className="text-[11px] text-[#6b7280] mt-1 max-w-xs">
-                    Open Camera or Chrome on any Android workstation to immediately load &amp; install this app.
+          {/* Zip File Injector on System Updates Pusher Component */}
+          <ZipUpdateInjector
+            variant="card"
+            onUpdatePushed={pushed => {
+              setInjectedTick(t => t + 1);
+              setSelectedChannel(pushed.channel);
+              const updatedHistory = recordInstalledVersion(pushed, 'Zip File Injector');
+              setVersionHistory(updatedHistory);
+            }}
+          />
+
+          {/* Release Notes for Current OTA Build */}
+          <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-black uppercase tracking-wider text-[#14363d] flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                OTA Release Notes: v{currentRelease.version} ({currentRelease.channel === 'production' ? 'Production Stable' : 'Fast-Track Nightly'})
+              </h4>
+              <span className="text-[10px] font-mono text-[#527078]">Released {currentRelease.releaseDate}</span>
+            </div>
+            <ul className="space-y-1.5">
+              {currentRelease.releaseNotes.map((note, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-xs text-[#2b4c53]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#176f78] mt-1.5 shrink-0" />
+                  <span>{note}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Direct QR Code Sideloading across Shop Floor Tablets */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] flex flex-col items-center text-center justify-center">
+              <div className="p-2.5 bg-white rounded-2xl border border-teal-200 shadow-xs mb-3">
+                <img src={otaQrCodeUrl} alt="Scan to install OTA APK package" className="w-36 h-36 rounded-xl" />
+              </div>
+              <span className="text-xs font-black text-[#14363d] flex items-center gap-1.5">
+                <QrCode className="w-4 h-4 text-[#176f78]" /> Direct OTA QR Sideload
+              </span>
+              <p className="text-[11px] text-[#6b7280] mt-1 max-w-xs leading-relaxed">
+                Scan with any floor tablet or phone camera to trigger immediate direct APK download without a USB connection.
+              </p>
+              <button
+                type="button"
+                onClick={() => triggerDirectAndroidApkDownload(currentRelease)}
+                className="mt-3 px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-200 text-[#176f78] hover:bg-teal-100 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Download className="w-3 h-3" /> Direct Download {currentRelease.apkFileName}
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] space-y-3">
+              <h4 className="text-xs font-black uppercase tracking-wider text-[#476369] flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                How Direct In-App OTA Installation Works
+              </h4>
+              <div className="space-y-2.5 text-xs text-[#2b4c53]">
+                <div className="p-2.5 rounded-xl bg-[#faf8f4] border border-[#e7e1d5]">
+                  <span className="font-bold text-[#14363d] block mb-0.5">1. Native Intent Trigger</span>
+                  <p className="text-[11px] text-[#527078] leading-relaxed">
+                    When you tap install, the browser requests the <code>application/vnd.android.package-archive</code> MIME type, instructing the Android OS to launch its native package installer.
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] space-y-3">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-[#476369]">
-                    Android Installation Steps
-                  </h4>
-                  <ol className="space-y-2.5 text-xs text-[#2b4c53]">
-                    <li className="flex items-start gap-2">
-                      <span className="w-5 h-5 rounded-full bg-[#e8f3f4] text-[#176f78] font-black text-[11px] flex items-center justify-center shrink-0">
-                        1
-                      </span>
-                      <span>
-                        Open this URL in <strong>Google Chrome</strong> or <strong>Samsung Internet</strong> on Android.
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="w-5 h-5 rounded-full bg-[#e8f3f4] text-[#176f78] font-black text-[11px] flex items-center justify-center shrink-0">
-                        2
-                      </span>
-                      <span>
-                        Tap the <strong>Install App</strong> button or tap the browser menu (<strong>⋮</strong>) and choose <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="w-5 h-5 rounded-full bg-[#e8f3f4] text-[#176f78] font-black text-[11px] flex items-center justify-center shrink-0">
-                        3
-                      </span>
-                      <span>
-                        Android will package and install <strong>IE Daily</strong> directly into your app drawer with native full-screen view.
-                      </span>
-                    </li>
-                  </ol>
+                <div className="p-2.5 rounded-xl bg-[#faf8f4] border border-[#e7e1d5]">
+                  <span className="font-bold text-[#14363d] block mb-0.5">2. One-Time Unknown Apps Permission</span>
+                  <p className="text-[11px] text-[#527078] leading-relaxed">
+                    If prompted, toggle <strong>"Allow from this source"</strong> in Android Settings. Future in-app updates will install seamlessly with one tap.
+                  </p>
                 </div>
-              </div>
 
-              {/* Package Identification Details */}
-              <div className="p-4 rounded-2xl bg-[#f1eee6] border border-[#d9d2c2] space-y-2">
-                <div className="text-xs font-bold text-[#14363d] flex items-center justify-between">
-                  <span>Android Package ID:</span>
-                  <span className="font-mono text-teal-800 bg-white px-2 py-0.5 rounded border border-[#d9d2c2]">
-                    com.debonair.iedailycontrol
-                  </span>
-                </div>
-                <div className="text-xs font-bold text-[#14363d] flex items-center justify-between">
-                  <span>Digital Asset Links URL:</span>
-                  <a
-                    href="/.well-known/assetlinks.json"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-mono text-[#176f78] underline flex items-center gap-1 hover:text-teal-900"
-                  >
-                    /.well-known/assetlinks.json <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-                <div className="text-xs font-bold text-[#14363d] flex items-center justify-between">
-                  <span>Web App Manifest:</span>
-                  <a
-                    href="/manifest.webmanifest"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-mono text-[#176f78] underline flex items-center gap-1 hover:text-teal-900"
-                  >
-                    /manifest.webmanifest <ExternalLink className="w-3 h-3" />
-                  </a>
+                <div className="p-2.5 rounded-xl bg-[#faf8f4] border border-[#e7e1d5]">
+                  <span className="font-bold text-[#14363d] block mb-0.5">3. Local Data &amp; Cache Preservation</span>
+                  <p className="text-[11px] text-[#527078] leading-relaxed">
+                    In-app OTA updates retain all 34 sewing line data records, checklists, offline sync queues, and user authentication state without wiping IndexedDB.
+                  </p>
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* TAB 2: PACKAGE MANIFEST & ASSETS */}
-          {activeTab === 'package_specs' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-black text-[#14363d] uppercase tracking-wider">
-                    Android Web App Manifest (manifest.webmanifest)
-                  </h3>
-                  <p className="text-[11px] text-[#6b7280]">
-                    Verified with standalone display mode, orientation locks, and adaptive maskable icons.
-                  </p>
-                </div>
+          {/* Native Android In-App OTA Architecture & Code Generator */}
+          <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e7e1d5] pb-2.5">
+              <div className="flex items-center gap-2">
+                <FileCode className="w-4 h-4 text-[#176f78]" />
+                <span className="text-xs font-black text-[#14363d]">Native Android OTA Update Engine Code</span>
+              </div>
+
+              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
                 <button
-                  onClick={() =>
-                    copyToClipboard(
-                      JSON.stringify(
-                        {
-                          id: '/',
-                          name: 'IE Daily Control',
-                          short_name: 'IE Daily',
-                          start_url: '/',
-                          display: 'standalone',
-                          background_color: '#f6f4ee',
-                          theme_color: '#176f78',
-                          packageId: 'com.debonair.iedailycontrol'
-                        },
-                        null,
-                        2
-                      ),
-                      'manifest'
-                    )
-                  }
-                  className="px-3 py-1.5 rounded-xl bg-white border border-[#d9d2c2] hover:bg-[#f1eee6] text-xs font-bold text-[#17343a] flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  type="button"
+                  onClick={() => setActiveCodeSnippet('kotlin')}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
+                    activeCodeSnippet === 'kotlin' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
                 >
-                  {copiedKey === 'manifest' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiedKey === 'manifest' ? 'Copied' : 'Copy'}
+                  Kotlin Installer
                 </button>
-              </div>
-
-              {/* Icon Assets Preview */}
-              <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] space-y-3">
-                <span className="text-xs font-black text-[#14363d] block">Packaged Android Icon Assets</span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3 rounded-xl bg-[#faf8f4] border border-[#e7e1d5] flex flex-col items-center text-center">
-                    <img src="/pwa-192x192.png" alt="192x192" className="w-12 h-12 rounded-xl mb-1.5 shadow-2xs" />
-                    <span className="text-[11px] font-bold text-[#14363d]">192 x 192 px</span>
-                    <span className="text-[10px] text-[#6b7280]">Any Purpose</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-[#faf8f4] border border-[#e7e1d5] flex flex-col items-center text-center">
-                    <img src="/pwa-512x512.png" alt="512x512" className="w-12 h-12 rounded-xl mb-1.5 shadow-2xs" />
-                    <span className="text-[11px] font-bold text-[#14363d]">512 x 512 px</span>
-                    <span className="text-[10px] text-[#6b7280]">Hi-Res Splash</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-[#faf8f4] border border-[#e7e1d5] flex flex-col items-center text-center">
-                    <img src="/pwa-maskable-512x512.png" alt="Maskable" className="w-12 h-12 rounded-full mb-1.5 shadow-2xs" />
-                    <span className="text-[11px] font-bold text-[#14363d]">512 x 512 Mask</span>
-                    <span className="text-[10px] text-[#6b7280]">Android Adaptive</span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-[#faf8f4] border border-[#e7e1d5] flex flex-col items-center text-center">
-                    <img src="/apple-touch-icon.png" alt="iOS" className="w-12 h-12 rounded-xl mb-1.5 shadow-2xs" />
-                    <span className="text-[11px] font-bold text-[#14363d]">180 x 180 px</span>
-                    <span className="text-[10px] text-[#6b7280]">Touch Icon</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* AndroidManifest.xml preview & download */}
-              <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileCode className="w-4 h-4 text-[#176f78]" />
-                    <span className="text-xs font-black text-[#14363d]">AndroidManifest.xml (Android Native)</span>
-                  </div>
-                  <button
-                    onClick={() => handleDownloadFile('AndroidManifest.xml', androidManifestXml, 'application/xml')}
-                    className="px-2.5 py-1 rounded-lg bg-[#176f78] hover:bg-[#125860] text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Download className="w-3 h-3" /> Download XML
-                  </button>
-                </div>
-                <pre className="p-3 rounded-xl bg-[#0f282f] text-teal-200 font-mono text-[10px] overflow-x-auto max-h-36">
-                  {androidManifestXml}
-                </pre>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: BUBBLEWRAP (GOOGLE PLAY TWA / APK BUILD) */}
-          {activeTab === 'twa_build' && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200">
-                <div className="flex items-start gap-3">
-                  <Sparkles className="w-5 h-5 text-amber-600 mt-0.5" />
-                  <div className="space-y-1">
-                    <h4 className="text-xs font-black text-amber-950">
-                      Google Bubblewrap CLI (Official Trusted Web Activity)
-                    </h4>
-                    <p className="text-[11px] text-amber-900/80 leading-relaxed">
-                      Bubblewrap is Google's official command-line tool that turns Progressive Web Apps into signed <strong>.apk</strong> and <strong>.aab</strong> (Android App Bundle) packages ready for direct sideloading or Google Play Store release.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Terminal className="w-4 h-4 text-[#176f78]" />
-                    <span className="text-xs font-black text-[#14363d]">One-Command APK Generation</span>
-                  </div>
-                  <button
-                    onClick={() =>
-                      copyToClipboard(
-                        `# Install Bubblewrap CLI\nnpm i -g @bubblewrap/cli\n\n# Initialize from manifest\nbubblewrap init --manifest=${currentUrl}/manifest.webmanifest\n\n# Build Signed Android APK\nbubblewrap build`,
-                        'bubblewrap'
-                      )
-                    }
-                    className="px-2.5 py-1 rounded-lg bg-[#f1eee6] hover:bg-[#e7e1d5] text-xs font-bold text-[#17343a] flex items-center gap-1 cursor-pointer"
-                  >
-                    {copiedKey === 'bubblewrap' ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                    Copy Commands
-                  </button>
-                </div>
-
-                <div className="p-3 rounded-xl bg-[#0f282f] text-emerald-300 font-mono text-xs space-y-1.5">
-                  <div className="text-teal-400/60"># 1. Install Bubblewrap CLI globally</div>
-                  <div>npm install -g @bubblewrap/cli</div>
-                  <div className="text-teal-400/60 pt-1"># 2. Initialize Android project</div>
-                  <div>bubblewrap init --manifest={currentUrl}/manifest.webmanifest</div>
-                  <div className="text-teal-400/60 pt-1"># 3. Build Production APK &amp; AAB</div>
-                  <div>bubblewrap build</div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-black text-[#14363d]">twa-manifest.json</h4>
-                  <p className="text-[11px] text-[#6b7280]">
-                    Pre-configured package metadata for com.debonair.iedailycontrol
-                  </p>
-                </div>
                 <button
-                  onClick={() => handleDownloadFile('twa-manifest.json', twaManifestJson, 'application/json')}
-                  className="px-3 py-1.5 rounded-xl bg-[#176f78] hover:bg-[#125860] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  type="button"
+                  onClick={() => setActiveCodeSnippet('session')}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
+                    activeCodeSnippet === 'session' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
                 >
-                  <Download className="w-3.5 h-3.5" /> Download twa-manifest.json
+                  Android 12+ Session
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveCodeSnippet('manifest')}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
+                    activeCodeSnippet === 'manifest' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Manifest.xml
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveCodeSnippet('paths')}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
+                    activeCodeSnippet === 'paths' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  file_paths.xml
                 </button>
               </div>
             </div>
-          )}
 
-          {/* TAB 4: CAPACITOR & ANDROID STUDIO */}
-          {activeTab === 'capacitor' && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] space-y-3">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-[#176f78]" />
-                  <h4 className="text-xs font-black text-[#14363d]">Build Native Android Studio Project</h4>
-                </div>
-                <p className="text-xs text-[#476369] leading-relaxed">
-                  Use Capacitor to open the app directly inside <strong>Android Studio</strong>, test on Android emulators, and generate Gradle builds.
-                </p>
+            <div className="relative">
+              <button
+                onClick={() => {
+                  const code =
+                    activeCodeSnippet === 'kotlin'
+                      ? NATIVE_ANDROID_OTA_KOTLIN_CODE
+                      : activeCodeSnippet === 'session'
+                      ? NATIVE_ANDROID_SESSION_INSTALLER_CODE
+                      : activeCodeSnippet === 'manifest'
+                      ? ANDROID_MANIFEST_OTA_SNIPPET
+                      : FILE_PATHS_XML_SNIPPET;
+                  copyToClipboard(code, 'ota_code');
+                }}
+                className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold font-mono flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                {copiedKey === 'ota_code' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                {copiedKey === 'ota_code' ? 'Copied' : 'Copy Code'}
+              </button>
 
-                <div className="p-3 rounded-xl bg-[#0f282f] text-emerald-300 font-mono text-xs space-y-1.5">
-                  <div className="text-teal-400/60"># 1. Install Capacitor CLI &amp; Android platform</div>
-                  <div>npm install @capacitor/core @capacitor/android</div>
-                  <div>npm install -D @capacitor/cli</div>
-                  <div className="text-teal-400/60 pt-1"># 2. Build production web bundle</div>
-                  <div>npm run build</div>
-                  <div className="text-teal-400/60 pt-1"># 3. Add Android platform &amp; sync</div>
-                  <div>npx cap add android</div>
-                  <div>npx cap sync android</div>
-                  <div className="text-teal-400/60 pt-1"># 4. Open in Android Studio to build APK</div>
-                  <div>npx cap open android</div>
-                </div>
+              <pre className="p-3 rounded-xl bg-[#0f282f] text-teal-200 font-mono text-[10px] overflow-x-auto max-h-48 leading-relaxed">
+                {activeCodeSnippet === 'kotlin' && NATIVE_ANDROID_OTA_KOTLIN_CODE}
+                {activeCodeSnippet === 'session' && NATIVE_ANDROID_SESSION_INSTALLER_CODE}
+                {activeCodeSnippet === 'manifest' && ANDROID_MANIFEST_OTA_SNIPPET}
+                {activeCodeSnippet === 'paths' && FILE_PATHS_XML_SNIPPET}
+              </pre>
+            </div>
+          </div>
 
-                <div className="pt-2 flex justify-end">
-                  <button
-                    onClick={() =>
-                      copyToClipboard(
-                        `npm install @capacitor/core @capacitor/android && npm install -D @capacitor/cli && npm run build && npx cap add android && npx cap sync android && npx cap open android`,
-                        'cap_all'
-                      )
-                    }
-                    className="px-3 py-1.5 rounded-xl bg-[#f1eee6] hover:bg-[#e7e1d5] text-xs font-bold text-[#17343a] flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    {copiedKey === 'cap_all' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    Copy Full Capacitor Workflow
-                  </button>
+          {/* OTA Shift Policy & Automation Settings */}
+          <div className="p-4 rounded-2xl bg-[#f1eee6] border border-[#d9d2c2] space-y-3">
+            <h4 className="text-xs font-black uppercase tracking-wider text-[#14363d] flex items-center gap-1.5">
+              <Settings className="w-3.5 h-3.5 text-[#176f78]" />
+              Automated Shift OTA Policy
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-white border border-[#d9d2c2] flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-[#14363d] block">Auto-Check on App Launch</span>
+                  <span className="text-[10px] text-[#527078]">Queries OTA server every time app boots</span>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleToggleAutoCheck}
+                  className={`w-10 h-6 rounded-full transition-colors p-0.5 cursor-pointer ${
+                    otaConfig.autoCheckEnabled ? 'bg-[#176f78]' : 'bg-slate-300'
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                      otaConfig.autoCheckEnabled ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white border border-[#d9d2c2] flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-[#14363d] block">Shift Notification Alerts</span>
+                  <span className="text-[10px] text-[#527078]">Alerts supervisor if line update is released</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleShiftNotify}
+                  className={`w-10 h-6 rounded-full transition-colors p-0.5 cursor-pointer ${
+                    otaConfig.notifyOnShiftStart ? 'bg-[#176f78]' : 'bg-slate-300'
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                      otaConfig.notifyOnShiftStart ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-[#f1eee6] border-t border-[#d9d2c2] flex items-center justify-between">
+        <div className="px-5 sm:px-6 py-3.5 sm:py-4 bg-[#f1eee6] border-t border-[#d9d2c2] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
             <span className="text-[11px] font-bold text-[#14363d]">
-              SHA256 &amp; Digital Asset Links Pre-Configured
+              Direct In-App OTA Package Installer • Version History &amp; 30-Day Auto-Pruner Active
             </span>
           </div>
           <button

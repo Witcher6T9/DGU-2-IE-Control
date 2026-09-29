@@ -1264,16 +1264,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 )}
 
-                {/* 3 Executive Metrics Banners: Responsive Layout for Mobile and Tablet */}
+                {/* 3 Executive Metrics Banners: Responsive Layout for Mobile and Tablet with Drilldown */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 pt-1">
                   {/* 1. Factory Efficiency */}
                   <div
                     id="executive-metric-efficiency"
-                    className="p-3 sm:p-3.5 rounded-2xl bg-white/10 border border-white/15 flex flex-col justify-between space-y-1.5 transition-all"
+                    onClick={() => setDrillDownKpiId('efficiency')}
+                    title="Click for Efficiency Hour-by-Hour Breakdown & 7-Day Trend"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setDrillDownKpiId('efficiency'); }}
+                    className="p-3 sm:p-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 flex flex-col justify-between space-y-1.5 transition-all cursor-pointer active:scale-[0.98] select-none group"
                   >
                     <div className="flex items-center justify-between text-[11px] text-sky-200 font-bold uppercase tracking-wider">
-                      <span>Plant Efficiency</span>
-                      <div className="w-6 h-6 rounded-lg bg-teal-400/20 flex items-center justify-center">
+                      <span className="flex items-center gap-1.5">
+                        <span>Plant Efficiency</span>
+                        <span className="text-[9px] text-teal-300 font-mono font-normal opacity-0 group-hover:opacity-100 transition-opacity">Drilldown ↗</span>
+                      </span>
+                      <div className="w-6 h-6 rounded-lg bg-teal-400/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                         <TrendingUp className="w-3.5 h-3.5 text-teal-300" />
                       </div>
                     </div>
@@ -1290,11 +1298,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   {/* 2. Output Volume */}
                   <div
                     id="executive-metric-output"
-                    className="p-3 sm:p-3.5 rounded-2xl bg-white/10 border border-white/15 flex flex-col justify-between space-y-1.5 transition-all"
+                    onClick={() => setDrillDownKpiId('production')}
+                    title="Click for Output Hourly Breakdown & 7-Day Shift Target Progress"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setDrillDownKpiId('production'); }}
+                    className="p-3 sm:p-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 flex flex-col justify-between space-y-1.5 transition-all cursor-pointer active:scale-[0.98] select-none group"
                   >
                     <div className="flex items-center justify-between text-[11px] text-sky-200 font-bold uppercase tracking-wider">
-                      <span>Output vs Target</span>
-                      <div className="w-6 h-6 rounded-lg bg-amber-400/20 flex items-center justify-center">
+                      <span className="flex items-center gap-1.5">
+                        <span>Output vs Target</span>
+                        <span className="text-[9px] text-amber-300 font-mono font-normal opacity-0 group-hover:opacity-100 transition-opacity">Drilldown ↗</span>
+                      </span>
+                      <div className="w-6 h-6 rounded-lg bg-amber-400/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                         <Target className="w-3.5 h-3.5 text-amber-300" />
                       </div>
                     </div>
@@ -1311,11 +1327,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   {/* 3. Manpower & Attendance */}
                   <div
                     id="executive-metric-attendance"
-                    className="p-3 sm:p-3.5 rounded-2xl bg-white/10 border border-white/15 flex flex-col justify-between space-y-1.5 transition-all sm:col-span-2 lg:col-span-1"
+                    onClick={() => setDrillDownKpiId('attendance')}
+                    title="Click for Operator Attendance Breakdown & Headcount Status"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setDrillDownKpiId('attendance'); }}
+                    className="p-3 sm:p-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 flex flex-col justify-between space-y-1.5 transition-all sm:col-span-2 lg:col-span-1 cursor-pointer active:scale-[0.98] select-none group"
                   >
                     <div className="flex items-center justify-between text-[11px] text-sky-200 font-bold uppercase tracking-wider">
-                      <span>Operator Attendance</span>
-                      <div className="w-6 h-6 rounded-lg bg-emerald-400/20 flex items-center justify-center">
+                      <span className="flex items-center gap-1.5">
+                        <span>Operator Attendance</span>
+                        <span className="text-[9px] text-emerald-300 font-mono font-normal opacity-0 group-hover:opacity-100 transition-opacity">Drilldown ↗</span>
+                      </span>
+                      <div className="w-6 h-6 rounded-lg bg-emerald-400/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                         <Users className="w-3.5 h-3.5 text-emerald-300" />
                       </div>
                     </div>

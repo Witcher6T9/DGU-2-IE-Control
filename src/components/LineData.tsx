@@ -1864,6 +1864,113 @@ export const LineData: React.FC<LineDataProps> = ({
           </div>
         )}
 
+        {/* Thumb-Zone Line Switcher Strip: 1-Tap Switching across all Sewing Lines */}
+        <div
+          id="linedata-line-switcher-strip"
+          className="mt-4 p-3 rounded-2xl bg-white border border-[#d9d2c2] shadow-2xs space-y-2 select-none"
+        >
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[#17343a] uppercase tracking-wide text-[11px] flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#176f78]" />
+                <span>Quick Line Select</span>
+              </span>
+              <span className="text-[10px] text-[#527078] font-mono-numbers">
+                ({sortedLines.length} lines available)
+              </span>
+            </div>
+
+            {/* Previous / Next Line Stepper Buttons with 44px mobile touch hitbox */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const idx = sortedLines.findIndex(l => l.lineNo === selectedLineNo);
+                  if (idx > 0) {
+                    onSelectLineNo(sortedLines[idx - 1].lineNo);
+                  } else if (sortedLines.length > 0) {
+                    onSelectLineNo(sortedLines[sortedLines.length - 1].lineNo);
+                  }
+                }}
+                title="Previous Sewing Line"
+                className="flex items-center justify-center gap-1 px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1 rounded-xl bg-[#f1eee6] hover:bg-[#e7e1d5] text-xs font-bold text-[#17343a] transition-all cursor-pointer touch-manipulation active:scale-95 shadow-2xs"
+              >
+                <ChevronLeft className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                <span className="hidden sm:inline">Prev Line</span>
+              </button>
+
+              <span className="text-xs font-mono font-bold text-[#176f78] px-2 py-1 rounded-lg bg-[#dceceb]">
+                {formData.lineNo}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const idx = sortedLines.findIndex(l => l.lineNo === selectedLineNo);
+                  if (idx >= 0 && idx < sortedLines.length - 1) {
+                    onSelectLineNo(sortedLines[idx + 1].lineNo);
+                  } else if (sortedLines.length > 0) {
+                    onSelectLineNo(sortedLines[0].lineNo);
+                  }
+                }}
+                title="Next Sewing Line"
+                className="flex items-center justify-center gap-1 px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1 rounded-xl bg-[#f1eee6] hover:bg-[#e7e1d5] text-xs font-bold text-[#17343a] transition-all cursor-pointer touch-manipulation active:scale-95 shadow-2xs"
+              >
+                <span className="hidden sm:inline">Next Line</span>
+                <ChevronRight className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Smooth Horizontal Carousel of Line Buttons with Tactile Touch Feedback */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 scroll-smooth touch-scroll">
+            {sortedLines.map((line) => {
+              const isSelected = line.lineNo === selectedLineNo;
+              const eff = line.efficiency ?? 0;
+              const bn = line.bottleneck;
+              const isCrit = bn && (bn.status === 'critical' || bn.status === 'high');
+
+              return (
+                <button
+                  key={line.id || line.lineNo}
+                  type="button"
+                  onClick={() => onSelectLineNo(line.lineNo)}
+                  title={`Select Line ${line.lineNo} • ${line.style || 'Standard'} • ${eff}% Eff`}
+                  className={`group relative flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 touch-manipulation select-none active:scale-95 ${
+                    isSelected
+                      ? 'bg-[#176f78] text-white shadow-md ring-2 ring-[#176f78]/40 border border-[#176f78]'
+                      : 'bg-[#fbfaf6] hover:bg-[#f1eee6] text-[#17343a] border border-[#d9d2c2]'
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 ${
+                      isCrit
+                        ? 'bg-rose-500 animate-pulse'
+                        : eff >= 75
+                        ? 'bg-emerald-500'
+                        : 'bg-amber-400'
+                    }`}
+                  />
+                  <span className="font-mono-numbers font-bold text-xs whitespace-nowrap">
+                    {line.lineNo.replace(/^Line\s+/i, 'L-')}
+                  </span>
+                  <span
+                    className={`text-[10px] font-mono-numbers px-1.5 py-0.2 rounded font-bold ${
+                      isSelected
+                        ? 'bg-white/20 text-white'
+                        : eff >= 75
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-900'
+                    }`}
+                  >
+                    {eff}%
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Capture Line Record Banner (Image 1 Header Banner) */}
         <div className="mt-5 p-4 rounded-2xl bg-white border border-[#e7e1d5] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-3">

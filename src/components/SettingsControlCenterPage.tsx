@@ -102,6 +102,7 @@ import { LeanToolsPage, LeanToolsSubTab } from './LeanToolsPage';
 import { WorldClassManufacturingSection } from './WorldClassManufacturingSection';
 import { Reports } from './Reports';
 import { CapacityCalculatorWorkspace } from './CapacityCalculatorWorkspace';
+import { ZipUpdateInjector } from './ZipUpdateInjector';
 
 export type SettingsPageSection =
   | 'control-center'
@@ -2067,9 +2068,12 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                     <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                       <span>Small Area Features System-Wide Suite</span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase font-mono bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
+                        Automatic
+                      </span>
                     </h3>
                     <p className="text-[11px] text-[#527078] dark:text-slate-400 mt-0.5">
-                      Enable collapsible line selectors, micro-chips, and dense data cards to minimize spatial footprint across all pages.
+                      Automatically detects viewport dimensions and device constraints to engage micro-chips, collapsible selectors, and zero-void data cards without manual intervention.
                     </p>
                   </div>
                   <button
@@ -2082,7 +2086,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                     }`}
                   >
                     <span className={`w-2 h-2 rounded-full ${currentSmallArea ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                    <span>{currentSmallArea ? 'Small Area Suite Active' : 'Enable Small Area Suite'}</span>
+                    <span>{currentSmallArea ? 'Automatic (Active)' : 'Manual Mode'}</span>
                   </button>
                 </div>
 
@@ -2427,10 +2431,13 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                   <button
                     type="button"
                     onClick={onOpenAndroidPackage}
-                    className="px-4 py-2 rounded-xl bg-[#176f78] text-white text-xs font-bold hover:bg-[#12555c] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <Smartphone className="w-3.5 h-3.5" />
-                    <span>Package Wizard</span>
+                    <span>Direct OTA Install</span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded-full font-mono bg-white text-emerald-900 font-black">
+                      v2.4.2
+                    </span>
                   </button>
                 )}
               </div>
@@ -2459,6 +2466,14 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                     Digital Asset Links Verified
                   </div>
                 </div>
+              </div>
+
+              {/* Zip File Injector on System Updates Pusher */}
+              <div className="mt-4">
+                <ZipUpdateInjector
+                  variant="embedded"
+                  onOpenAndroidPackageModal={onOpenAndroidPackage}
+                />
               </div>
             </section>
           )}

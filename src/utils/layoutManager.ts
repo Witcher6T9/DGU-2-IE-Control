@@ -197,7 +197,15 @@ export function applyLayoutStyling(config: AppPageLayoutConfig): void {
     if (config.fontScalePct) {
       root.style.setProperty('--app-font-scale', `${config.fontScalePct}%`);
     }
-    const density = config.density || 'comfortable';
+
+    // Automatic screen constraint detection
+    const isConstrained = typeof window !== 'undefined' && (window.innerWidth < 1024 || window.innerHeight < 720);
+
+    // Auto-density adaptation: On small area viewports, automatically use compact spacing
+    let density = config.density || 'comfortable';
+    if (isConstrained && density !== 'spacious') {
+      density = 'compact';
+    }
     root.setAttribute('data-layout-density', density);
     root.setAttribute('data-density', density);
     if (typeof document !== 'undefined' && document.body) {
@@ -212,11 +220,14 @@ export function applyLayoutStyling(config: AppPageLayoutConfig): void {
       document.body.setAttribute('data-workspace-width', workspaceWidth);
     }
 
-    // Small Area Features Suite
-    const smallArea = config.smallAreaFeaturesEnabled !== false ? 'enabled' : 'disabled';
+    // Small Area Features Suite (Automatic System-Wide)
+    // Automatically enabled and responsive across all screens
+    const smallArea = config.smallAreaFeaturesEnabled !== false ? 'enabled' : (isConstrained ? 'enabled' : 'disabled');
     root.setAttribute('data-small-area', smallArea);
+    root.setAttribute('data-auto-small-area', isConstrained ? 'active' : 'desktop-ready');
     if (typeof document !== 'undefined' && document.body) {
       document.body.setAttribute('data-small-area', smallArea);
+      document.body.setAttribute('data-auto-small-area', isConstrained ? 'active' : 'desktop-ready');
     }
 
     if (config.highContrastMode) {
@@ -227,6 +238,54 @@ export function applyLayoutStyling(config: AppPageLayoutConfig): void {
   } catch (e) {
     console.warn('Failed to apply layout styling:', e);
   }
+}
+
+/**
+ * Initializes automatic Small Area detection listener that dynamically adjusts
+ * DOM attributes whenever screen or viewport dimensions change.
+ */
+export function initAutomaticSmallAreaObserver(onUpdate?: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+
+  const applyAutoRules = () => {
+    try {
+      const root = document.documentElement;
+      const isSmall = window.innerWidth < 1024;
+      const isMobile = window.innerWidth < 640;
+
+      root.setAttribute('data-small-area', 'enabled');
+      root.setAttribute('data-auto-small-area', isSmall ? 'active' : 'desktop-ready');
+
+      if (isSmall) {
+        root.setAttribute('data-auto-compact', 'true');
+      } else {
+        root.removeAttribute('data-auto-compact');
+      }
+
+      if (document.body) {
+        document.body.setAttribute('data-small-area', 'enabled');
+        document.body.setAttribute('data-auto-small-area', isSmall ? 'active' : 'desktop-ready');
+        if (isSmall) {
+          document.body.setAttribute('data-auto-compact', 'true');
+        } else {
+          document.body.removeAttribute('data-auto-compact');
+        }
+      }
+
+      if (onUpdate) onUpdate();
+    } catch (e) {
+      console.warn('Error in auto small area observer:', e);
+    }
+  };
+
+  applyAutoRules();
+  window.addEventListener('resize', applyAutoRules, { passive: true });
+  window.addEventListener('orientationchange', applyAutoRules, { passive: true });
+
+  return () => {
+    window.removeEventListener('resize', applyAutoRules);
+    window.removeEventListener('orientationchange', applyAutoRules);
+  };
 }
 
 export function setWorkspaceWidthMode(width: 'fluid' | 'maximized' | 'standard'): void {
