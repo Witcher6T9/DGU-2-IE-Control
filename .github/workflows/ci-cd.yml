@@ -159,7 +159,7 @@ jobs:
     steps:
       - name: Deploy Pages Web App
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
   # =========================================================================
   # 5. Continuous Deployment: Firebase Hosting & Firestore Rules
