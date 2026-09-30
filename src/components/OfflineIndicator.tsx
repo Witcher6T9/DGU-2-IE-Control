@@ -4,18 +4,22 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { WifiOff, ChevronRight, Activity, Wifi, CheckCircle2 } from 'lucide-react';
+import { WifiOff, ChevronRight, Activity, Wifi, CheckCircle2, Shield } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/usePWAInstall';
 import { isSystemOffline, setSystemOffline } from '../utils/offlineSyncManager';
+import { UserProfile } from '../types';
+import { isTier0Authority } from '../utils/rbac';
 
 interface OfflineIndicatorProps {
+  profile?: UserProfile;
   onOpenOfflineLog?: () => void;
 }
 
-export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ onOpenOfflineLog }) => {
+export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ profile, onOpenOfflineLog }) => {
   const isBrowserOnline = useOnlineStatus();
   const [isOfflineConfig, setIsOfflineConfig] = useState<boolean>(() => isSystemOffline());
   const [showOnlineToast, setShowOnlineToast] = useState(false);
+  const isTier0 = Boolean(profile && isTier0Authority(profile));
 
   useEffect(() => {
     const handleStatusChange = (e: any) => {
@@ -78,15 +82,16 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ onOpenOfflin
         <span>Go Online</span>
       </button>
 
-      {onOpenOfflineLog && (
+      {onOpenOfflineLog && isTier0 && (
         <button
           type="button"
           onClick={onOpenOfflineLog}
           className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] sm:text-[11px] font-bold flex items-center gap-1 border border-amber-400/30 transition-all cursor-pointer touch-manipulation active:scale-95 shrink-0"
-          title="Open Offline Activity Log in Database Modal"
+          title="Open Offline Activity Log & Sync (Tier_0 Authority)"
         >
           <Activity className="w-3 h-3 text-amber-400" />
           <span className="hidden xs:inline">Activity Log</span>
+          <span className="px-1 py-0.2 rounded bg-amber-500/30 text-[9px] font-mono font-bold">Tier_0</span>
           <ChevronRight className="w-3 h-3" />
         </button>
       )}

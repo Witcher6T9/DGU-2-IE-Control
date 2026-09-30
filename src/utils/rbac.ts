@@ -207,6 +207,31 @@ export function isMasterAdminOrAdmin(profile?: Partial<UserProfile> | UserProfil
   return false;
 }
 
+/**
+ * Check if the active profile holds Tier_0 Authority.
+ * Offline Activity Log, sync queue management, and deep system audits
+ * are strictly restricted to Tier_0 Authority base.
+ */
+export function isTier0Authority(profile?: Partial<UserProfile> | UserProfile | null): boolean {
+  if (!profile) return false;
+  // Tier_0 Authority base requires Level 0 / tier_0 tierId or verified System Administrator clearance
+  if (profile.tierId === 'tier_0') return true;
+  if (isSystemAdmin(profile)) return true;
+  const email = (profile.email || '').toLowerCase().trim();
+  if (SYSTEM_ADMIN_EMAILS.some(e => e.toLowerCase() === email)) {
+    return true;
+  }
+  const jobTitle = (profile.jobTitle || '').toLowerCase();
+  if (
+    jobTitle.includes('system administrator') ||
+    jobTitle.includes('master admin') ||
+    jobTitle.includes('root operations')
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function verifySystemAdminPasscode(passcode: string, userEmail?: string): boolean {
   // If email is provided, verify email match as well
   if (userEmail) {

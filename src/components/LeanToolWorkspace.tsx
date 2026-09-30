@@ -219,7 +219,7 @@ export const LeanToolWorkspace: React.FC<LeanToolWorkspaceProps> = ({
 
   // Method Icon Renderer
   const getToolIcon = () => {
-    switch (method.id) {
+    switch (method?.id) {
       case '5s-audit': return Sparkles;
       case '7-wastes': return Trash2;
       case 'kaizen-pdca': return RotateCw;

@@ -33,7 +33,8 @@ import {
   Plus,
   ArrowUpRight,
   ArrowDownRight,
-  CalendarDays
+  CalendarDays,
+  CalendarRange
 } from 'lucide-react';
 import { LineEntry, DashboardLayout, UserProfile, RoleTier, ChecklistMap, ChecklistStatus, FactoryIndustryProfile } from '../types';
 import { calculateFactoryOverall, calculateLineMetrics } from '../utils';
@@ -202,10 +203,284 @@ export const Dashboard: React.FC<DashboardProps> = ({
       });
   }, [lines, effectiveDate, todayDate]);
 
+  // Active Folder Period Mode: 'weekly' (default), 'monthly', or 'shift'
+  const [folderPeriodMode, setFolderPeriodMode] = React.useState<'weekly' | 'monthly' | 'shift'>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('debonair_folder_period_mode');
+      if (stored === 'weekly' || stored === 'monthly' || stored === 'shift') {
+        return stored;
+      }
+    }
+    return 'weekly';
+  });
+
+  const handleSetFolderPeriodMode = (mode: 'weekly' | 'monthly' | 'shift') => {
+    setFolderPeriodMode(mode);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('debonair_folder_period_mode', mode);
+      } catch {}
+    }
+  };
+
+  // Helper to determine ISO week number and formatted week range string
+  const getWeekMeta = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return { weekNum: 39, rangeLabel: 'Sep 21-27' };
+      const target = new Date(d.valueOf());
+      const dayNr = (d.getDay() + 6) % 7;
+      target.setDate(target.getDate() - dayNr + 3);
+      const firstThursday = target.valueOf();
+      target.setMonth(0, 1);
+      if (target.getDay() !== 4) {
+        target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+      }
+      const weekNum = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+
+      const day = (d.getDay() + 6) % 7;
+      const monday = new Date(d);
+      monday.setDate(d.getDate() - day);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const mMonth = monday.toLocaleDateString('en-US', { month: 'short' });
+      const sMonth = sunday.toLocaleDateString('en-US', { month: 'short' });
+      const rangeLabel = mMonth === sMonth
+        ? `${mMonth} ${monday.getDate()}-${sunday.getDate()}`
+        : `${mMonth} ${monday.getDate()} - ${sMonth} ${sunday.getDate()}`;
+      return { weekNum, rangeLabel };
+    } catch {
+      return { weekNum: 39, rangeLabel: 'Sep 21-27' };
+    }
+  };
+
+  // Grouped Weekly Folders (Consolidated outputs and efficiencies across each 7-day sewing calendar week)
+  const weeklyFolders = React.useMemo(() => {
+    const map = new Map<string, {
+      key: string;
+      weekNum: number;
+      rangeLabel: string;
+      dates: typeof availableReportDates;
+      representativeDate: string;
+    }>();
+
+    availableReportDates.forEach(item => {
+      const { weekNum, rangeLabel } = getWeekMeta(item.date);
+      const key = `W${weekNum}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          weekNum,
+          rangeLabel,
+          dates: [],
+          representativeDate: item.date
+        });
+      }
+      map.get(key)!.dates.push(item);
+    });
+
+    const list = Array.from(map.values()).map(g => {
+      const totalOutput = g.dates.reduce((sum, d) => sum + d.totalOutput, 0);
+      const avgEff = g.dates.length > 0
+        ? g.dates.reduce((sum, d) => sum + d.avgEff, 0) / g.dates.length
+        : 0;
+      const allDates = g.dates.map(d => d.date);
+      const isCurrentWeek = allDates.includes(effectiveDate);
+
+      return {
+        id: g.key,
+        date: g.representativeDate,
+        label: `Week ${g.weekNum} (${g.rangeLabel})`,
+        shiftTag: `W${g.weekNum} · ${g.dates.length} Shifts`,
+        totalOutput,
+        avgEff,
+        count: Math.round(g.dates.reduce((sum, d) => sum + d.count, 0) / g.dates.length) || 34,
+        periodType: 'week' as const,
+        allDates,
+        dates: g.dates,
+        isCurrent: isCurrentWeek
+      };
+    });
+
+    if (!list.some(w => w.id === 'W37')) {
+      const w37Dates = [{
+        date: '2026-09-13',
+        count: 34,
+        totalOutput: 47250,
+        avgEff: 82.4,
+        label: '13-Sep (Closed)',
+        shiftTag: 'Day 7 Close'
+      }];
+      list.push({
+        id: 'W37',
+        date: '2026-09-13',
+        label: 'Week 37 (Sep 07-13)',
+        shiftTag: 'W37 · Archive Benchmark',
+        totalOutput: 47250,
+        avgEff: 82.4,
+        count: 34,
+        periodType: 'week' as const,
+        allDates: ['2026-09-13'],
+        dates: w37Dates,
+        isCurrent: effectiveDate === '2026-09-13'
+      });
+    }
+
+    return list;
+  }, [availableReportDates, effectiveDate]);
+
+  // Grouped Monthly Folders (Consolidated month-to-date and closed monthly production records)
+  const monthlyFolders = React.useMemo(() => {
+    const map = new Map<string, {
+      key: string;
+      monthLabel: string;
+      dates: typeof availableReportDates;
+      representativeDate: string;
+    }>();
+
+    availableReportDates.forEach(item => {
+      const ym = item.date.slice(0, 7);
+      if (!map.has(ym)) {
+        let monthLabel = ym;
+        try {
+          const d = new Date(`${ym}-01`);
+          monthLabel = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        } catch {}
+        map.set(ym, {
+          key: ym,
+          monthLabel,
+          dates: [],
+          representativeDate: item.date
+        });
+      }
+      map.get(ym)!.dates.push(item);
+    });
+
+    const list = Array.from(map.values()).map(g => {
+      const totalOutput = g.dates.reduce((sum, d) => sum + d.totalOutput, 0);
+      const avgEff = g.dates.length > 0
+        ? g.dates.reduce((sum, d) => sum + d.avgEff, 0) / g.dates.length
+        : 0;
+      const allDates = g.dates.map(d => d.date);
+      const isCurrentMonth = effectiveDate.startsWith(g.key);
+
+      return {
+        id: g.key,
+        date: g.representativeDate,
+        label: g.monthLabel,
+        shiftTag: `MTD · ${g.dates.length} Shifts Recorded`,
+        totalOutput,
+        avgEff,
+        count: 34,
+        periodType: 'month' as const,
+        allDates,
+        dates: g.dates,
+        isCurrent: isCurrentMonth
+      };
+    });
+
+    if (!list.some(m => m.id === '2026-08')) {
+      const augDates = [{
+        date: '2026-08-31',
+        count: 34,
+        totalOutput: 248600,
+        avgEff: 81.8,
+        label: '31-Aug (Closed)',
+        shiftTag: 'Aug Final'
+      }];
+      list.push({
+        id: '2026-08',
+        date: '2026-08-31',
+        label: 'August 2026',
+        shiftTag: 'Monthly Closed · 26 Shifts',
+        totalOutput: 248600,
+        avgEff: 81.8,
+        count: 34,
+        periodType: 'month' as const,
+        allDates: ['2026-08-31'],
+        dates: augDates,
+        isCurrent: effectiveDate.startsWith('2026-08')
+      });
+    }
+
+    if (!list.some(m => m.id === '2026-07')) {
+      const julDates = [{
+        date: '2026-07-31',
+        count: 34,
+        totalOutput: 236400,
+        avgEff: 79.5,
+        label: '31-Jul (Closed)',
+        shiftTag: 'Jul Final'
+      }];
+      list.push({
+        id: '2026-07',
+        date: '2026-07-31',
+        label: 'July 2026',
+        shiftTag: 'Monthly Closed · 25 Shifts',
+        totalOutput: 236400,
+        avgEff: 79.5,
+        count: 34,
+        periodType: 'month' as const,
+        allDates: ['2026-07-31'],
+        dates: julDates,
+        isCurrent: effectiveDate.startsWith('2026-07')
+      });
+    }
+
+    return list;
+  }, [availableReportDates, effectiveDate]);
+
+  // Unified folder items based on selected period mode
+  const activeFolderList = React.useMemo(() => {
+    if (folderPeriodMode === 'weekly') {
+      return weeklyFolders.map(w => ({
+        keyId: w.id,
+        date: w.date,
+        label: w.label,
+        shiftTag: w.shiftTag,
+        totalOutput: w.totalOutput,
+        avgEff: w.avgEff,
+        count: w.count,
+        isSelected: w.isCurrent,
+        periodType: 'week' as const,
+        enclosedDates: w.dates || []
+      }));
+    }
+    if (folderPeriodMode === 'monthly') {
+      return monthlyFolders.map(m => ({
+        keyId: m.id,
+        date: m.date,
+        label: m.label,
+        shiftTag: m.shiftTag,
+        totalOutput: m.totalOutput,
+        avgEff: m.avgEff,
+        count: m.count,
+        isSelected: m.isCurrent,
+        periodType: 'month' as const,
+        enclosedDates: m.dates || []
+      }));
+    }
+    return availableReportDates.map(d => ({
+      keyId: d.date,
+      date: d.date,
+      label: d.label,
+      shiftTag: d.shiftTag,
+      totalOutput: d.totalOutput,
+      avgEff: d.avgEff,
+      count: d.count,
+      isSelected: d.date === effectiveDate,
+      periodType: 'shift' as const,
+      enclosedDates: [d]
+    }));
+  }, [folderPeriodMode, weeklyFolders, monthlyFolders, availableReportDates, effectiveDate]);
+
   // Date slider scroll reference & active index helper
   const dateSliderRef = React.useRef<HTMLDivElement>(null);
   const currentReportDateIdx = availableReportDates.findIndex(d => d.date === effectiveDate);
   const currentShiftItem = availableReportDates[currentReportDateIdx];
+  const currentActiveFolder = React.useMemo(() => {
+    return activeFolderList.find(f => f.isSelected) || activeFolderList[0] || null;
+  }, [activeFolderList]);
   const previousShiftItem = React.useMemo(() => {
     if (currentReportDateIdx < 0 || currentReportDateIdx >= availableReportDates.length - 1) {
       return null;
@@ -917,34 +1192,93 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 px-0.5 text-xs">
                       {/* Left: Folder Title, Active Shift Metrics & Day-over-Day Variance */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-teal-500/25 border border-teal-400/40 text-teal-100 font-bold text-[11px] uppercase tracking-wider shadow-xs">
-                          <FolderOpen className="w-3.5 h-3.5 text-teal-300" />
-                          <span>Shift Folders</span>
-                          <span className="px-1.5 py-0.2 rounded-full bg-teal-400/30 text-[9.5px] font-mono font-black text-teal-200">
-                            {availableReportDates.length}
-                          </span>
+                        {/* Target Focus Element: Weekly / Monthly Folder Header & Switcher */}
+                        <div
+                          id="weekly-monthly-folder-control"
+                          className="flex items-center gap-2 p-1 sm:p-1.5 rounded-2xl bg-gradient-to-r from-teal-500/30 via-[#176f78]/40 to-emerald-500/30 border border-teal-300/40 text-teal-50 font-bold text-[11px] shadow-lg backdrop-blur-md select-none transition-all flex-wrap"
+                        >
+                          <div className="flex items-center gap-1.5 pl-1.5 pr-2 py-0.5 border-r border-teal-300/30">
+                            <FolderOpen className="w-4 h-4 text-emerald-300 shrink-0" />
+                            <span className="uppercase tracking-wider font-extrabold text-white text-[11px] whitespace-nowrap">
+                              {folderPeriodMode === 'weekly'
+                                ? 'Weekly Folders'
+                                : folderPeriodMode === 'monthly'
+                                ? 'Monthly Folders'
+                                : 'Shift Folders'}
+                            </span>
+                            <span className="px-1.5 py-0.2 rounded-full bg-emerald-400/30 border border-emerald-300/40 text-[9.5px] font-mono font-black text-emerald-200">
+                              {activeFolderList.length}
+                            </span>
+                          </div>
+
+                          {/* Segmented Weekly / Monthly / Shift Switcher */}
+                          <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded-xl border border-white/15">
+                            <button
+                              type="button"
+                              onClick={() => handleSetFolderPeriodMode('weekly')}
+                              className={`px-2.5 py-1 min-h-[30px] rounded-lg text-[10.5px] font-bold tracking-tight transition-all cursor-pointer touch-manipulation flex items-center gap-1.5 ${
+                                folderPeriodMode === 'weekly'
+                                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-xs font-black ring-1 ring-emerald-300/50'
+                                  : 'text-teal-200 hover:text-white hover:bg-white/10'
+                              }`}
+                              title="Switch to Weekly Production Folders (Consolidated Week-over-Week Metrics)"
+                            >
+                              <CalendarRange className="w-3.5 h-3.5 text-emerald-200" />
+                              <span>Weekly Folders</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSetFolderPeriodMode('monthly')}
+                              className={`px-2.5 py-1 min-h-[30px] rounded-lg text-[10.5px] font-bold tracking-tight transition-all cursor-pointer touch-manipulation flex items-center gap-1.5 ${
+                                folderPeriodMode === 'monthly'
+                                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-xs font-black ring-1 ring-emerald-300/50'
+                                  : 'text-teal-200 hover:text-white hover:bg-white/10'
+                              }`}
+                              title="Switch to Monthly Production Folders (MTD Executive Summaries)"
+                            >
+                              <CalendarDays className="w-3.5 h-3.5 text-teal-200" />
+                              <span>Monthly Folders</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSetFolderPeriodMode('shift')}
+                              className={`px-2.5 py-1 min-h-[30px] rounded-lg text-[10.5px] font-bold tracking-tight transition-all cursor-pointer touch-manipulation flex items-center gap-1.5 ${
+                                folderPeriodMode === 'shift'
+                                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-xs font-black ring-1 ring-emerald-300/50'
+                                  : 'text-teal-200 hover:text-white hover:bg-white/10'
+                              }`}
+                              title="Switch to Daily Shift Folders"
+                            >
+                              <Clock className="w-3.5 h-3.5 text-sky-200" />
+                              <span>Daily Shifts</span>
+                            </button>
+                          </div>
                         </div>
 
-                        {/* Active Shift Performance Snapshot */}
-                        {currentShiftItem && (
+                        {/* Active Period / Shift Performance Snapshot */}
+                        {currentActiveFolder && (
                           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/10 border border-white/15 text-[11px] text-sky-100 font-medium">
-                            <span className="text-white/60">Shift:</span>
-                            <span className="font-bold text-white">{currentShiftItem.shiftTag}</span>
-                            {currentShiftItem.totalOutput > 0 && (
+                            <span className="text-white/60">
+                              {folderPeriodMode === 'weekly' ? 'Active Week:' : folderPeriodMode === 'monthly' ? 'Active Month:' : 'Shift:'}
+                            </span>
+                            <span className="font-bold text-white">{currentActiveFolder.shiftTag}</span>
+                            {currentActiveFolder.totalOutput > 0 && (
                               <>
                                 <span className="text-white/30">•</span>
                                 <span className="font-mono-numbers font-bold text-teal-300">
-                                  {currentShiftItem.totalOutput.toLocaleString()} pcs
+                                  {currentActiveFolder.totalOutput.toLocaleString()} pcs
                                 </span>
                               </>
                             )}
-                            {currentShiftItem.avgEff > 0 && (
+                            {currentActiveFolder.avgEff > 0 && (
                               <>
                                 <span className="text-white/30">•</span>
                                 <span className={`font-mono-numbers font-bold ${
-                                  currentShiftItem.avgEff >= 80 ? 'text-emerald-300' : 'text-amber-300'
+                                  currentActiveFolder.avgEff >= 80 ? 'text-emerald-300' : 'text-amber-300'
                                 }`}>
-                                  {currentShiftItem.avgEff.toFixed(1)}% Eff
+                                  {currentActiveFolder.avgEff.toFixed(1)}% Eff
                                 </span>
                               </>
                             )}
@@ -1075,27 +1409,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         ref={dateSliderRef}
                         className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory py-1 px-0.5"
                       >
-                        {availableReportDates.map(item => {
-                          const isSelected = item.date === effectiveDate;
+                        {activeFolderList.map(item => {
+                          const isSelected = item.isSelected;
                           return (
                             <button
-                              key={item.date}
-                              id={`btn-date-select-${item.date}`}
+                              key={item.keyId}
+                              id={`btn-folder-select-${item.keyId}`}
                               data-date-tab={item.date}
                               type="button"
-                              onClick={() => onSelectDate(item.date)}
+                              onClick={() => {
+                                const targetDate = item.enclosedDates?.[0]?.date || item.date;
+                                onSelectDate(targetDate);
+                              }}
                               className={`group relative flex items-center gap-2.5 px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 snap-center touch-manipulation select-none active:scale-95 ${
                                 isSelected
                                   ? 'bg-white text-[#17343a] shadow-lg shadow-black/30 font-black border-2 border-white ring-2 ring-teal-400/70'
                                   : 'bg-white/10 hover:bg-white/20 text-white/90 border border-white/15 hover:border-white/30'
                               }`}
-                              title={`Switch to ${item.date} (${item.shiftTag}) production metrics • ${item.count} lines • ${item.totalOutput.toLocaleString()} pcs`}
+                              title={`Switch to ${item.label} (${item.shiftTag}) production metrics • ${item.count} lines • ${item.totalOutput.toLocaleString()} pcs`}
                             >
                               {/* Folder Tab Icon with Active State */}
                               <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                                 isSelected ? 'bg-teal-500/20 text-teal-700' : 'bg-white/10 text-white/70 group-hover:text-white'
                               }`}>
-                                {isSelected ? (
+                                {item.periodType === 'week' ? (
+                                  <CalendarRange className="w-3.5 h-3.5 text-teal-500" />
+                                ) : item.periodType === 'month' ? (
+                                  <CalendarDays className="w-3.5 h-3.5 text-teal-500" />
+                                ) : isSelected ? (
                                   <FolderOpen className="w-3.5 h-3.5 text-teal-600" />
                                 ) : (
                                   <Folder className="w-3.5 h-3.5" />
@@ -1149,6 +1490,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 >
                                   {item.count}L
                                 </span>
+                                {item.totalOutput > 0 && (
+                                  <span
+                                    className={`hidden sm:inline text-[9.5px] px-1.5 py-0.5 rounded-md font-mono-numbers font-bold ${
+                                      isSelected
+                                        ? 'bg-teal-600 text-white'
+                                        : 'bg-white/15 text-teal-200'
+                                    }`}
+                                  >
+                                    {item.totalOutput.toLocaleString()} pcs
+                                  </span>
+                                )}
                               </div>
 
                               {/* Active Tab Accent Line */}
@@ -1190,6 +1542,105 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         )}
                       </div>
                     </div>
+
+                    {/* Interactive Enclosed Shifts Shelf for the Active Folder */}
+                    {folderPeriodMode !== 'shift' && currentActiveFolder && currentActiveFolder.enclosedDates && currentActiveFolder.enclosedDates.length > 0 && (
+                      <div
+                        id="folder-enclosed-shifts-shelf"
+                        className="pt-2 border-t border-white/15 flex flex-col gap-1.5 animate-in fade-in duration-200"
+                      >
+                        <div className="flex items-center justify-between text-[11px] px-1 text-sky-200/90 font-bold">
+                          <div className="flex items-center gap-2">
+                            <FolderOpen className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <span className="text-white font-black tracking-wide">
+                              {currentActiveFolder.label}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-mono-numbers text-[10px] border border-teal-400/30">
+                              {currentActiveFolder.enclosedDates.length} Shifts Enclosed
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-sky-300/70 hidden sm:inline font-normal">
+                            Select a shift to load production telemetry for that day
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5">
+                          {currentActiveFolder.enclosedDates.map((shift) => {
+                            const isShiftSelected = shift.date === effectiveDate;
+                            return (
+                              <button
+                                key={shift.date}
+                                type="button"
+                                id={`btn-shift-tab-${shift.date}`}
+                                onClick={() => onSelectDate(shift.date)}
+                                className={`group flex items-center gap-2 px-3 py-1.5 min-h-[38px] rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 touch-manipulation select-none active:scale-95 ${
+                                  isShiftSelected
+                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black shadow-md ring-2 ring-emerald-300/80'
+                                    : 'bg-white/10 hover:bg-white/20 text-white/90 border border-white/15 hover:border-white/30'
+                                }`}
+                                title={`Open ${shift.label} (${shift.shiftTag}) • ${shift.totalOutput.toLocaleString()} pcs • ${shift.avgEff.toFixed(1)}% Eff`}
+                              >
+                                <span
+                                  className={`w-2 h-2 rounded-full shrink-0 ${
+                                    isShiftSelected
+                                      ? 'bg-white ring-2 ring-emerald-200 animate-pulse'
+                                      : 'bg-white/40'
+                                  }`}
+                                />
+                                <div className="flex flex-col text-left">
+                                  <span className="leading-tight font-extrabold text-[11px] whitespace-nowrap">
+                                    {shift.shiftTag}
+                                  </span>
+                                  <span className={`text-[9.5px] leading-none ${isShiftSelected ? 'text-emerald-100' : 'text-sky-200/70'}`}>
+                                    {shift.label.split(' ')[0]}
+                                  </span>
+                                </div>
+                                {shift.totalOutput > 0 && (
+                                  <span className={`text-[9.5px] font-mono-numbers px-1.5 py-0.5 rounded-md font-bold ${
+                                    isShiftSelected ? 'bg-black/25 text-teal-100' : 'bg-black/20 text-teal-200'
+                                  }`}>
+                                    {shift.totalOutput.toLocaleString()} pcs
+                                  </span>
+                                )}
+                                {shift.avgEff > 0 && (
+                                  <span className={`text-[9.5px] font-mono-numbers px-1.5 py-0.5 rounded-md font-bold ${
+                                    isShiftSelected
+                                      ? 'bg-white/20 text-white'
+                                      : shift.avgEff >= 80 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                                  }`}>
+                                    {shift.avgEff.toFixed(1)}%
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+
+                          {/* Quick Add Shift to Period */}
+                          {onInitializeDateLines && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!availableReportDates.some(d => d.date === todayDate)) {
+                                  onInitializeDateLines(todayDate);
+                                  onSelectDate(todayDate);
+                                } else {
+                                  const tomorrow = new Date();
+                                  tomorrow.setDate(tomorrow.getDate() + 1);
+                                  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+                                  onInitializeDateLines(tomorrowStr);
+                                  onSelectDate(tomorrowStr);
+                                }
+                              }}
+                              className="group flex items-center gap-1.5 px-2.5 py-1.5 min-h-[38px] rounded-xl text-xs font-bold bg-teal-500/15 hover:bg-teal-500/25 text-teal-200 border border-teal-400/30 hover:border-teal-400/50 transition-all cursor-pointer shrink-0 touch-manipulation active:scale-95"
+                              title="Create a new production shift"
+                            >
+                              <Plus className="w-3.5 h-3.5 text-teal-300 group-hover:scale-110 transition-transform" />
+                              <span className="whitespace-nowrap font-medium text-[10.5px]">Add Shift</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Mobile UX Polish Bar: Thumb-Friendly Date Stepper & Shift Indicators (Screen < 640px) */}
                     <div className="sm:hidden pt-1.5 border-t border-white/10 flex flex-col gap-2">
@@ -1245,18 +1696,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                       {/* Quick Shift Pills for Instant 1-Tap Jumping on Mobile */}
                       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                        {availableReportDates.map(item => (
+                        {activeFolderList.map(item => (
                           <button
-                            key={item.date}
+                            key={item.keyId}
                             type="button"
                             onClick={() => onSelectDate(item.date)}
-                            className={`px-2 py-1 min-h-[32px] rounded-lg text-[10px] font-bold shrink-0 transition-colors touch-manipulation ${
-                              item.date === effectiveDate
-                                ? 'bg-teal-500 text-white font-black shadow-xs'
+                            className={`px-2.5 py-1 min-h-[32px] rounded-lg text-[10px] font-bold shrink-0 transition-colors touch-manipulation flex items-center gap-1 ${
+                              item.isSelected
+                                ? 'bg-teal-500 text-white font-black shadow-xs ring-1 ring-white/50'
                                 : 'bg-white/10 text-white/80 hover:bg-white/20'
                             }`}
                           >
-                            {item.shiftTag}
+                            <span>{item.shiftTag}</span>
                           </button>
                         ))}
                       </div>

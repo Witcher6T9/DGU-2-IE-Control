@@ -27,8 +27,13 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Shield,
+  ShieldAlert,
+  Lock
 } from 'lucide-react';
+import { UserProfile } from '../types';
+import { isTier0Authority } from '../utils/rbac';
 import {
   OfflineActivityLogEntry,
   getOfflineActivityLogs,
@@ -44,15 +49,19 @@ import {
 } from '../utils/offlineSyncManager';
 
 interface OfflineActivityLogViewProps {
+  profile?: UserProfile;
   onRefreshData?: () => void;
   activeOperatorName?: string;
   activeOperatorRole?: string;
 }
 
 export const OfflineActivityLogView: React.FC<OfflineActivityLogViewProps> = ({
+  profile,
   activeOperatorName = 'Debonair IE Admin',
   activeOperatorRole = 'SENIOR INDUSTRIAL ENGINEER'
 }) => {
+  // Strictly enforce Tier_0 Authority: Requires an active profile passing isTier0Authority check
+  const isAuthorizedTier0 = Boolean(profile && isTier0Authority(profile));
   const [logs, setLogs] = useState<OfflineActivityLogEntry[]>(() => getOfflineActivityLogs());
   const [isOffline, setIsOffline] = useState<boolean>(() => isSystemOffline());
   const [searchQuery, setSearchQuery] = useState('');
@@ -114,6 +123,13 @@ export const OfflineActivityLogView: React.FC<OfflineActivityLogViewProps> = ({
   }, [logs, selectedCategory, selectedStatus, searchQuery]);
 
   const handleToggleOfflineMode = () => {
+    if (!isAuthorizedTier0) {
+      setSyncToast({
+        message: 'Tier_0 Authority Clearance Required to toggle system offline network state.',
+        type: 'info'
+      });
+      return;
+    }
     const nextState = !isOffline;
     setIsOffline(nextState);
     setSystemOffline(nextState);
@@ -127,6 +143,14 @@ export const OfflineActivityLogView: React.FC<OfflineActivityLogViewProps> = ({
   };
 
   const handleForceSyncAll = () => {
+    if (!isAuthorizedTier0) {
+      setSyncToast({
+        message: 'Access Denied: Tier_0 Authority clearance is strictly required to dispatch cloud sync queues.',
+        type: 'info'
+      });
+      return;
+    }
+
     if (pendingCount === 0) {
       setSyncToast({
         message: 'All offline changes are already synchronized with the server!',
@@ -138,7 +162,7 @@ export const OfflineActivityLogView: React.FC<OfflineActivityLogViewProps> = ({
 
     setIsSyncingAll(true);
     setTimeout(() => {
-      const { syncedCount } = syncAllPendingLogs();
+      const { syncedCount } = syncAllPendingLogs(profile);
       setLogs(getOfflineActivityLogs());
       setIsSyncingAll(false);
       setSyncToast({
@@ -151,7 +175,14 @@ export const OfflineActivityLogView: React.FC<OfflineActivityLogViewProps> = ({
 
   const handleSyncSingle = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const updated = syncSingleLogEntry(id);
+    if (!isAuthorizedTier0) {
+      setSyncToast({
+        message: 'Access Denied: Tier_0 Authority required to force-sync individual offline transaction logs.',
+        type: 'info'
+      });
+      return;
+    }
+    const updated = syncSingleLogEntry(id, profile);
     setLogs(updated);
     setSyncToast({
       message: 'Modification successfully synchronized to server.',
@@ -161,6 +192,13 @@ export const OfflineActivityLogView: React.FC<OfflineActivityLogViewProps> = ({
   };
 
   const handleClearSynced = () => {
+    if (!isAuthorizedTier0) {
+      setSyncToast({
+        message: 'Access Denied: Tier_0 Authority required to clear synchronized activity journals.',
+        type: 'info'
+      });
+      return;
+    }
     const remaining = clearSyncedLogs();
     setLogs(remaining);
     setSyncToast({
@@ -288,6 +326,51 @@ ${entry.dataPoints.map(dp => `  - ${dp.label}: ${dp.previousValue ?? 'N/A'} -> $
     }
   };
 
+  // Enforce Tier_0 Authority: Only Tier_0 operators may inspect offline journals or dispatch cloud sync queues
+  if (!isAuthorizedTier0) {
+    return (
+      <div className="p-8 sm:p-12 text-center max-w-lg mx-auto space-y-4 animate-in fade-in duration-200">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto shadow-xs">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-400/30">
+            Tier_0 Authority Clearance Required
+          </span>
+          <h3 className="text-xl font-bold text-[#17343a] dark:text-slate-100 font-display">
+            Offline Activity Log &amp; Sync Restricted
+          </h3>
+          <p className="text-xs text-[#527078] dark:text-slate-400 leading-relaxed">
+            Inspection of local offline transaction journals, cryptographic audit timestamps, and cloud batch force-synchronization is governed strictly under <strong className="text-amber-700 dark:text-amber-400">Tier_0 Root Authority</strong>.
+          </p>
+        </div>
+        {profile ? (
+          <div className="p-3.5 rounded-xl bg-[#f1eee6] dark:bg-slate-800/60 border border-[#d9d2c2] dark:border-slate-700 text-xs text-left space-y-1.5">
+            <div className="flex justify-between text-[11px]">
+              <span className="text-[#527078] dark:text-slate-400 font-medium">Active Operator:</span>
+              <span className="font-bold text-[#17343a] dark:text-slate-200">{profile.name}</span>
+            </div>
+            <div className="flex justify-between text-[11px]">
+              <span className="text-[#527078] dark:text-slate-400 font-medium">Assigned Tier:</span>
+              <span className="font-mono font-bold text-amber-700 dark:text-amber-400 uppercase">{profile.tierId || 'Unassigned'}</span>
+            </div>
+            <div className="flex justify-between text-[11px]">
+              <span className="text-[#527078] dark:text-slate-400 font-medium">Required Authority:</span>
+              <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">Tier_0 Root Authority</span>
+            </div>
+          </div>
+        ) : (
+          <div className="p-3.5 rounded-xl bg-[#f1eee6] dark:bg-slate-800/60 border border-[#d9d2c2] dark:border-slate-700 text-xs text-center space-y-1">
+            <span className="font-bold text-[#17343a] dark:text-slate-200 block">No Active Profile Authenticated</span>
+            <span className="text-[#527078] dark:text-slate-400 text-[11px] block">
+              Please sign in with a verified Tier_0 Root Administrator profile to access offline journals and sync controls.
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 sm:p-6 space-y-5 overflow-y-auto max-h-[75vh]">
       {/* Toast Notification */}
@@ -342,6 +425,11 @@ ${entry.dataPoints.map(dp => `  - ${dp.label}: ${dp.previousValue ?? 'N/A'} -> $
                     ONLINE (Connected)
                   </span>
                 )}
+                {/* Tier_0 Authority Verified Pill */}
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase font-mono bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                  <Shield className="w-3 h-3 text-amber-600" />
+                  Tier_0 Authority
+                </span>
               </div>
               <p className="text-xs text-[#527078] mt-0.5">
                 {isOffline

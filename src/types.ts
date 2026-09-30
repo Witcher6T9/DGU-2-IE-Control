@@ -730,6 +730,9 @@ export interface UserProfile {
   shift?: string;
   photoURL?: string;
   googleUid?: string;
+  userId?: string;
+  department?: string;
+  phone?: string;
 
   // Debonair LTD (Unit-02) Scoping Fields
   assignedWing?: 'Blue Wing' | 'Green Wing' | 'All';
@@ -1032,6 +1035,39 @@ export interface EnterprisePlant {
   notes?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export type WorkspaceRole = 'owner' | 'co_owner' | 'admin' | 'ie_manager' | 'line_supervisor' | 'viewer';
+
+export interface WorkspaceMember {
+  id: string;
+  userId?: string;
+  name: string;
+  email: string;
+  role: WorkspaceRole;
+  department?: string;
+  designation?: string;
+  phone?: string;
+  avatarColor?: string;
+  addedAt: string;
+}
+
+export interface EnterpriseWorkspace {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  ownerId: string;
+  ownerEmail: string;
+  ownerName: string;
+  tier: 'enterprise_free' | 'enterprise_pro' | 'enterprise_sovereign';
+  status: 'active' | 'archived';
+  members: WorkspaceMember[];
+  plants: EnterprisePlant[];
+  defaultPlantId?: string;
+  storageNamespace: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ManagementMember {

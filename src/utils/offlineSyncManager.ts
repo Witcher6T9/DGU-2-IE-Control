@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { isTier0Authority } from './rbac';
+
 export interface OfflineDataPointDiff {
   field: string;
   label: string;
@@ -279,9 +281,20 @@ export function logOfflineActivity(
 }
 
 /**
- * Force-sync a single log entry
+ * Check if an operator holds Tier_0 Authority to dispatch sync operations
  */
-export function syncSingleLogEntry(id: string): OfflineActivityLogEntry[] {
+export function canPerformOfflineSync(profile?: any): boolean {
+  return isTier0Authority(profile);
+}
+
+/**
+ * Force-sync a single log entry - restricted to Tier_0 Authority base
+ */
+export function syncSingleLogEntry(id: string, operatorProfile?: any): OfflineActivityLogEntry[] {
+  if (operatorProfile && !isTier0Authority(operatorProfile)) {
+    console.warn('[OfflineSyncManager] Sync rejected: Tier_0 Authority clearance required.');
+    return getOfflineActivityLogs();
+  }
   const currentLogs = getOfflineActivityLogs();
   const now = new Date().toISOString();
   const updated = currentLogs.map(l => {
@@ -300,8 +313,13 @@ export function syncSingleLogEntry(id: string): OfflineActivityLogEntry[] {
 
 /**
  * Force-sync all pending log entries once connectivity is restored
+ * Manual force-sync is governed by Tier_0 Authority clearance
  */
-export function syncAllPendingLogs(): { syncedCount: number; logs: OfflineActivityLogEntry[] } {
+export function syncAllPendingLogs(operatorProfile?: any): { syncedCount: number; logs: OfflineActivityLogEntry[] } {
+  if (operatorProfile && !isTier0Authority(operatorProfile)) {
+    console.warn('[OfflineSyncManager] Batch sync rejected: Tier_0 Authority clearance required.');
+    return { syncedCount: 0, logs: getOfflineActivityLogs() };
+  }
   const currentLogs = getOfflineActivityLogs();
   const now = new Date().toISOString();
   let count = 0;

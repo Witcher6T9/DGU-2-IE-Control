@@ -66,7 +66,8 @@ import {
   X,
   PlayCircle,
   HelpCircle,
-  BarChart3
+  BarChart3,
+  WifiOff
 } from 'lucide-react';
 import {
   UserProfile,
@@ -100,6 +101,7 @@ import { CapacityCalculatorWorkspace } from '../CapacityCalculatorWorkspace';
 import { IESimulator } from '../IESimulator';
 import { WorldClassManufacturingSection } from '../WorldClassManufacturingSection';
 import { Reports } from '../Reports';
+import { OfflineActivityLogView } from '../OfflineActivityLogView';
 import {
   getStoredAppPageLayout,
   saveStoredAppPageLayout,
@@ -117,6 +119,7 @@ export type Tier0ModuleId =
   | 'layout-customizer'
   | 'schema-forge'
   // 2. Maintaining Suite
+  | 'offline-sync-log'
   | 'maintenance-hub'
   | 'data-vault'
   | 'backup-forge'
@@ -214,6 +217,17 @@ export const TIER_0_MODULES: Tier0ModuleMeta[] = [
   },
 
   // --- 2. MAINTAINING SUITE ---
+  {
+    id: 'offline-sync-log',
+    category: 'maintaining',
+    name: 'Offline Activity Log & Sync',
+    shortDesc: 'Local transaction journals, high-precision timestamps, field diffs & cloud synchronization',
+    tagline: 'Tier_0 offline data audit trail, change journals & manual queue force-sync',
+    icon: WifiOff,
+    badge: 'TIER_0 SYNC',
+    color: '#f59e0b',
+    accentBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+  },
   {
     id: 'maintenance-hub',
     category: 'maintaining',
@@ -888,6 +902,12 @@ export const Tier0CommandHub: React.FC<Tier0CommandHubProps> = ({
         )}
 
         {/* --- 2. MAINTAINING COMPONENTS --- */}
+        {activeModule === 'offline-sync-log' && (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-[#d9d2c2] dark:border-slate-800 shadow-sm overflow-hidden animate-in fade-in duration-200">
+            <OfflineActivityLogView profile={profile} />
+          </div>
+        )}
+
         {activeModule === 'maintenance-hub' && (
           <MaintenanceHubModule lines={lines} showToast={showToast} />
         )}

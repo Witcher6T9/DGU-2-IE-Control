@@ -4,10 +4,12 @@
  * Enterprise Plants & Multiple Managements Architecture Engine
  */
 
-import { EnterprisePlant, ManagementDivision, FactoryIndustryProfile, PlantLeadershipMember } from '../types';
+import { EnterprisePlant, ManagementDivision, FactoryIndustryProfile, PlantLeadershipMember, EnterpriseWorkspace, WorkspaceMember } from '../types';
 
 export const STORAGE_KEY_ENTERPRISE_PLANTS = 'debonair_enterprise_plants_v1';
 export const STORAGE_KEY_ACTIVE_PLANT_ID = 'debonair_active_plant_id_v1';
+export const STORAGE_KEY_ENTERPRISE_WORKSPACES = 'debonair_enterprise_workspaces_v1';
+export const STORAGE_KEY_ACTIVE_WORKSPACE_ID = 'debonair_active_workspace_id_v1';
 export const STORAGE_KEY_MANAGEMENT_DIVISIONS = 'debonair_management_divisions_v1';
 export const STORAGE_KEY_PLANT_LEADERSHIPS = 'debonair_plant_leaderships_v1';
 
@@ -1074,6 +1076,39 @@ export function saveStoredEnterprisePlants(plants: EnterprisePlant[]): void {
   }
 }
 
+// Initial sovereign enterprise workspace
+export const INITIAL_ENTERPRISE_WORKSPACES: EnterpriseWorkspace[] = [
+  {
+    id: 'ws_debonair_flagship',
+    name: 'Debonair Enterprise Global',
+    code: 'DBN-HQ',
+    description: 'Flagship sovereign workspace for Debonair Group Bangladesh industrial engineering plants and multiple managements.',
+    ownerId: 'ashikhossainkr@gmail.com',
+    ownerEmail: 'ashikhossainkr@gmail.com',
+    ownerName: 'Ashik Hossain',
+    tier: 'enterprise_sovereign',
+    status: 'active',
+    members: [
+      {
+        id: 'mem_1',
+        name: 'Ashik Hossain',
+        email: 'ashikhossainkr@gmail.com',
+        role: 'owner',
+        department: 'Industrial Engineering (IE)',
+        designation: 'Head of Industrial Engineering',
+        phone: '+880 1711-002233',
+        avatarColor: '#176f78',
+        addedAt: '2026-01-01T00:00:00Z'
+      }
+    ],
+    plants: INITIAL_ENTERPRISE_PLANTS,
+    defaultPlantId: 'plant_debonair_u02',
+    storageNamespace: 'dbn_u02_sovereign',
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: new Date().toISOString()
+  }
+];
+
 // Get currently active plant
 export function getActiveEnterprisePlant(): EnterprisePlant {
   const plants = getStoredEnterprisePlants();
@@ -1081,7 +1116,7 @@ export function getActiveEnterprisePlant(): EnterprisePlant {
   try {
     const activeId = localStorage.getItem(STORAGE_KEY_ACTIVE_PLANT_ID);
     if (activeId) {
-      const found = plants.find(p => p.id === activeId);
+      const found = plants.find(p => p?.id === activeId);
       if (found) return found;
     }
   } catch (e) {
@@ -1090,20 +1125,92 @@ export function getActiveEnterprisePlant(): EnterprisePlant {
   return plants[0] || INITIAL_ENTERPRISE_PLANTS[0];
 }
 
-// Set active plant
-export function setActiveEnterprisePlant(plantId: string): EnterprisePlant | null {
-  const plants = getStoredEnterprisePlants();
-  const plant = plants.find(p => p.id === plantId);
-  if (plant && typeof window !== 'undefined') {
-    try {
-      localStorage.setItem(STORAGE_KEY_ACTIVE_PLANT_ID, plantId);
+// Set active plant - safe against undefined, strings, or object with .id
+export function setActiveEnterprisePlant(plantOrId: EnterprisePlant | string | null | undefined): EnterprisePlant | null {
+  try {
+    if (!plantOrId) return null;
+    const plantId = typeof plantOrId === 'string' ? plantOrId : plantOrId?.id;
+    if (!plantId) return null;
+    const plants = getStoredEnterprisePlants();
+    const plant = plants.find(p => p?.id === plantId);
+    if (plant && typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_PLANT_ID, plant.id);
       // Sync with factoryProfile storage for existing components
       localStorage.setItem('ie_active_factory_profile', JSON.stringify(plantToFactoryProfile(plant)));
       window.dispatchEvent(new CustomEvent('debonair:plant_switched', { detail: plant }));
-    } catch (e) {
-      console.error('Failed to set active plant:', e);
+      return plant;
     }
-    return plant;
+  } catch (e) {
+    console.error('Failed to set active plant:', e);
+  }
+  return null;
+}
+
+// Get all stored Enterprise Workspaces
+export function getStoredEnterpriseWorkspaces(): EnterpriseWorkspace[] {
+  if (typeof window === 'undefined') return INITIAL_ENTERPRISE_WORKSPACES;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ENTERPRISE_WORKSPACES);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to parse enterprise workspaces from localStorage:', e);
+  }
+  return INITIAL_ENTERPRISE_WORKSPACES;
+}
+
+// Save all Enterprise Workspaces
+export function saveStoredEnterpriseWorkspaces(workspaces: EnterpriseWorkspace[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY_ENTERPRISE_WORKSPACES, JSON.stringify(workspaces));
+    window.dispatchEvent(new CustomEvent('debonair:workspaces_updated', { detail: workspaces }));
+  } catch (e) {
+    console.error('Failed to save enterprise workspaces to localStorage:', e);
+  }
+}
+
+// Get currently active enterprise workspace
+export function getActiveEnterpriseWorkspace(): EnterpriseWorkspace {
+  const workspaces = getStoredEnterpriseWorkspaces();
+  if (typeof window === 'undefined') return workspaces[0] || INITIAL_ENTERPRISE_WORKSPACES[0];
+  try {
+    const activeId = localStorage.getItem(STORAGE_KEY_ACTIVE_WORKSPACE_ID);
+    if (activeId) {
+      const found = workspaces.find(w => w?.id === activeId);
+      if (found) return found;
+    }
+  } catch (e) {
+    console.error('Failed to read active workspace id:', e);
+  }
+  return workspaces[0] || INITIAL_ENTERPRISE_WORKSPACES[0];
+}
+
+// Set active enterprise workspace - safe against undefined, strings, or object with .id
+export function setActiveEnterpriseWorkspace(workspaceOrId: EnterpriseWorkspace | string | null | undefined): EnterpriseWorkspace | null {
+  try {
+    if (!workspaceOrId) {
+      const fallback = getStoredEnterpriseWorkspaces()[0] || INITIAL_ENTERPRISE_WORKSPACES[0];
+      if (fallback?.id && typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_ACTIVE_WORKSPACE_ID, fallback.id);
+      }
+      return fallback || null;
+    }
+    const workspaceId = typeof workspaceOrId === 'string' ? workspaceOrId : workspaceOrId?.id;
+    if (!workspaceId) return null;
+    const workspaces = getStoredEnterpriseWorkspaces();
+    const workspace = workspaces.find(w => w?.id === workspaceId) || workspaces[0];
+    if (workspace && typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_WORKSPACE_ID, workspace.id);
+      window.dispatchEvent(new CustomEvent('debonair:workspace_switched', { detail: workspace }));
+      return workspace;
+    }
+  } catch (e) {
+    console.error('Failed to set active workspace ID:', e);
   }
   return null;
 }

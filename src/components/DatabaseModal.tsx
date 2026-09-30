@@ -40,9 +40,12 @@ import {
   Archive,
   ArrowDownToLine,
   WifiOff,
-  Activity
+  Activity,
+  Lock,
+  Shield
 } from 'lucide-react';
-import { LineEntry, ChecklistMap, TodoItem, LeanActionItem, UserDailyBackupSettings, DailyBackupRecord } from '../types';
+import { LineEntry, ChecklistMap, TodoItem, LeanActionItem, UserDailyBackupSettings, DailyBackupRecord, UserProfile } from '../types';
+import { isTier0Authority } from '../utils/rbac';
 import {
   getAllBackupsFromIndexedDB,
   saveBackupToIndexedDB,
@@ -80,6 +83,7 @@ interface DatabaseModalProps {
   onImportLines?: (importedLines: LineEntry[], mode?: 'upsert' | 'append' | 'replace') => void;
   activeDate?: string;
   initialTab?: 'backup' | 'csv-import' | 'cloud-vault' | 'offline-log';
+  profile?: UserProfile;
   dailyBackupSettings?: UserDailyBackupSettings;
   onUpdateDailyBackupSettings?: (updated: UserDailyBackupSettings) => void;
   onOpenSettingsBackup?: () => void;
@@ -100,11 +104,14 @@ export const DatabaseModal: React.FC<DatabaseModalProps> = ({
   onImportLines,
   activeDate = '2026-09-24',
   initialTab = 'backup',
+  profile,
   dailyBackupSettings,
   onUpdateDailyBackupSettings,
   onOpenSettingsBackup,
   onTriggerManualBackup
 }) => {
+  // Strictly enforce Tier_0 Authority: Only active profile with Tier_0 clearance
+  const isTier0 = Boolean(profile && isTier0Authority(profile));
   const [activeTab, setActiveTab] = useState<'backup' | 'csv-import' | 'cloud-vault' | 'offline-log'>(initialTab);
   const jsonFileInputRef = useRef<HTMLInputElement>(null);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
@@ -569,23 +576,43 @@ export const DatabaseModal: React.FC<DatabaseModalProps> = ({
             </span>
           </button>
 
-          <button
-            id="db-tab-offline-log"
-            type="button"
-            onClick={() => setActiveTab('offline-log')}
-            className={`flex items-center gap-2 py-3 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer relative whitespace-nowrap ${
-              activeTab === 'offline-log'
-                ? 'border-[#176f78] text-[#176f78] bg-white/60'
-                : 'border-transparent text-[#527078] hover:text-[#17343a]'
-            }`}
-          >
-            <WifiOff className="w-4 h-4 text-amber-600" />
-            <span>Offline Activity Log</span>
-            <span className="ml-1 text-[9px] uppercase px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 font-bold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-              Offline
-            </span>
-          </button>
+          {isTier0 ? (
+            <button
+              id="db-tab-offline-log"
+              type="button"
+              onClick={() => setActiveTab('offline-log')}
+              className={`flex items-center gap-2 py-3 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer relative whitespace-nowrap ${
+                activeTab === 'offline-log'
+                  ? 'border-[#176f78] text-[#176f78] bg-white/60'
+                  : 'border-transparent text-[#527078] hover:text-[#17343a]'
+              }`}
+            >
+              <WifiOff className="w-4 h-4 text-amber-600" />
+              <span>Offline Activity Log</span>
+              <span className="ml-1 text-[9px] uppercase px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 font-bold flex items-center gap-1 font-mono">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Tier_0 Only
+              </span>
+            </button>
+          ) : (
+            <button
+              id="db-tab-offline-log"
+              type="button"
+              onClick={() => setActiveTab('offline-log')}
+              className={`flex items-center gap-2 py-3 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer relative whitespace-nowrap opacity-75 hover:opacity-100 ${
+                activeTab === 'offline-log'
+                  ? 'border-amber-600 text-amber-800 bg-amber-50/50'
+                  : 'border-transparent text-[#527078]'
+              }`}
+              title="Offline Activity Log & Sync is restricted to Tier_0 Authority base"
+            >
+              <Lock className="w-3.5 h-3.5 text-amber-600" />
+              <span>Offline Log</span>
+              <span className="ml-1 text-[9px] uppercase px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 font-bold font-mono">
+                Tier_0 Required
+              </span>
+            </button>
+          )}
         </div>
 
         {/* TAB 1: Backup & Storage */}
@@ -1630,9 +1657,9 @@ export const DatabaseModal: React.FC<DatabaseModalProps> = ({
           </div>
         )}
 
-        {/* TAB 3: Offline Activity Log */}
+        {/* TAB 3: Offline Activity Log (Tier_0 Authority Only) */}
         {activeTab === 'offline-log' && (
-          <OfflineActivityLogView />
+          <OfflineActivityLogView profile={profile} />
         )}
 
         {/* Modal Bottom Action Footer */}

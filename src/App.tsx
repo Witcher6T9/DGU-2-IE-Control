@@ -2533,14 +2533,6 @@ export default function App() {
       </footer>
       </motion.div>
 
-      {/* Mobile Ergonomic Quick-Action FAB Speed Dial */}
-      <MobileQuickActionFAB
-        onOpenHourlyProduction={() => setIsHourlyProductionModalOpen(true)}
-        onOpenNewDowntime={() => setIsNewDowntimeModalOpen(true)}
-        onOpenNewAction={() => setIsNewActionModalOpen(true)}
-        onNavigate={handleNavigate}
-      />
-
       {/* Fixed Bottom Navigation Bar */}
       <BottomNav
         currentTab={currentTab}
@@ -2659,6 +2651,7 @@ export default function App() {
           <DatabaseModal
             isOpen={isDatabaseOpen}
             onClose={() => setIsDatabaseOpen(false)}
+            profile={profile}
             lines={lines}
             checklists={checklists}
             todos={todos}
@@ -2726,7 +2719,7 @@ export default function App() {
       {isFloorSnapshotOpen && (
         <div
           id="floor-status-snapshot-overlay"
-          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-3.5 sm:bottom-24 sm:right-6 z-40 w-[330px] sm:w-[380px] max-h-[85vh] overflow-y-auto scrollbar-none rounded-3xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-[#d9d2c2] dark:border-slate-700 shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200 select-none text-slate-800 dark:text-slate-100"
+          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-3.5 sm:bottom-24 sm:right-6 z-50 w-[330px] sm:w-[380px] max-h-[85vh] overflow-y-auto scrollbar-none rounded-3xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-[#d9d2c2] dark:border-slate-700 shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200 select-none text-slate-800 dark:text-slate-100"
         >
           {/* Header */}
           <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
@@ -2958,57 +2951,75 @@ export default function App() {
           countdown={snapshotCountdown}
         />
       )}
-      <button
-        id="floating-floor-snapshot-quick-btn"
-        type="button"
-        onClick={() => setIsFloorSnapshotOpen(prev => !prev)}
-        title="Toggle Floor Status Snapshot (4-Hour WIP Trend & Bottlenecks)"
-        aria-label="Floor Status Snapshot"
-        className={`fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] right-18 sm:bottom-22 sm:right-48 z-30 flex items-center justify-center gap-1.5 px-3 py-2 sm:py-2.5 rounded-full sm:rounded-2xl transition-all cursor-pointer shadow-xl border touch-manipulation active:scale-95 ${
-          isFloorSnapshotOpen
-            ? 'bg-[#176f78] text-white border-[#176f78] ring-2 ring-[#176f78]/30 shadow-[#176f78]/20'
-            : 'bg-white/95 dark:bg-slate-900/95 text-slate-700 dark:text-slate-200 border-[#d9d2c2] dark:border-slate-700 hover:border-[#176f78]'
-        }`}
+      {/* Unified Floating Actions Dock (Frontline Quick Action FAB, Google Chat & Floor Snapshot) */}
+      <div
+        id="floating-actions-dock"
+        className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-20 right-3.5 sm:right-6 z-40 flex flex-col items-end gap-2.5 sm:flex-row sm:items-center sm:gap-2.5 select-none pointer-events-none"
       >
-        <Activity className="w-4 h-4 text-[#176f78] dark:text-teal-400" />
-        <span className="hidden sm:inline text-xs font-bold font-display">Floor Snapshot</span>
-        {activeWipBreachedLines.length > 0 && (
-          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-400 text-slate-950">
-            {activeWipBreachedLines.length}
-          </span>
-        )}
-      </button>
+        {/* 1. Floor Status Snapshot Trigger (Desktop / Tablet view) */}
+        <button
+          id="floating-floor-snapshot-quick-btn"
+          type="button"
+          onClick={() => setIsFloorSnapshotOpen(prev => !prev)}
+          title="Toggle Floor Status Snapshot (4-Hour WIP Trend & Bottlenecks)"
+          aria-label="Floor Status Snapshot"
+          className={`hidden sm:flex pointer-events-auto order-1 items-center justify-center gap-1.5 h-12 px-3.5 rounded-2xl transition-all cursor-pointer shadow-xl border touch-manipulation active:scale-95 ${
+            isFloorSnapshotOpen
+              ? 'bg-[#176f78] text-white border-[#176f78] ring-2 ring-[#176f78]/30 shadow-[#176f78]/20'
+              : 'bg-white/95 dark:bg-slate-900/95 text-slate-700 dark:text-slate-200 border-[#d9d2c2] dark:border-slate-700 hover:border-[#176f78]'
+          }`}
+        >
+          <Activity className="w-4 h-4 text-[#176f78] dark:text-teal-400 shrink-0" />
+          <span className="text-xs font-bold font-display whitespace-nowrap">Floor Snapshot</span>
+          {activeWipBreachedLines.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-amber-400 text-slate-950">
+              {activeWipBreachedLines.length}
+            </span>
+          )}
+        </button>
 
-      {/* Floating Google Chat Trigger Button (Click to open, Long-press to toggle Floor Status Snapshot) */}
-      <button
-        id="floating-ie-ai-chat-btn"
-        onPointerDown={handleChatButtonPointerDown}
-        onPointerUp={handleChatButtonPointerUp}
-        onPointerCancel={handleChatButtonPointerCancel}
-        onPointerLeave={handleChatButtonPointerCancel}
-        title="Google Chat • Click to open Google Chat, or long-press to toggle Floor Status Snapshot"
-        aria-label="Google Chat Workspace & Floor Status Snapshot"
-        className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] right-3.5 sm:bottom-22 sm:right-6 z-30 flex items-center justify-center gap-2 sm:gap-2.5 w-12 h-12 sm:w-auto sm:h-auto sm:px-4 sm:py-2.5 rounded-full sm:rounded-2xl bg-gradient-to-r from-[#1e8e3e] to-[#1a73e8] hover:from-[#188038] hover:to-[#1557b0] text-white shadow-2xl hover:scale-105 active:scale-95 transition-all cursor-pointer border border-blue-400/30 group animate-subtle-breathe touch-manipulation"
-      >
-        {/* Subtle breathing aura glow */}
-        <span className="absolute -inset-1 rounded-full sm:rounded-2xl bg-blue-400/25 blur-xs pointer-events-none animate-ai-pulse-aura -z-10" />
+        {/* 2. Floating Google Chat Trigger Button (Click to open, Long-press to toggle Floor Status Snapshot) */}
+        <button
+          id="floating-ie-ai-chat-btn"
+          onPointerDown={handleChatButtonPointerDown}
+          onPointerUp={handleChatButtonPointerUp}
+          onPointerCancel={handleChatButtonPointerCancel}
+          onPointerLeave={handleChatButtonPointerCancel}
+          title="Google Chat • Click to open Google Chat, or long-press to toggle Floor Status Snapshot"
+          aria-label="Google Chat Workspace & Floor Status Snapshot"
+          className="pointer-events-auto order-2 sm:order-2 flex items-center justify-center gap-2 sm:gap-2.5 h-12 w-12 min-w-[48px] min-h-[48px] sm:w-auto sm:px-4 rounded-full sm:rounded-2xl bg-gradient-to-r from-[#1e8e3e] to-[#1a73e8] hover:from-[#188038] hover:to-[#1557b0] text-white shadow-2xl hover:scale-105 active:scale-95 transition-all cursor-pointer border border-blue-400/30 group animate-subtle-breathe touch-manipulation"
+        >
+          {/* Subtle breathing aura glow */}
+          <span className="absolute -inset-1 rounded-full sm:rounded-2xl bg-blue-400/25 blur-xs pointer-events-none animate-ai-pulse-aura -z-10" />
 
-        <div className="relative">
-          <MessageSquare className="w-5 h-5 text-white fill-white" />
-          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#1a73e8] animate-ping" />
-        </div>
-        <div className="hidden sm:flex flex-col text-left">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold leading-tight font-display tracking-wider">Google Chat</span>
-            {isPeakHour && (
-              <span className="text-[9px] font-black uppercase px-1 py-0.2 rounded bg-amber-300 text-amber-950 leading-none shadow-2xs">
-                Peak
-              </span>
-            )}
+          <div className="relative">
+            <MessageSquare className="w-5 h-5 text-white fill-white shrink-0" />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#1a73e8] animate-ping" />
           </div>
-          <span className="text-[10px] text-blue-100 leading-tight">Spaces • AI</span>
+          <div className="hidden sm:flex flex-col text-left">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold leading-tight font-display tracking-wider whitespace-nowrap">Google Chat</span>
+              {isPeakHour && (
+                <span className="text-[9px] font-black uppercase px-1 py-0.2 rounded bg-amber-300 text-amber-950 leading-none shadow-2xs">
+                  Peak
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] text-blue-100 leading-tight whitespace-nowrap">Spaces • AI</span>
+          </div>
+        </button>
+
+        {/* 3. Frontline Quick Action FAB Speed Dial */}
+        <div className="pointer-events-auto order-1 sm:order-3">
+          <MobileQuickActionFAB
+            onOpenHourlyProduction={() => setIsHourlyProductionModalOpen(true)}
+            onOpenNewDowntime={() => setIsNewDowntimeModalOpen(true)}
+            onOpenNewAction={() => setIsNewActionModalOpen(true)}
+            onToggleFloorSnapshot={() => setIsFloorSnapshotOpen(prev => !prev)}
+            onNavigate={handleNavigate}
+          />
         </div>
-      </button>
+      </div>
 
       {/* Heavy Subsystems - Lazy Loaded on Demand */}
       <Suspense fallback={null}>
@@ -3070,6 +3081,7 @@ export default function App() {
 
       {/* Real-Time Connectivity Offline Indicator with Direct Access to Activity Log */}
       <OfflineIndicator
+        profile={profile}
         onOpenOfflineLog={() => {
           setDatabaseInitialTab('offline-log');
           setIsDatabaseOpen(true);
