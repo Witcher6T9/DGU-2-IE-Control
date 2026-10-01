@@ -23,12 +23,28 @@ import {
   Clock,
   Shirt,
   ShieldCheck,
-  Zap
+  Zap,
+  DollarSign,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  Plus,
+  Trash2,
+  ExternalLink,
+  Search
 } from 'lucide-react';
-import { LineEntry, ChecklistMap, UserProfile, TodoItem } from '../types';
+import { LineEntry, ChecklistMap, UserProfile, TodoItem, MonthlyBudgetRecord } from '../types';
 import { MonthlyAuditCalendar } from './MonthlyAuditCalendar';
 import { AiAuditView } from './AiAuditView';
 import { getTodayDateStr } from '../utils';
+import {
+  exportMonthlyBudgetsToCSV,
+  generateMonthlyBudgetTemplateCSV,
+  loadStoredMonthlyBudgets,
+  saveStoredMonthlyBudgets,
+  downloadTextAsFile,
+  parseMonthlyBudgetFromTextOrBuffer
+} from '../utils/bookingAndBudgetCsv';
 
 interface MonthlySummaryProps {
   lines: LineEntry[];
@@ -38,6 +54,7 @@ interface MonthlySummaryProps {
   onNavigate?: (tab: string) => void;
   profile?: UserProfile;
   onAddTodo?: (item: Partial<TodoItem>) => void;
+  onOpenLineBookingModal?: (tab?: 'booking' | 'budget') => void;
 }
 
 export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
@@ -47,10 +64,23 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
   onSelectDate = () => {},
   onNavigate,
   profile,
-  onAddTodo
+  onAddTodo,
+  onOpenLineBookingModal
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'audit_calendar' | 'efficiency_trends' | 'ai_audit'>('efficiency_trends');
+  const [activeSubTab, setActiveSubTab] = useState<'audit_calendar' | 'efficiency_trends' | 'ai_audit' | 'monthly_budget'>('efficiency_trends');
   const [selectedMonth, setSelectedMonth] = useState('September 2026');
+
+  // Monthly Budget Management State
+  const [budgets, setBudgets] = useState<MonthlyBudgetRecord[]>(() => loadStoredMonthlyBudgets());
+  const [budgetMonth, setBudgetMonth] = useState('2026-10');
+  const [budgetFilterCategory, setBudgetFilterCategory] = useState('all');
+  const budgetFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [budgetFeedback, setBudgetFeedback] = useState<string | null>(null);
+
+  const showBudgetFeedback = (msg: string) => {
+    setBudgetFeedback(msg);
+    setTimeout(() => setBudgetFeedback(null), 3500);
+  };
 
   // Toggle between 'single' and 'comparative' views for production KPIs
   const [kpiViewMode, setKpiViewMode] = useState<'single' | 'comparative'>('single');
@@ -202,6 +232,19 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
               New
             </span>
           </button>
+
+          <button
+            id="monthly-tab-budget"
+            onClick={() => setActiveSubTab('monthly_budget')}
+            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer relative ${
+              activeSubTab === 'monthly_budget'
+                ? 'bg-[#176f78] text-white shadow-xs'
+                : 'text-[#527078] hover:text-[#17343a]'
+            }`}
+          >
+            <DollarSign className={`w-4 h-4 ${activeSubTab === 'monthly_budget' ? 'text-emerald-300' : 'text-[#176f78]'}`} />
+            <span>Monthly Budget &amp; Costing</span>
+          </button>
         </div>
 
         <div className="hidden lg:flex items-center gap-2 text-xs text-[#527078]">
@@ -229,6 +272,293 @@ export const MonthlySummary: React.FC<MonthlySummaryProps> = ({
           onAddTodo={onAddTodo}
         />
       )}
+
+      {/* MONTHLY OPERATING BUDGET SUB-TAB */}
+      {activeSubTab === 'monthly_budget' && (() => {
+        const monthItems = budgets.filter(b => b.month === budgetMonth);
+        const filteredItems = monthItems.filter(b =>
+          budgetFilterCategory === 'all' || b.category.toLowerCase().includes(budgetFilterCategory.toLowerCase())
+        );
+        const totalAlloc = monthItems.reduce((acc, b) => acc + (b.allocatedBudget || 0), 0);
+        const totalSpent = monthItems.reduce((acc, b) => acc + (b.actualSpend || 0), 0);
+        const netVar = totalAlloc - totalSpent;
+        const burnRate = totalAlloc > 0 ? Math.round((totalSpent / totalAlloc) * 100) : 0;
+        const overCount = monthItems.filter(b => b.status === 'Over Budget').length;
+
+        const handleBudgetUpload = (file: File) => {
+          const reader = new FileReader();
+          reader.onload = ev => {
+            const res = ev.target?.result;
+            if (!res) return;
+            const parseRes = parseMonthlyBudgetFromTextOrBuffer(res);
+            if (parseRes.budgets.length > 0) {
+              const updated = [...budgets, ...parseRes.budgets];
+              setBudgets(updated);
+              saveStoredMonthlyBudgets(updated);
+              showBudgetFeedback(`Imported ${parseRes.budgets.length} budget items successfully!`);
+            } else {
+              showBudgetFeedback(parseRes.errors[0] || 'No valid budget items found.');
+            }
+          };
+          if (file.name.endsWith('.csv')) reader.readAsText(file);
+          else reader.readAsArrayBuffer(file);
+        };
+
+        return (
+          <div className="space-y-5">
+            {/* Hidden file input for import */}
+            <input
+              ref={budgetFileInputRef}
+              type="file"
+              accept=".csv, .xlsx, .xls"
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) handleBudgetUpload(f);
+              }}
+              className="hidden"
+            />
+
+            {/* Feedback Alert */}
+            {budgetFeedback && (
+              <div className="p-3 rounded-2xl bg-teal-50 border border-teal-200 text-[#176f78] text-xs font-semibold flex items-center justify-between shadow-2xs">
+                <span>{budgetFeedback}</span>
+                <button type="button" onClick={() => setBudgetFeedback(null)} className="font-bold">✕</button>
+              </div>
+            )}
+
+            {/* Budget Header Card */}
+            <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] p-5 sm:p-6 shadow-2xs">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                      Financial Control &amp; Cost Centers
+                    </span>
+                    <span className="text-xs text-[#527078]">Debonair Unit-02 IE Operations</span>
+                  </div>
+                  <h1 className="font-display text-2xl sm:text-3xl font-bold uppercase text-[#17343a] tracking-tight">
+                    Monthly Operating Budget &amp; Variance Analysis
+                  </h1>
+                  <p className="text-xs sm:text-sm text-[#527078] mt-1">
+                    Direct labor wages, indirect helpers, machine maintenance, utility power, and overtime expenditure controls.
+                  </p>
+                </div>
+
+                {/* Month Navigator & Actions */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex items-center gap-1.5 bg-[#f1eee6] px-3 py-1.5 rounded-xl border border-[#d9d2c2]">
+                    <span className="text-xs font-bold text-[#527078]">Period:</span>
+                    <select
+                      value={budgetMonth}
+                      onChange={e => setBudgetMonth(e.target.value)}
+                      className="text-xs font-bold text-[#17343a] bg-transparent focus:outline-hidden cursor-pointer"
+                    >
+                      <option value="2026-10">October 2026 (Active Forecast)</option>
+                      <option value="2026-09">September 2026 (Benchmark)</option>
+                      <option value="2026-11">November 2026 (Upcoming)</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => budgetFileInputRef.current?.click()}
+                    title="Import Budget CSV / Excel"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 border border-teal-200 text-[#176f78] text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Import CSV</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const csv = exportMonthlyBudgetsToCSV(budgets, budgetMonth);
+                      downloadTextAsFile(`Monthly_Budget_${budgetMonth}.csv`, csv);
+                      showBudgetFeedback(`Exported budget dataset for ${budgetMonth}!`);
+                    }}
+                    title="Export Budget CSV"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#f1eee6] hover:bg-[#e7e1d5] border border-[#d9d2c2] text-[#17343a] text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                  >
+                    <Download className="w-3.5 h-3.5 text-[#176f78]" />
+                    <span>Export CSV</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const csv = generateMonthlyBudgetTemplateCSV();
+                      downloadTextAsFile('Monthly_Budget_Template.csv', csv);
+                      showBudgetFeedback('Downloaded Monthly Budget CSV Template.');
+                    }}
+                    title="Download Template"
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#f1eee6] border border-[#d9d2c2] text-[#17343a] text-xs font-bold transition-all cursor-pointer"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-[#527078]" />
+                    <span>Template</span>
+                  </button>
+
+                  {onOpenLineBookingModal && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenLineBookingModal('budget')}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#176f78] hover:bg-[#12555c] text-white text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Full Hub</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* KPI Summary Cards Ribbon */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t border-[#e7e1d5]">
+                <div className="p-3.5 rounded-2xl bg-white border border-[#d9d2c2] shadow-2xs">
+                  <div className="text-[11px] font-semibold text-[#527078] uppercase">Allocated Budget</div>
+                  <div className="text-xl font-bold font-mono-numbers text-[#17343a] mt-0.5">
+                    ${totalAlloc.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-[#527078] mt-1">{monthItems.length} Cost Centers</div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white border border-[#d9d2c2] shadow-2xs">
+                  <div className="text-[11px] font-semibold text-[#527078] uppercase">Actual Expenditure</div>
+                  <div className="text-xl font-bold font-mono-numbers text-[#17343a] mt-0.5">
+                    ${totalSpent.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-teal-700 font-medium mt-1">{burnRate}% Budget Burn</div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white border border-[#d9d2c2] shadow-2xs">
+                  <div className="text-[11px] font-semibold text-[#527078] uppercase">Net Variance</div>
+                  <div className={`text-xl font-bold font-mono-numbers mt-0.5 ${netVar >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {netVar >= 0 ? `+$${netVar.toLocaleString()}` : `-$${Math.abs(netVar).toLocaleString()}`}
+                  </div>
+                  <div className="text-[10px] text-[#527078] mt-1">
+                    {netVar >= 0 ? 'Favorable Surplus' : 'Deficit Overrun'}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white border border-[#d9d2c2] shadow-2xs">
+                  <div className="text-[11px] font-semibold text-[#527078] uppercase">Budget Health</div>
+                  <div className="text-xl font-bold text-[#17343a] mt-0.5">
+                    {overCount === 0 ? 'Optimal' : `${overCount} Over Budget`}
+                  </div>
+                  <div className="text-[10px] text-[#527078] mt-1">Controlled variance</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter & Cost Center Ledger Table */}
+            <div className="rounded-2xl border border-[#d9d2c2] bg-white overflow-hidden shadow-2xs">
+              <div className="p-4 bg-[#fbfaf6] border-b border-[#e7e1d5] flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-display text-sm font-bold uppercase text-[#17343a]">
+                    Cost Center Ledger ({budgetMonth})
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-700 font-bold">
+                    {filteredItems.length} Items
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={budgetFilterCategory}
+                    onChange={e => setBudgetFilterCategory(e.target.value)}
+                    className="py-1 px-2.5 text-xs rounded-lg border border-[#d9d2c2] bg-white text-[#17343a]"
+                  >
+                    <option value="all">All Expense Categories</option>
+                    <option value="labor">Direct / Indirect Labor</option>
+                    <option value="maintenance">Maintenance &amp; Spares</option>
+                    <option value="overtime">Overtime Allocations</option>
+                    <option value="utility">Utility &amp; Energy</option>
+                    <option value="quality">Quality &amp; Consumables</option>
+                    <option value="training">IE &amp; Skill Training</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto max-h-[460px]">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-[#f1eee6] text-[#527078] uppercase text-[10px] font-bold sticky top-0 z-10 border-b border-[#d9d2c2]">
+                    <tr>
+                      <th className="py-2.5 px-3">Expense Category</th>
+                      <th className="py-2.5 px-3">Department</th>
+                      <th className="py-2.5 px-3">Floor</th>
+                      <th className="py-2.5 px-3 font-mono-numbers">Allocated ($)</th>
+                      <th className="py-2.5 px-3 font-mono-numbers">Actual ($)</th>
+                      <th className="py-2.5 px-3 font-mono-numbers">Variance ($)</th>
+                      <th className="py-2.5 px-3">Burn %</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">In-Charge</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#e7e1d5]">
+                    {filteredItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-8 text-center text-[#527078]">
+                          No budget ledger items found for this selection.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredItems.map(item => {
+                        const burn = item.allocatedBudget > 0 ? Math.round((item.actualSpend / item.allocatedBudget) * 100) : 0;
+                        return (
+                          <tr key={item.id} className="hover:bg-[#fbfaf6] transition-colors">
+                            <td className="py-2.5 px-3 font-bold text-[#17343a]">
+                              <div>{item.category}</div>
+                              {item.notes && <div className="text-[10px] text-[#527078] font-normal">{item.notes}</div>}
+                            </td>
+                            <td className="py-2.5 px-3 text-[#527078]">{item.department}</td>
+                            <td className="py-2.5 px-3 text-[#527078] whitespace-nowrap">{item.floor || 'All Floors'}</td>
+                            <td className="py-2.5 px-3 font-mono-numbers font-semibold text-[#17343a] whitespace-nowrap">
+                              ${item.allocatedBudget.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono-numbers font-semibold text-[#17343a] whitespace-nowrap">
+                              ${item.actualSpend.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono-numbers whitespace-nowrap">
+                              <span className={item.variance >= 0 ? 'text-emerald-700 font-bold' : 'text-rose-700 font-bold'}>
+                                {item.variance >= 0 ? `+$${item.variance.toLocaleString()}` : `-$${Math.abs(item.variance).toLocaleString()}`}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 font-mono-numbers whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-12 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                  <div
+                                    className={`h-full ${burn > 100 ? 'bg-rose-500' : burn > 90 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                    style={{ width: `${Math.min(100, burn)}%` }}
+                                  />
+                                </div>
+                                <span className="text-[10px] font-semibold text-[#527078]">{burn}%</span>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3 whitespace-nowrap">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  item.status === 'Within Budget'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : item.status === 'Warning'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}
+                              >
+                                {item.status}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-[11px] text-[#527078] whitespace-nowrap">
+                              {item.responsiblePerson || '—'}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {activeSubTab === 'efficiency_trends' && (
         <>

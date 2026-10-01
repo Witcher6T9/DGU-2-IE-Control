@@ -62,6 +62,7 @@ interface ChecklistPageProps {
   onSelectLineNo?: (lineNo: string) => void;
   onAddTodoFromAudit?: (item: Partial<TodoItem>) => void;
   initialSubTab?: ChecklistSubTab;
+  onOpenLineBookingModal?: (tab?: 'booking' | 'budget') => void;
 }
 
 export const ChecklistPage: React.FC<ChecklistPageProps> = ({
@@ -90,7 +91,8 @@ export const ChecklistPage: React.FC<ChecklistPageProps> = ({
   selectedLineNo,
   onSelectLineNo,
   onAddTodoFromAudit = () => {},
-  initialSubTab = 'daily-checklist'
+  initialSubTab = 'daily-checklist',
+  onOpenLineBookingModal
 }) => {
   const [subTab, setSubTab] = useState<ChecklistSubTab>(initialSubTab);
 
@@ -171,6 +173,7 @@ export const ChecklistPage: React.FC<ChecklistPageProps> = ({
             onNavigate={onNavigate}
             profile={profile}
             onAddTodo={onAddTodoFromAudit}
+            onOpenLineBookingModal={onOpenLineBookingModal}
           />
         )}
       </div>

@@ -33,7 +33,8 @@ import {
   DailyBackupRecord,
   AppPageLayoutConfig,
   WorkspaceWidthMode,
-  TopBarConfig
+  TopBarConfig,
+  LineBookingRecord
 } from './types';
 import {
   DEFAULT_DAILY_BACKUP_SETTINGS,
@@ -154,6 +155,7 @@ const GoogleChatHubModal = lazyWithRetry(() => import('./components/GoogleChatHu
 const PrivacySecurityModal = lazyWithRetry(() => import('./components/PrivacySecurityModal').then(m => ({ default: m.PrivacySecurityModal })));
 const TerminalLockScreen = lazyWithRetry(() => import('./components/TerminalLockScreen').then(m => ({ default: m.TerminalLockScreen })));
 const AndroidPackageModal = lazyWithRetry(() => import('./components/AndroidPackageModal').then(m => ({ default: m.AndroidPackageModal })));
+const LineBookingAndBudgetModal = lazyWithRetry(() => import('./components/LineBookingAndBudgetModal').then(m => ({ default: m.LineBookingAndBudgetModal })));
 
 function TabLoadingSkeleton() {
   return (
@@ -216,6 +218,51 @@ export default function App() {
   // Modals for Downtime and Action Items
   const [isNewDowntimeModalOpen, setIsNewDowntimeModalOpen] = useState(false);
   const [isNewActionModalOpen, setIsNewActionModalOpen] = useState(false);
+
+  // Line Booking for Upcoming Styles & Monthly Budget Modal State
+  const [isLineBookingModalOpen, setIsLineBookingModalOpen] = useState(false);
+  const [lineBookingInitialTab, setLineBookingInitialTab] = useState<'booking' | 'budget'>('booking');
+
+  const handleOpenLineBookingModal = React.useCallback((tab: 'booking' | 'budget' = 'booking') => {
+    setLineBookingInitialTab(tab);
+    setIsLineBookingModalOpen(true);
+  }, []);
+
+  const handleSyncLinesWithBookings = React.useCallback((bookingsToSync: LineBookingRecord[]) => {
+    if (!bookingsToSync || bookingsToSync.length === 0) return;
+
+    setLines(prev => {
+      const updated = [...prev];
+      bookingsToSync.forEach(b => {
+        const bLineNoNorm = b.lineNo.toLowerCase().replace(/[^0-9a-z]/g, '');
+        const idx = updated.findIndex(
+          l => l.lineNo.toLowerCase().replace(/[^0-9a-z]/g, '') === bLineNoNorm
+        );
+        if (idx >= 0) {
+          updated[idx] = {
+            ...updated[idx],
+            nextStyle: b.style,
+            nextStyleDate: b.startDate,
+            buyer: b.buyer || updated[idx].buyer,
+            orderQty: b.orderQty || updated[idx].orderQty
+          };
+        }
+      });
+      return updated;
+    });
+
+    setNotifications(prev => [
+      {
+        id: `notif-sync-bookings-${Date.now()}`,
+        title: `Bookings Synced: ${bookingsToSync.length} Schedule(s)`,
+        message: `Synchronized upcoming style loading schedule and order quantities with active line registry.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        read: false,
+        type: 'sync'
+      },
+      ...prev
+    ]);
+  }, []);
 
   // Save Status Indicator for Header ('idle' | 'saving' | 'saved')
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -2409,6 +2456,7 @@ export default function App() {
               onSaveMultipleLines={handleSaveMultipleLines}
               factoryProfile={factoryProfile}
               onOpenHourlyProduction={() => setIsHourlyProductionModalOpen(true)}
+              onOpenLineBookingModal={handleOpenLineBookingModal}
             />
           )}
 
@@ -2500,6 +2548,7 @@ export default function App() {
               onApplySimulationToLine={handleApplySimulationToLine}
               onAddNewLineWithSimulation={handleAddNewLineWithSimulation}
               leanToolsSubTab={leanToolsSubTab}
+              onOpenLineBookingModal={handleOpenLineBookingModal}
             />
           )}
         </Suspense>
@@ -2671,6 +2720,7 @@ export default function App() {
               setIsSettingsOpen(true);
             }}
             onTriggerManualBackup={() => handleTriggerDailyBackup('manual')}
+            onOpenLineBookingModal={handleOpenLineBookingModal}
           />
         )}
 
@@ -3075,6 +3125,18 @@ export default function App() {
             onSaveConfig={handleSaveTopBarConfig}
             theme={theme}
             onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+          />
+        )}
+
+        {/* Line Booking for Upcoming Styles & Monthly Budget Modal */}
+        {isLineBookingModalOpen && (
+          <LineBookingAndBudgetModal
+            isOpen={isLineBookingModalOpen}
+            onClose={() => setIsLineBookingModalOpen(false)}
+            initialTab={lineBookingInitialTab}
+            lines={lines}
+            onSyncLinesWithBookings={handleSyncLinesWithBookings}
+            profile={profile}
           />
         )}
       </Suspense>

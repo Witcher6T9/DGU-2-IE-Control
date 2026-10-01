@@ -125,6 +125,7 @@ import { Reports } from './Reports';
 import { CapacityCalculatorWorkspace } from './CapacityCalculatorWorkspace';
 import { ZipUpdateInjector } from './ZipUpdateInjector';
 import { UiUxComponentVisualizer } from './UiUxComponentVisualizer';
+import { PlantIdentityAndFloorsCustomizer } from './PlantIdentityAndFloorsCustomizer';
 
 export type SettingsPageSection =
   | 'control-center'
@@ -252,6 +253,9 @@ interface SettingsControlCenterPageProps {
   onAddNewLineWithSimulation?: (lineData: Partial<LineEntry>) => void;
   leanToolsSubTab?: LeanToolsSubTab;
 
+  // Line Booking & Monthly Budget Hub
+  onOpenLineBookingModal?: (tab?: 'booking' | 'budget') => void;
+
   // Auto-Refresh Engine
   onOpenAutoRefreshCustomizer?: () => void;
 
@@ -359,7 +363,8 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   onUpdateLeanActions = () => {},
   onApplySimulationToLine = () => {},
   onAddNewLineWithSimulation = () => {},
-  leanToolsSubTab = 'toolkit'
+  leanToolsSubTab = 'toolkit',
+  onOpenLineBookingModal
 }) => {
   const isSysAdmin = isSystemAdmin(profile);
   const isMasterAdmin = isMasterAdminOrAdmin(profile);
@@ -1022,6 +1027,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
             onSelectLineNo={onSelectLineNo}
             onAddTodoFromAudit={onAddTodoFromAudit}
             initialSubTab={checklistSubTab}
+            onOpenLineBookingModal={onOpenLineBookingModal}
           />
         )}
 
@@ -1064,6 +1070,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
             onNavigate={onNavigate}
             todayDate={activeDate || '2026-09-24'}
             profile={profile}
+            onOpenLineBookingModal={onOpenLineBookingModal}
           />
         )}
 

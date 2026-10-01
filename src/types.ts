@@ -1134,3 +1134,43 @@ export interface PlantLeadershipMember {
   notes?: string;
   createdAt?: string;
 }
+
+// Line Booking for Upcoming Styles
+export interface LineBookingRecord {
+  id: string;
+  lineNo: string;
+  floor: string;
+  style: string;
+  buyer: string;
+  orderQty: number;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  sam: number; // Standard Allowed Minutes
+  plannedOperators: number;
+  plannedHelpers: number;
+  targetEfficiency: number; // % e.g. 72
+  dailyTarget: number;
+  totalTarget: number;
+  trSampleStatus: 'Ready' | 'In Development' | 'Pending Approval' | 'Revision Required';
+  trimsStatus: 'In House' | 'Partial' | 'Pending Shipment' | 'Delayed';
+  bookingStatus: 'Confirmed' | 'Tentative' | 'In Production' | 'Completed';
+  notes?: string;
+  updatedAt?: string;
+}
+
+// Monthly Operating Budget
+export interface MonthlyBudgetRecord {
+  id: string;
+  month: string; // e.g. '2026-10' or 'October 2026'
+  category: string;
+  department: string;
+  floor?: string;
+  allocatedBudget: number; // in USD
+  actualSpend: number; // in USD
+  variance: number; // allocatedBudget - actualSpend
+  variancePercent: number; // percentage variance
+  status: 'Within Budget' | 'Warning' | 'Over Budget';
+  responsiblePerson?: string;
+  notes?: string;
+  updatedAt?: string;
+}

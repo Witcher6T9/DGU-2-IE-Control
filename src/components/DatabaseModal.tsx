@@ -88,6 +88,7 @@ interface DatabaseModalProps {
   onUpdateDailyBackupSettings?: (updated: UserDailyBackupSettings) => void;
   onOpenSettingsBackup?: () => void;
   onTriggerManualBackup?: () => Promise<DailyBackupRecord>;
+  onOpenLineBookingModal?: (tab?: 'booking' | 'budget') => void;
 }
 
 export const DatabaseModal: React.FC<DatabaseModalProps> = ({
@@ -108,7 +109,8 @@ export const DatabaseModal: React.FC<DatabaseModalProps> = ({
   dailyBackupSettings,
   onUpdateDailyBackupSettings,
   onOpenSettingsBackup,
-  onTriggerManualBackup
+  onTriggerManualBackup,
+  onOpenLineBookingModal
 }) => {
   // Strictly enforce Tier_0 Authority: Only active profile with Tier_0 clearance
   const isTier0 = Boolean(profile && isTier0Authority(profile));
@@ -1068,6 +1070,49 @@ export const DatabaseModal: React.FC<DatabaseModalProps> = ({
                 )}
               </div>
             </div>
+
+            {/* Quick Link to Line Booking and Monthly Budget */}
+            {onOpenLineBookingModal && (
+              <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200/80 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#176f78] text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-[#17343a]">
+                      Line Booking for Upcoming Styles &amp; Monthly Operating Budget
+                    </div>
+                    <div className="text-[11px] text-[#527078]">
+                      Import or export upcoming style changeover schedules, floor line allocations, and financial budget ledgers.
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenLineBookingModal('booking');
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-teal-50 text-[#176f78] border border-teal-300 text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Line Bookings</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenLineBookingModal('budget');
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-[#176f78] hover:bg-[#12555c] text-white text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Monthly Budget</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Success message banner */}
             {importSuccessMessage && (

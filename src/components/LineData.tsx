@@ -878,16 +878,16 @@ export const LineData: React.FC<LineDataProps> = ({
   const [showProgressionModal, setShowProgressionModal] = useState(false);
   const [is8hBalancingModalOpen, setIs8hBalancingModalOpen] = useState(false);
 
-  // Collapsible sections state matching the Line Telemetry Logging Sections
+  // Collapsible sections state matching the Line Telemetry Logging Sections (collapsed by default)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    liveTelemetry: true,
-    top5: true,
-    planning: true,
-    flowHandoff: true,
-    manpowerBalancing: true,
-    bottleneck: true,
-    timeStudy: true,
-    learningCurve: true,
+    liveTelemetry: false,
+    top5: false,
+    planning: false,
+    flowHandoff: false,
+    manpowerBalancing: false,
+    bottleneck: false,
+    timeStudy: false,
+    learningCurve: false,
   });
 
   const toggleSection = (key: string) => {
@@ -895,22 +895,6 @@ export const LineData: React.FC<LineDataProps> = ({
       ...prev,
       [key]: !prev[key]
     }));
-  };
-
-  const isAllExpanded = Object.values(expandedSections).every(Boolean);
-
-  const toggleAllSections = () => {
-    const nextState = !isAllExpanded;
-    setExpandedSections({
-      liveTelemetry: nextState,
-      top5: nextState,
-      planning: nextState,
-      flowHandoff: nextState,
-      manpowerBalancing: nextState,
-      bottleneck: nextState,
-      timeStudy: nextState,
-      learningCurve: nextState,
-    });
   };
 
   // Pre-production technical handoff state for Section 3
@@ -2089,34 +2073,6 @@ export const LineData: React.FC<LineDataProps> = ({
 
       {/* Line Telemetry Sections */}
       <form id="line-telemetry-sections" onSubmit={handleSave} className="space-y-4">
-        {/* Section Navigation & Expand/Collapse Master Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white border border-[#d9d2c2] shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-[#eef7f7] text-[#176f78]">
-              <Layers className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold text-[#17343a] uppercase tracking-wide">
-                Line Telemetry Logging Sections
-              </span>
-              <span className="text-[11px] text-[#527078] ml-2">
-                ({Object.values(expandedSections).filter(Boolean).length} of 8 Open)
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={toggleAllSections}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#d9d2c2] bg-[#fbfaf6] text-xs font-bold text-[#527078] hover:text-[#17343a] hover:bg-[#f1eee6] shadow-2xs transition-all cursor-pointer"
-            >
-              {isAllExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              <span>{isAllExpanded ? "Collapse All Sections" : "Expand All Sections"}</span>
-            </button>
-          </div>
-        </div>
-
         {/* ================= 1. TOP 5 MEETING MONITORING ================= */}
         <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] overflow-hidden shadow-xs">
           <button
@@ -2286,31 +2242,7 @@ export const LineData: React.FC<LineDataProps> = ({
 
           {expandedSections.planning && (
             <div className="p-5 space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">
-                    Line Number
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.lineNo}
-                    onChange={e => setFormData({ ...formData, lineNo: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] font-bold text-[#17343a]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">
-                    Floor Location
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.floor}
-                    onChange={e => setFormData({ ...formData, floor: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#d9d2c2] text-[#17343a]"
-                  />
-                </div>
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-[#527078] mb-1">
                     Buyer / Customer

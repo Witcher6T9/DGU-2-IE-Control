@@ -34,7 +34,9 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   CalendarDays,
-  CalendarRange
+  CalendarRange,
+  Download,
+  Shirt
 } from 'lucide-react';
 import { LineEntry, DashboardLayout, UserProfile, RoleTier, ChecklistMap, ChecklistStatus, FactoryIndustryProfile } from '../types';
 import { calculateFactoryOverall, calculateLineMetrics } from '../utils';
@@ -48,6 +50,11 @@ import { isMasterAdminOrAdmin } from '../utils/rbac';
 import { motion, AnimatePresence } from 'motion/react';
 import { DashboardKpiCard, HourlyKpiPoint, HistoricalKpiPoint } from './DashboardKpiCard';
 import { KpiDrillDownModal } from './KpiDrillDownModal';
+import {
+  exportLineBookingsToCSV,
+  loadStoredLineBookings,
+  downloadTextAsFile
+} from '../utils/bookingAndBudgetCsv';
 import { ContextAwareFab, FabTabId } from './ContextAwareFab';
 
 interface DashboardProps {
@@ -85,6 +92,7 @@ interface DashboardProps {
   onOpenNewAction?: () => void;
   onOpenHourlyProduction?: () => void;
   activeTab?: string;
+  onOpenLineBookingModal?: (tab?: 'booking' | 'budget') => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -116,7 +124,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onOpenNewDowntime,
   onOpenNewAction,
   onOpenHourlyProduction,
-  activeTab
+  activeTab,
+  onOpenLineBookingModal
 }) => {
   const isMasterAdmin = isMasterAdminOrAdmin(profile);
   const availableRoleTiers = roleTiers && roleTiers.length > 0 ? roleTiers : ROLE_TIERS;
@@ -2749,18 +2758,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Upcoming Style Changeovers */}
         {layout.showUpcoming && (
           <div className="rounded-2xl border border-[#d9d2c2] bg-[#fbfaf6] p-5 shadow-2xs">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
               <div>
                 <h3 className="font-display text-lg sm:text-xl font-bold uppercase text-[#17343a] tracking-tight">
                   Upcoming Style Changeovers &amp; T.R Samples
                 </h3>
                 <p className="text-xs text-[#527078]">
-                  Critical 10-day style input schedules and technical sample readiness
+                  Critical 10-day style input schedules, line capacity bookings, and technical sample readiness
                 </p>
               </div>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#dceceb] text-[#176f78]">
-                10-Day File
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#dceceb] text-[#176f78]">
+                  10-Day File
+                </span>
+                {onOpenLineBookingModal && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenLineBookingModal('booking')}
+                    title="Import or Book Upcoming Styles"
+                    className="px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 border border-teal-200 text-[#176f78] text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                  >
+                    <Upload className="w-3 h-3" />
+                    <span>Book / Import Styles</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const bookings = loadStoredLineBookings();
+                    const csv = exportLineBookingsToCSV(bookings);
+                    downloadTextAsFile(`Upcoming_Styles_Schedule_${effectiveDate}.csv`, csv);
+                  }}
+                  title="Export Line Booking Schedule to CSV"
+                  className="px-2.5 py-1 rounded-lg bg-[#f1eee6] hover:bg-[#e7e1d5] border border-[#d9d2c2] text-[#17343a] text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                >
+                  <Download className="w-3 h-3 text-[#176f78]" />
+                  <span>Export CSV</span>
+                </button>
+              </div>
             </div>
 
             {floorSummaries.length > 1 && (

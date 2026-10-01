@@ -74,6 +74,7 @@ interface ReportsProps {
   onDeleteFloor?: (floorName: string, mode: 'delete_all_lines' | 'reassign', targetFloor?: string) => void;
   onImportLines?: (importedLines: LineEntry[], mode?: 'upsert' | 'append' | 'replace') => void;
   onOpenDatabase?: (tab?: 'backup' | 'csv-import') => void;
+  onOpenLineBookingModal?: (tab?: 'booking' | 'budget') => void;
 }
 
 export const Reports: React.FC<ReportsProps> = ({
@@ -87,7 +88,8 @@ export const Reports: React.FC<ReportsProps> = ({
   profile,
   onNavigate,
   onImportLines,
-  onOpenDatabase
+  onOpenDatabase,
+  onOpenLineBookingModal
 }) => {
   const [reportDate, setReportDate] = useState(activeDate || todayDate);
   const [floorFilter, setFloorFilter] = useState(activeFloor || 'all');
@@ -272,6 +274,18 @@ export const Reports: React.FC<ReportsProps> = ({
               <FileSpreadsheet className="w-4 h-4 transition-transform group-hover:scale-110" />
               <span>Import/Print/Export Report</span>
             </button>
+            {onOpenLineBookingModal && (
+              <button
+                id="btn-reports-line-booking-budget"
+                type="button"
+                onClick={() => onOpenLineBookingModal('booking')}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-[#176f78] dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/60 transition-colors text-xs font-bold cursor-pointer shadow-2xs"
+                title="Line Booking for Upcoming Styles & Monthly Operating Budget"
+              >
+                <Layers className="w-4 h-4 text-[#176f78] dark:text-teal-300" />
+                <span>Line Booking &amp; Budget</span>
+              </button>
+            )}
             <button
               id="btn-export-csv"
               onClick={handleExportCSV}
@@ -1358,6 +1372,7 @@ export const Reports: React.FC<ReportsProps> = ({
             profile={profile}
             onImportLines={onImportLines}
             onOpenDatabase={onOpenDatabase}
+            onOpenLineBookingModal={onOpenLineBookingModal}
           />
         </React.Suspense>
       )}

@@ -24,9 +24,10 @@ import {
   TrendingUp,
   BarChart3,
   ExternalLink,
-  Shirt
+  Shirt,
+  DollarSign
 } from 'lucide-react';
-import { LineEntry, UserProfile } from '../types';
+import { LineEntry, UserProfile, LineBookingRecord, MonthlyBudgetRecord } from '../types';
 import {
   calculateFactoryOverall,
   calculateLineMetrics,
@@ -41,6 +42,19 @@ import {
   PDFReportOptions
 } from '../utils/generatePdfReport';
 import { isMasterAdminOrAdmin } from '../utils/rbac';
+import {
+  exportLineBookingsToCSV,
+  generateLineBookingTemplateCSV,
+  exportMonthlyBudgetsToCSV,
+  generateMonthlyBudgetTemplateCSV,
+  loadStoredLineBookings,
+  loadStoredMonthlyBudgets,
+  downloadTextAsFile,
+  parseLineBookingFromTextOrBuffer,
+  parseMonthlyBudgetFromTextOrBuffer,
+  saveStoredLineBookings,
+  saveStoredMonthlyBudgets
+} from '../utils/bookingAndBudgetCsv';
 
 interface ImportPrintExportModalProps {
   isOpen: boolean;
@@ -51,6 +65,8 @@ interface ImportPrintExportModalProps {
   profile: UserProfile;
   onImportLines?: (importedLines: LineEntry[], mode?: 'upsert' | 'append' | 'replace') => void;
   onOpenDatabase?: (tab?: 'backup' | 'csv-import') => void;
+  onOpenLineBookingModal?: (tab?: 'booking' | 'budget') => void;
+  onSyncLinesWithBookings?: (bookings: LineBookingRecord[]) => void;
 }
 
 export const ImportPrintExportModal: React.FC<ImportPrintExportModalProps> = ({
@@ -61,13 +77,24 @@ export const ImportPrintExportModal: React.FC<ImportPrintExportModalProps> = ({
   onSelectDate,
   profile,
   onImportLines,
-  onOpenDatabase
+  onOpenDatabase,
+  onOpenLineBookingModal,
+  onSyncLinesWithBookings
 }) => {
   const isMasterAdmin = isMasterAdminOrAdmin(profile);
-  const [activeTab, setActiveTab] = useState<'pdf' | 'print' | 'import' | 'export'>('pdf');
+  const [activeTab, setActiveTab] = useState<'pdf' | 'print' | 'import' | 'export' | 'booking_budget'>('pdf');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [feedbackToast, setFeedbackToast] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  // Import Sub-Category Selector
+  const [importCategory, setImportCategory] = useState<'lines' | 'booking' | 'budget'>('lines');
+  const [bookingImportText, setBookingImportText] = useState('');
+  const [parsedBookingPreview, setParsedBookingPreview] = useState<LineBookingRecord[]>([]);
+  const [budgetImportText, setBudgetImportText] = useState('');
+  const [parsedBudgetPreview, setParsedBudgetPreview] = useState<MonthlyBudgetRecord[]>([]);
+  const bookingFileRef = useRef<HTMLInputElement>(null);
+  const budgetFileRef = useRef<HTMLInputElement>(null);
 
   // PDF generation options
   const [pdfOptions, setPdfOptions] = useState<PDFReportOptions>({
@@ -392,6 +419,20 @@ Generated via Debonair IE Operational Cockpit.`;
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Export Spreadsheets &amp; Text</span>
+          </button>
+
+          <button
+            type="button"
+            id="modal-tab-booking-budget"
+            onClick={() => setActiveTab('booking_budget')}
+            className={`px-3.5 py-2 border-b-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'booking_budget'
+                ? 'border-[#176f78] text-[#176f78]'
+                : 'border-transparent text-[#527078] hover:text-[#17343a]'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5 text-[#176f78]" />
+            <span>Line Booking &amp; Monthly Budget</span>
           </button>
         </div>
 
@@ -718,15 +759,59 @@ Generated via Debonair IE Operational Cockpit.`;
           {/* TAB 3: IMPORT LINE TELEMETRY & CSV - ONLY for Master Administration/Admin Role */}
           {activeTab === 'import' && isMasterAdmin && (
             <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-white border border-[#d9d2c2] space-y-3">
-                <div>
-                  <h3 className="font-display text-sm font-bold uppercase text-[#17343a] tracking-tight">
-                    Import Daily Line Performance CSV
-                  </h3>
-                  <p className="text-xs text-[#527078]">
-                    Import line output telemetry or shift log spreadsheets directly into this date ({reportDate})
-                  </p>
-                </div>
+              {/* Import Category Switcher */}
+              <div className="flex items-center gap-1.5 p-1 bg-[#f1eee6] rounded-2xl border border-[#d9d2c2]">
+                <button
+                  type="button"
+                  onClick={() => setImportCategory('lines')}
+                  className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    importCategory === 'lines'
+                      ? 'bg-white text-[#17343a] shadow-2xs font-extrabold'
+                      : 'text-[#527078] hover:text-[#17343a]'
+                  }`}
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-[#176f78]" />
+                  <span>Daily Line Output Telemetry</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setImportCategory('booking')}
+                  className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    importCategory === 'booking'
+                      ? 'bg-white text-[#17343a] shadow-2xs font-extrabold'
+                      : 'text-[#527078] hover:text-[#17343a]'
+                  }`}
+                >
+                  <Shirt className="w-3.5 h-3.5 text-[#176f78]" />
+                  <span>Upcoming Style Line Bookings</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setImportCategory('budget')}
+                  className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    importCategory === 'budget'
+                      ? 'bg-white text-[#17343a] shadow-2xs font-extrabold'
+                      : 'text-[#527078] hover:text-[#17343a]'
+                  }`}
+                >
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Monthly Operating Budget</span>
+                </button>
+              </div>
+
+              {/* Sub-view 1: Daily Line Telemetry */}
+              {importCategory === 'lines' && (
+                <div className="p-4 rounded-2xl bg-white border border-[#d9d2c2] space-y-3">
+                  <div>
+                    <h3 className="font-display text-sm font-bold uppercase text-[#17343a] tracking-tight">
+                      Import Daily Line Performance CSV
+                    </h3>
+                    <p className="text-xs text-[#527078]">
+                      Import line output telemetry or shift log spreadsheets directly into this date ({reportDate})
+                    </p>
+                  </div>
 
                 {/* Upload or Dropzone */}
                 <div
@@ -840,6 +925,324 @@ Generated via Debonair IE Operational Cockpit.`;
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Sub-view 2: Upcoming Style Line Bookings */}
+            {importCategory === 'booking' && (
+              <div className="p-4 rounded-2xl bg-white border border-[#d9d2c2] space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-display text-sm font-bold uppercase text-[#17343a] tracking-tight flex items-center gap-2">
+                      <Shirt className="w-4 h-4 text-[#176f78]" />
+                      Import Upcoming Style Line Bookings (CSV / Excel)
+                    </h3>
+                    <p className="text-xs text-[#527078]">
+                      Import 10-day style loading schedule, planned order volumes, SAMs, and technical readiness
+                    </p>
+                  </div>
+                  {onOpenLineBookingModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenLineBookingModal('booking');
+                      }}
+                      className="text-xs font-bold text-[#176f78] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Interactive Manager</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Upload or Dropzone */}
+                <div
+                  onClick={() => bookingFileRef.current?.click()}
+                  className="p-6 rounded-xl border-2 border-dashed border-[#176f78]/30 hover:border-[#176f78] bg-[#fbfaf6] text-center cursor-pointer transition-colors space-y-2"
+                >
+                  <Upload className="w-6 h-6 text-[#176f78] mx-auto" />
+                  <div className="text-xs font-bold text-[#17343a]">Click to select CSV or Excel (.xlsx) file</div>
+                  <div className="text-[11px] text-[#527078]">
+                    Supports LineNo, Floor, Style, Buyer, OrderQty, StartDate, EndDate, SAM, PlannedOperators, etc.
+                  </div>
+                  <input
+                    ref={bookingFileRef}
+                    type="file"
+                    accept=".csv, .xlsx, .xls"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => {
+                        const res = ev.target?.result;
+                        if (!res) return;
+                        const parseRes = parseLineBookingFromTextOrBuffer(res);
+                        setParsedBookingPreview(parseRes.bookings);
+                        if (parseRes.bookings.length > 0) {
+                          showToast(`Validated ${parseRes.bookings.length} line booking schedules!`, 'info');
+                        } else if (parseRes.errors.length > 0) {
+                          showToast(`Error: ${parseRes.errors[0]}`, 'error');
+                        }
+                      };
+                      if (file.name.endsWith('.csv')) reader.readAsText(file);
+                      else reader.readAsArrayBuffer(file);
+                    }}
+                    className="hidden"
+                  />
+                </div>
+
+                {/* Paste Area */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-[#17343a]">Or Paste CSV Text:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const sample = generateLineBookingTemplateCSV();
+                        setBookingImportText(sample);
+                        const parseRes = parseLineBookingFromTextOrBuffer(sample);
+                        setParsedBookingPreview(parseRes.bookings);
+                      }}
+                      className="text-[11px] text-[#176f78] hover:underline font-bold cursor-pointer"
+                    >
+                      Load Sample Template
+                    </button>
+                  </div>
+                  <textarea
+                    rows={4}
+                    value={bookingImportText}
+                    onChange={e => {
+                      setBookingImportText(e.target.value);
+                      const parseRes = parseLineBookingFromTextOrBuffer(e.target.value);
+                      setParsedBookingPreview(parseRes.bookings);
+                    }}
+                    placeholder="LineNo,Floor,UpcomingStyle,Buyer,OrderQty,StartDate,EndDate,SAM..."
+                    className="w-full p-2.5 rounded-xl border border-[#d9d2c2] bg-white font-mono text-xs text-[#17343a] focus:outline-hidden focus:ring-1 focus:ring-[#176f78]"
+                  />
+                </div>
+
+                {/* Booking Preview Table */}
+                {parsedBookingPreview.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-[#f1eee6]">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-emerald-800 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        Validated {parsedBookingPreview.length} Line Booking Schedules
+                      </span>
+                    </div>
+
+                    <div className="max-h-40 overflow-y-auto rounded-xl border border-[#e7e1d5]">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#f1eee6] text-[#527078] sticky top-0">
+                          <tr>
+                            <th className="p-1.5">Line</th>
+                            <th className="p-1.5">Upcoming Style</th>
+                            <th className="p-1.5">Buyer</th>
+                            <th className="p-1.5 text-right">Order Qty</th>
+                            <th className="p-1.5">Start Date</th>
+                            <th className="p-1.5">T.R Sample</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#e7e1d5]">
+                          {parsedBookingPreview.map((b, i) => (
+                            <tr key={i} className="hover:bg-slate-50">
+                              <td className="p-1.5 font-bold text-[#176f78]">{b.lineNo}</td>
+                              <td className="p-1.5 font-bold text-[#17343a]">{b.style}</td>
+                              <td className="p-1.5 text-[#527078]">{b.buyer}</td>
+                              <td className="p-1.5 text-right font-mono-numbers">{b.orderQty.toLocaleString()}</td>
+                              <td className="p-1.5 font-mono-numbers text-[11px]">{b.startDate}</td>
+                              <td className="p-1.5">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-bold">
+                                  {b.trSampleStatus}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const existing = loadStoredLineBookings();
+                        // Upsert
+                        const map = new Map<string, LineBookingRecord>();
+                        existing.forEach(item => map.set(item.lineNo.toLowerCase().trim(), item));
+                        parsedBookingPreview.forEach(item => map.set(item.lineNo.toLowerCase().trim(), item));
+                        const merged = Array.from(map.values());
+                        saveStoredLineBookings(merged);
+
+                        if (onSyncLinesWithBookings) {
+                          onSyncLinesWithBookings(parsedBookingPreview);
+                        }
+
+                        showToast(`Applied ${parsedBookingPreview.length} bookings to factory schedule!`, 'success');
+                        setParsedBookingPreview([]);
+                        setBookingImportText('');
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-[#176f78] hover:bg-[#12555c] active:scale-95 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Apply {parsedBookingPreview.length} Bookings to Factory Schedule &amp; Sync Active Lines</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sub-view 3: Monthly Operating Budget */}
+            {importCategory === 'budget' && (
+              <div className="p-4 rounded-2xl bg-white border border-[#d9d2c2] space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-display text-sm font-bold uppercase text-[#17343a] tracking-tight flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-emerald-700" />
+                      Import Monthly Operating Budget (CSV / Excel)
+                    </h3>
+                    <p className="text-xs text-[#527078]">
+                      Import cost centers, direct &amp; indirect labor, machine maintenance, utilities, and overtime
+                    </p>
+                  </div>
+                  {onOpenLineBookingModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenLineBookingModal('budget');
+                      }}
+                      className="text-xs font-bold text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Interactive Ledger</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Upload or Dropzone */}
+                <div
+                  onClick={() => budgetFileRef.current?.click()}
+                  className="p-6 rounded-xl border-2 border-dashed border-emerald-500/30 hover:border-emerald-600 bg-[#fbfaf6] text-center cursor-pointer transition-colors space-y-2"
+                >
+                  <Upload className="w-6 h-6 text-emerald-700 mx-auto" />
+                  <div className="text-xs font-bold text-[#17343a]">Click to select CSV or Excel (.xlsx) file</div>
+                  <div className="text-[11px] text-[#527078]">
+                    Supports Month, Category, Department, AllocatedBudget, ActualSpend, Status, Notes
+                  </div>
+                  <input
+                    ref={budgetFileRef}
+                    type="file"
+                    accept=".csv, .xlsx, .xls"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => {
+                        const res = ev.target?.result;
+                        if (!res) return;
+                        const parseRes = parseMonthlyBudgetFromTextOrBuffer(res);
+                        setParsedBudgetPreview(parseRes.budgets);
+                        if (parseRes.budgets.length > 0) {
+                          showToast(`Validated ${parseRes.budgets.length} budget items!`, 'info');
+                        } else if (parseRes.errors.length > 0) {
+                          showToast(`Error: ${parseRes.errors[0]}`, 'error');
+                        }
+                      };
+                      if (file.name.endsWith('.csv')) reader.readAsText(file);
+                      else reader.readAsArrayBuffer(file);
+                    }}
+                    className="hidden"
+                  />
+                </div>
+
+                {/* Paste Area */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-[#17343a]">Or Paste CSV Text:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const sample = generateMonthlyBudgetTemplateCSV();
+                        setBudgetImportText(sample);
+                        const parseRes = parseMonthlyBudgetFromTextOrBuffer(sample);
+                        setParsedBudgetPreview(parseRes.budgets);
+                      }}
+                      className="text-[11px] text-[#176f78] hover:underline font-bold cursor-pointer"
+                    >
+                      Load Sample Template
+                    </button>
+                  </div>
+                  <textarea
+                    rows={4}
+                    value={budgetImportText}
+                    onChange={e => {
+                      setBudgetImportText(e.target.value);
+                      const parseRes = parseMonthlyBudgetFromTextOrBuffer(e.target.value);
+                      setParsedBudgetPreview(parseRes.budgets);
+                    }}
+                    placeholder="Month,Category,Department,AllocatedBudget_USD,ActualSpend_USD,Status,Notes..."
+                    className="w-full p-2.5 rounded-xl border border-[#d9d2c2] bg-white font-mono text-xs text-[#17343a] focus:outline-hidden focus:ring-1 focus:ring-[#176f78]"
+                  />
+                </div>
+
+                {/* Budget Preview Table */}
+                {parsedBudgetPreview.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-[#f1eee6]">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-emerald-800 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        Validated {parsedBudgetPreview.length} Cost Center Items
+                      </span>
+                    </div>
+
+                    <div className="max-h-40 overflow-y-auto rounded-xl border border-[#e7e1d5]">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#f1eee6] text-[#527078] sticky top-0">
+                          <tr>
+                            <th className="p-1.5">Month</th>
+                            <th className="p-1.5">Category</th>
+                            <th className="p-1.5">Department</th>
+                            <th className="p-1.5 text-right">Budget</th>
+                            <th className="p-1.5 text-right">Actual</th>
+                            <th className="p-1.5 text-right">Variance</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#e7e1d5]">
+                          {parsedBudgetPreview.map((b, i) => (
+                            <tr key={i} className="hover:bg-slate-50">
+                              <td className="p-1.5 font-bold font-mono-numbers">{b.month}</td>
+                              <td className="p-1.5 font-semibold text-[#17343a]">{b.category}</td>
+                              <td className="p-1.5 text-[#527078]">{b.department}</td>
+                              <td className="p-1.5 text-right font-mono-numbers">${b.allocatedBudget.toLocaleString()}</td>
+                              <td className="p-1.5 text-right font-mono-numbers">${b.actualSpend.toLocaleString()}</td>
+                              <td className="p-1.5 text-right font-mono-numbers font-bold text-emerald-700">
+                                {b.variance >= 0 ? `+$${b.variance.toLocaleString()}` : `-$${Math.abs(b.variance).toLocaleString()}`}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const existing = loadStoredMonthlyBudgets();
+                        const merged = [...existing, ...parsedBudgetPreview];
+                        saveStoredMonthlyBudgets(merged);
+                        showToast(`Applied ${parsedBudgetPreview.length} budget items to ledger!`, 'success');
+                        setParsedBudgetPreview([]);
+                        setBudgetImportText('');
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Apply {parsedBudgetPreview.length} Items to Monthly Budget Ledger</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             </div>
           )}
 
@@ -892,6 +1295,86 @@ Generated via Debonair IE Operational Cockpit.`;
                     <span>Download CSV Dataset</span>
                   </button>
                 </div>
+
+                {/* Option 3: Line Booking for Upcoming Styles CSV */}
+                <div className="p-4 rounded-2xl bg-white border border-[#d9d2c2] space-y-2 flex flex-col justify-between">
+                  <div>
+                    <div className="w-9 h-9 rounded-xl bg-teal-50 text-[#176f78] flex items-center justify-center font-bold mb-2">
+                      <Shirt className="w-5 h-5" />
+                    </div>
+                    <h4 className="font-display text-sm font-bold text-[#17343a]">Upcoming Style Line Bookings (CSV)</h4>
+                    <p className="text-xs text-[#527078] mt-1 leading-relaxed">
+                      Comprehensive booking schedule with upcoming styles, planned order quantities, SAMs, line allocations, and T.R sample readiness.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const bookings = loadStoredLineBookings();
+                        const csv = exportLineBookingsToCSV(bookings);
+                        downloadTextAsFile(`Debonair_Upcoming_Style_Line_Bookings_${reportDate}.csv`, csv);
+                        showToast(`Exported ${bookings.length} line booking schedules to CSV!`, 'success');
+                      }}
+                      className="flex-1 py-2 rounded-xl bg-[#176f78] hover:bg-[#12555c] text-white text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download Bookings CSV</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const csv = generateLineBookingTemplateCSV();
+                        downloadTextAsFile('Line_Booking_Upcoming_Styles_Template.csv', csv);
+                        showToast('Downloaded standard Line Booking CSV Template.', 'info');
+                      }}
+                      title="Download CSV Template"
+                      className="px-2.5 py-2 rounded-xl bg-[#f1eee6] hover:bg-[#e7e1d5] border border-[#d9d2c2] text-[#17343a] text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Template
+                    </button>
+                  </div>
+                </div>
+
+                {/* Option 4: Monthly Operating Budget CSV */}
+                <div className="p-4 rounded-2xl bg-white border border-[#d9d2c2] space-y-2 flex flex-col justify-between">
+                  <div>
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold mb-2">
+                      <DollarSign className="w-5 h-5" />
+                    </div>
+                    <h4 className="font-display text-sm font-bold text-[#17343a]">Monthly Operating Budget (CSV)</h4>
+                    <p className="text-xs text-[#527078] mt-1 leading-relaxed">
+                      Factory cost center ledger with direct &amp; indirect labor, machine maintenance, utilities, overtime, and financial variance tracking.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const budgets = loadStoredMonthlyBudgets();
+                        const csv = exportMonthlyBudgetsToCSV(budgets);
+                        downloadTextAsFile(`Debonair_Monthly_Operating_Budget_${reportDate}.csv`, csv);
+                        showToast(`Exported ${budgets.length} monthly budget items to CSV!`, 'success');
+                      }}
+                      className="flex-1 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download Budget CSV</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const csv = generateMonthlyBudgetTemplateCSV();
+                        downloadTextAsFile('Monthly_Operating_Budget_Template.csv', csv);
+                        showToast('Downloaded standard Monthly Budget CSV Template.', 'info');
+                      }}
+                      title="Download CSV Template"
+                      className="px-2.5 py-2 rounded-xl bg-[#f1eee6] hover:bg-[#e7e1d5] border border-[#d9d2c2] text-[#17343a] text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Template
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Text Summary Copy Card */}
@@ -913,6 +1396,163 @@ Generated via Debonair IE Operational Cockpit.`;
                 <p className="text-[11px] text-[#527078]">
                   Formatted plaintext summary formatted with emojis and key factory indicators for direct pasting into WhatsApp, Slack, or executive emails.
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: LINE BOOKING & MONTHLY BUDGET HUB */}
+          {activeTab === 'booking_budget' && (
+            <div className="space-y-4">
+              <div className="p-5 rounded-2xl bg-white border border-[#d9d2c2] space-y-4 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#f1eee6] pb-3">
+                  <div>
+                    <h3 className="font-display text-base font-bold uppercase text-[#17343a] tracking-tight flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-[#176f78]" />
+                      Line Booking &amp; Monthly Budget Manager
+                    </h3>
+                    <p className="text-xs text-[#527078] mt-0.5">
+                      Streamlined import, export, and synchronization for Debonair Unit-02 line allocations &amp; financial cost centers
+                    </p>
+                  </div>
+
+                  {onOpenLineBookingModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenLineBookingModal('booking');
+                      }}
+                      className="px-4 py-2 rounded-xl bg-[#176f78] hover:bg-[#12555c] text-white text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Open Full Interactive Hub</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Card 1: Line Booking */}
+                  <div className="p-4 rounded-xl border border-[#d9d2c2] bg-[#fbfaf6] space-y-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="p-2 rounded-lg bg-teal-50 text-[#176f78]">
+                          <Shirt className="w-4 h-4" />
+                        </span>
+                        <div>
+                          <h4 className="font-bold text-sm text-[#17343a]">Line Booking for Upcoming Styles</h4>
+                          <span className="text-[11px] text-[#527078]">10-Day File &amp; Technical Readiness</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-[#527078] mt-2 leading-relaxed">
+                        Track upcoming styles, order quantities, SAM values, planned operators, daily targets, and T.R sample approvals.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 pt-2 border-t border-[#e7e1d5]">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const bookings = loadStoredLineBookings();
+                            const csv = exportLineBookingsToCSV(bookings);
+                            downloadTextAsFile(`Debonair_Line_Bookings_${reportDate}.csv`, csv);
+                            showToast(`Exported ${bookings.length} line booking schedules to CSV!`, 'success');
+                          }}
+                          className="flex-1 py-1.5 rounded-lg bg-[#176f78] hover:bg-[#12555c] text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Export Bookings CSV</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const csv = generateLineBookingTemplateCSV();
+                            downloadTextAsFile('Line_Booking_Template.csv', csv);
+                            showToast('Downloaded Line Booking Template.', 'info');
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-white border border-[#d9d2c2] text-xs font-bold text-[#17343a] hover:bg-[#f1eee6] cursor-pointer"
+                        >
+                          Template
+                        </button>
+                      </div>
+
+                      {onOpenLineBookingModal && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            onOpenLineBookingModal('booking');
+                          }}
+                          className="w-full py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-[#176f78] border border-teal-200 text-xs font-bold flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Upload className="w-3 h-3" />
+                          <span>Import &amp; Manage Line Bookings</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card 2: Monthly Budget */}
+                  <div className="p-4 rounded-xl border border-[#d9d2c2] bg-[#fbfaf6] space-y-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="p-2 rounded-lg bg-emerald-50 text-emerald-700">
+                          <DollarSign className="w-4 h-4" />
+                        </span>
+                        <div>
+                          <h4 className="font-bold text-sm text-[#17343a]">Monthly Operating Budget</h4>
+                          <span className="text-[11px] text-[#527078]">Cost Centers &amp; Variance Ledgers</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-[#527078] mt-2 leading-relaxed">
+                        Control labor wages, machine spare parts, utility power, overtime hours, and training ramp-up expenses across monthly periods.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 pt-2 border-t border-[#e7e1d5]">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const budgets = loadStoredMonthlyBudgets();
+                            const csv = exportMonthlyBudgetsToCSV(budgets);
+                            downloadTextAsFile(`Debonair_Monthly_Budget_${reportDate}.csv`, csv);
+                            showToast(`Exported ${budgets.length} monthly budget items to CSV!`, 'success');
+                          }}
+                          className="flex-1 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Export Budget CSV</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const csv = generateMonthlyBudgetTemplateCSV();
+                            downloadTextAsFile('Monthly_Budget_Template.csv', csv);
+                            showToast('Downloaded Monthly Budget Template.', 'info');
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-white border border-[#d9d2c2] text-xs font-bold text-[#17343a] hover:bg-[#f1eee6] cursor-pointer"
+                        >
+                          Template
+                        </button>
+                      </div>
+
+                      {onOpenLineBookingModal && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            onOpenLineBookingModal('budget');
+                          }}
+                          className="w-full py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Upload className="w-3 h-3" />
+                          <span>Import &amp; Manage Monthly Budget</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
