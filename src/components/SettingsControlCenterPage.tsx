@@ -208,6 +208,7 @@ interface SettingsControlCenterPageProps {
   selectedLineNo?: string;
   onSelectLineNo?: (lineNo: string) => void;
   onSaveLine?: (line: LineEntry) => void;
+  onSaveMultipleLines?: (lines: LineEntry[]) => void;
   onAddNewLine?: (customLine?: LineEntry | Partial<LineEntry>) => void;
   onDeleteLine?: (id: string | number) => void;
   onDeleteFloor?: (floorName: string, mode: 'delete_all_lines' | 'reassign', targetFloor?: string) => void;
@@ -320,6 +321,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   selectedLineNo = '18',
   onSelectLineNo = () => {},
   onSaveLine = () => {},
+  onSaveMultipleLines,
   onAddNewLine = () => {},
   onDeleteLine = () => {},
   onDeleteFloor = () => {},
@@ -973,6 +975,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
             selectedLineNo={selectedLineNo}
             onSelectLineNo={onSelectLineNo}
             onSaveLine={onSaveLine}
+            onSaveMultipleLines={onSaveMultipleLines}
             onAddNewLine={onAddNewLine}
             onDeleteLine={onDeleteLine}
             onDeleteFloor={onDeleteFloor}

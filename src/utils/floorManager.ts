@@ -195,10 +195,24 @@ export interface FloorMetricSummary {
   totalWip: number;
 }
 
+/**
+ * Checks whether a line belongs to a target floor, gracefully handling "Floor" suffix variations
+ * (e.g. "Padma" vs "Padma Floor" vs "Floor 01 (Padma Floor)")
+ */
+export function isLineOnFloor(lineFloor?: string, targetFloor?: string): boolean {
+  if (!lineFloor || !targetFloor) return false;
+  const lf = lineFloor.trim().toLowerCase();
+  const tf = targetFloor.trim().toLowerCase();
+  if (lf === tf) return true;
+  const lfClean = lf.replace(/\s*floor$/, '').replace(/^floor\s*\d+\s*\((.+)\)$/, '$1').trim();
+  const tfClean = tf.replace(/\s*floor$/, '').replace(/^floor\s*\d+\s*\((.+)\)$/, '$1').trim();
+  if (lfClean === tfClean) return true;
+  return lf.includes(tfClean) || tf.includes(lfClean);
+}
+
 export function computeFloorMetricSummaries(floors: CustomFloor[], lines: LineEntry[]): FloorMetricSummary[] {
   return floors.map(floor => {
-    const floorKey = floor.name.trim().toLowerCase();
-    const matchedLines = lines.filter(l => (l.floor?.trim().toLowerCase() || '') === floorKey);
+    const matchedLines = lines.filter(l => isLineOnFloor(l.floor, floor.name));
 
     const sortedLines = [...matchedLines].sort((a, b) => {
       const numA = parseInt(String(a.lineNo).replace(/\D/g, ''), 10) || 0;

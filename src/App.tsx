@@ -563,7 +563,7 @@ export default function App() {
   // Enterprise Factory & Industry Profile State
   const [factoryProfile, setFactoryProfile] = useState<FactoryIndustryProfile>(() => getStoredActiveFactory());
   const [savedFactories, setSavedFactories] = useState<FactoryIndustryProfile[]>(() => getStoredSavedFactories());
-  const [floorSetupInitialSubView, setFloorSetupInitialSubView] = useState<'floor-plan' | 'line-setup' | 'split-view' | 'factory'>('floor-plan');
+  const [floorSetupInitialSubView, setFloorSetupInitialSubView] = useState<'floor-plan' | 'line-setup' | 'drag-drop' | 'split-view' | 'factory'>('floor-plan');
 
   useEffect(() => {
     ensureOnlineReady();
@@ -2182,10 +2182,14 @@ export default function App() {
       tab === 'line-configuration' ||
       tab === 'factory' ||
       tab === 'factory-setup' ||
-      tab === 'factory-profile'
+      tab === 'factory-profile' ||
+      tab === 'drag-drop' ||
+      tab === 'drag-reallocate'
     ) {
       if (tab === 'factory' || tab === 'factory-setup' || tab === 'factory-profile' || lineNo === 'factory') {
         setFloorSetupInitialSubView('factory');
+      } else if (tab === 'drag-drop' || tab === 'drag-reallocate' || lineNo === 'drag-drop') {
+        setFloorSetupInitialSubView('drag-drop');
       }
       setLineDataSubTab('floor-plan');
       setSettingsSection('line-data');
@@ -2506,6 +2510,7 @@ export default function App() {
               selectedLineNo={selectedLineNo}
               onSelectLineNo={setSelectedLineNo}
               onSaveLine={handleSaveLine}
+              onSaveMultipleLines={handleSaveMultipleLines}
               onAddNewLine={handleAddNewLine}
               onDeleteLine={handleDeleteLine}
               onDeleteFloor={handleDeleteFloor}

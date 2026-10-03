@@ -145,6 +145,7 @@ interface LineDataPageProps {
   selectedLineNo: string;
   onSelectLineNo: (lineNo: string) => void;
   onSaveLine: (line: LineEntry) => void;
+  onSaveMultipleLines?: (lines: LineEntry[]) => void;
   onAddNewLine?: (customLine?: LineEntry | Partial<LineEntry>) => void;
   onDeleteLine?: (identifier: string | number) => void;
   onDeleteFloor?: (floorName: string, mode: 'delete_all_lines' | 'reassign', targetFloor?: string) => void;
@@ -178,6 +179,7 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
   selectedLineNo,
   onSelectLineNo,
   onSaveLine,
+  onSaveMultipleLines,
   onAddNewLine,
   onDeleteLine,
   onDeleteFloor,
@@ -1007,6 +1009,7 @@ export const LineDataPage: React.FC<LineDataPageProps> = ({
         <FloorPlanLineSetup
           lines={lines}
           onSaveLine={onSaveLine}
+          onSaveMultipleLines={onSaveMultipleLines}
           onAddNewLine={(newLine: LineEntry) => onAddNewLine && onAddNewLine(newLine)}
           onDeleteLine={onDeleteLine}
           onDeleteFloor={onDeleteFloor}

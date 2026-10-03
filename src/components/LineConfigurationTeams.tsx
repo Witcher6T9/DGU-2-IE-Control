@@ -30,7 +30,8 @@ import {
   Award,
   Zap,
   LayoutGrid,
-  MapPin
+  MapPin,
+  Move
 } from 'lucide-react';
 import { LineEntry, LineTeamMember, UserProfile } from '../types';
 import { AiTeamAssignmentModal } from './AiTeamAssignmentModal';
@@ -46,6 +47,7 @@ export interface LineConfigurationTeamsProps {
   profile?: UserProfile;
   hideTopHeader?: boolean;
   onSwitchToFloorPlan?: (floorName?: string, lineNo?: string) => void;
+  onSwitchToDragReallocate?: () => void;
   initialFloorFilter?: string;
 }
 
@@ -69,6 +71,7 @@ export const LineConfigurationTeams: React.FC<LineConfigurationTeamsProps> = ({
   profile,
   hideTopHeader = false,
   onSwitchToFloorPlan,
+  onSwitchToDragReallocate,
   initialFloorFilter
 }) => {
   const isMasterAdmin = isMasterAdminOrAdmin(profile);
@@ -905,6 +908,18 @@ export const LineConfigurationTeams: React.FC<LineConfigurationTeamsProps> = ({
           >
             Inactive
           </button>
+
+          {onSwitchToDragReallocate && (
+            <button
+              type="button"
+              onClick={onSwitchToDragReallocate}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-[#176f78] bg-teal-50 border border-teal-300 hover:bg-teal-100 transition-colors cursor-pointer"
+              title="Open drag-and-drop workspace to reallocate lines between floors"
+            >
+              <Move className="w-3 h-3" />
+              <span>Drag &amp; Reallocate Lines</span>
+            </button>
+          )}
 
           {isMasterAdmin && onDeleteFloor && selectedFloorFilter !== 'all' && floorOptions.length > 1 && (
             <button

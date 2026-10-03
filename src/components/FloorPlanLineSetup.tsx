@@ -29,11 +29,13 @@ import {
   Building,
   Check,
   RotateCcw,
-  Filter
+  Filter,
+  Move
 } from 'lucide-react';
 import { LineEntry, UserProfile, FactoryIndustryProfile } from '../types';
 import { VisualFloorPlan } from './VisualFloorPlan';
 import { LineConfigurationTeams } from './LineConfigurationTeams';
+import { FloorDragAndDropWorkspace } from './FloorDragAndDropWorkspace';
 import {
   DEFAULT_FACTORY_PROFILE,
   PRESET_FACTORIES,
@@ -43,7 +45,7 @@ import {
 } from '../data/factoryProfiles';
 import { isMasterAdminOrAdmin } from '../utils/rbac';
 
-export type FloorSetupSubView = 'floor-plan' | 'line-setup' | 'factory' | 'split-view';
+export type FloorSetupSubView = 'floor-plan' | 'line-setup' | 'drag-drop' | 'factory' | 'split-view';
 export type ManpowerDensityFilter = 'all' | 'high' | 'medium' | 'low';
 
 /**
@@ -77,6 +79,7 @@ export const getLineManpowerCapacity = (line: LineEntry): number => {
 export interface FloorPlanLineSetupProps {
   lines: LineEntry[];
   onSaveLine: (updatedLine: LineEntry) => void;
+  onSaveMultipleLines?: (updatedLines: LineEntry[]) => void;
   onAddNewLine: (newLine: LineEntry) => void;
   onDeleteLine?: (lineNo: string) => void;
   onDeleteFloor?: (floorName: string, mode: 'delete_all_lines' | 'reassign', targetFloor?: string) => void;
@@ -96,6 +99,7 @@ export interface FloorPlanLineSetupProps {
 export const FloorPlanLineSetup: React.FC<FloorPlanLineSetupProps> = ({
   lines,
   onSaveLine,
+  onSaveMultipleLines,
   onAddNewLine,
   onDeleteLine,
   onDeleteFloor,
@@ -558,6 +562,32 @@ export const FloorPlanLineSetup: React.FC<FloorPlanLineSetupProps> = ({
                 </span>
               </button>
 
+              <button
+                type="button"
+                id="btn-subview-drag-drop"
+                onClick={() => setActiveSubView('drag-drop')}
+                className={`group relative flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer touch-manipulation select-none active:scale-[0.98] whitespace-nowrap ${
+                  activeSubView === 'drag-drop'
+                    ? 'bg-[#176f78] text-white shadow-md ring-2 ring-[#176f78]/40 font-black'
+                    : 'text-[#527078] hover:text-[#17343a] hover:bg-[#e7e1d5]/80'
+                }`}
+                title="Drag and drop lines between floors to reallocate floor layout and update state"
+              >
+                <div className={`p-1 rounded-lg transition-colors ${activeSubView === 'drag-drop' ? 'bg-white/15 text-white' : 'bg-white/60 text-[#176f78] group-hover:bg-white'}`}>
+                  <Move className="w-4 h-4" />
+                </div>
+                <span className="tracking-tight font-display uppercase">Drag &amp; Reallocate</span>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-black transition-colors ${
+                    activeSubView === 'drag-drop'
+                      ? 'bg-white/20 text-white border border-white/25'
+                      : 'bg-white border border-[#d9d2c2] text-[#176f78]'
+                  }`}
+                >
+                  {stats.totalFloors} Floors
+                </span>
+              </button>
+
               {/* FACTORY & INDUSTRY NAME TAB - ONLY for Master Administration/Admin Role */}
               {isMasterAdmin && (
                 <button
@@ -886,32 +916,32 @@ export const FloorPlanLineSetup: React.FC<FloorPlanLineSetupProps> = ({
 
         {/* Floor Line Distribution Bar */}
         <div className="pt-3 border-t border-[#e7e1d5] flex items-center justify-between gap-2 flex-wrap text-xs">
-          <span className="font-bold text-[#527078] text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-            <Building2 className="w-3.5 h-3.5 text-[#176f78]" /> Production Floor Layout Distribution:
-          </span>
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-            <span className="px-2.5 py-1 rounded-lg bg-[#f1eee6] border border-[#d9d2c2] text-[#17343a] font-semibold text-[11px]">
-              <strong className="text-[#176f78]">Padma Floor:</strong> 06 Lines
+            <span className="font-bold text-[#527078] text-[11px] uppercase tracking-wider flex items-center gap-1.5 mr-1">
+              <Building2 className="w-3.5 h-3.5 text-[#176f78]" /> Production Floor Layout Distribution:
             </span>
-            <span className="px-2.5 py-1 rounded-lg bg-[#f1eee6] border border-[#d9d2c2] text-[#17343a] font-semibold text-[11px]">
-              <strong className="text-[#176f78]">Meghna Floor:</strong> 06 Lines
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-[#f1eee6] border border-[#d9d2c2] text-[#17343a] font-semibold text-[11px]">
-              <strong className="text-[#176f78]">Karnophuli Floor:</strong> 05 Lines
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-[#f1eee6] border border-[#d9d2c2] text-[#17343a] font-semibold text-[11px]">
-              <strong className="text-[#176f78]">Korotoya Floor:</strong> 06 Lines
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-[#f1eee6] border border-[#d9d2c2] text-[#17343a] font-semibold text-[11px]">
-              <strong className="text-[#176f78]">Shitalokshya Floor:</strong> 06 Lines
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-[#f1eee6] border border-[#d9d2c2] text-[#17343a] font-semibold text-[11px]">
-              <strong className="text-[#176f78]">Turag Floor:</strong> 05 Lines
-            </span>
+            {['Padma Floor', 'Meghna Floor', 'Karnophuli Floor', 'Korotoya Floor', 'Shitalokshya Floor', 'Turag Floor'].map(floorName => {
+              const count = lines.filter(l => (l.floor?.trim().toLowerCase() || '').includes(floorName.toLowerCase().replace(' floor', ''))).length;
+              return (
+                <span key={floorName} className="px-2.5 py-1 rounded-lg bg-[#f1eee6] border border-[#d9d2c2] text-[#17343a] font-semibold text-[11px]">
+                  <strong className="text-[#176f78]">{floorName}:</strong> {String(count).padStart(2, '0')} Lines
+                </span>
+              );
+            })}
             <span className="px-2.5 py-1 rounded-lg bg-[#176f78]/10 border border-[#176f78]/30 text-[#176f78] font-bold text-[11px]">
-              Total: 34 Lines in Layout
+              Total: {stats.totalLines} Lines
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubView('drag-drop')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-[#176f78] font-bold text-xs border border-teal-300 transition-all cursor-pointer shadow-2xs ml-auto"
+            title="Open drag-and-drop workspace to reallocate lines between floors"
+          >
+            <Move className="w-3.5 h-3.5" />
+            <span>Drag &amp; Drop Reallocate</span>
+          </button>
         </div>
       </div>
 
@@ -931,6 +961,7 @@ export const FloorPlanLineSetup: React.FC<FloorPlanLineSetupProps> = ({
             profile={profile}
             initialFloor={syncedFloor}
             onSwitchToSetup={handleSwitchToSetup}
+            onSwitchToDragReallocate={() => setActiveSubView('drag-drop')}
             hideTopHeader={false}
           />
         </section>
@@ -949,7 +980,24 @@ export const FloorPlanLineSetup: React.FC<FloorPlanLineSetupProps> = ({
             profile={profile}
             initialFloorFilter={syncedFloor}
             onSwitchToFloorPlan={handleSwitchToFloorPlan}
+            onSwitchToDragReallocate={() => setActiveSubView('drag-drop')}
             hideTopHeader={false}
+          />
+        </section>
+      )}
+
+      {/* Mode 3: Drag & Drop Floor Line Reallocation Workspace */}
+      {activeSubView === 'drag-drop' && (
+        <section id="unified-view-drag-drop" className="animate-fadeIn">
+          <FloorDragAndDropWorkspace
+            lines={densityFilteredLines}
+            onSaveLine={onSaveLine}
+            onSaveMultipleLines={onSaveMultipleLines}
+            onSelectLineNo={(lNo) => {
+              setSelectedTargetLineNo(lNo);
+              setActiveSubView('line-setup');
+            }}
+            onNavigate={onNavigate}
           />
         </section>
       )}
@@ -1337,6 +1385,7 @@ export const FloorPlanLineSetup: React.FC<FloorPlanLineSetupProps> = ({
               profile={profile}
               initialFloor={syncedFloor}
               onSwitchToSetup={handleSwitchToSetup}
+              onSwitchToDragReallocate={() => setActiveSubView('drag-drop')}
               hideTopHeader={false}
             />
           </div>
@@ -1367,6 +1416,7 @@ export const FloorPlanLineSetup: React.FC<FloorPlanLineSetupProps> = ({
               profile={profile}
               initialFloorFilter={syncedFloor}
               onSwitchToFloorPlan={handleSwitchToFloorPlan}
+              onSwitchToDragReallocate={() => setActiveSubView('drag-drop')}
               hideTopHeader={false}
             />
           </div>

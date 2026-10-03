@@ -57,6 +57,7 @@ export interface VisualFloorPlanProps {
   initialFloor?: string;
   hideTopHeader?: boolean;
   onSwitchToSetup?: (lineNo?: string) => void;
+  onSwitchToDragReallocate?: () => void;
 }
 
 // Helper to determine normalized line status
@@ -152,7 +153,8 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
   profile,
   initialFloor,
   hideTopHeader = false,
-  onSwitchToSetup
+  onSwitchToSetup,
+  onSwitchToDragReallocate
 }) => {
   const isMasterAdmin = isMasterAdminOrAdmin(profile);
   // Physical unique lines on current active shift/layout (deduplicated by lineNo)
@@ -251,6 +253,7 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
   // Drag and Drop tracking states
   const [draggedLineId, setDraggedLineId] = useState<number | null>(null);
   const [dragOverLineId, setDragOverLineId] = useState<number | null>(null);
+  const [dragOverFloorTab, setDragOverFloorTab] = useState<string | null>(null);
 
   // Filter lines for current floor and active date if applicable, respecting custom IE layout order
   const floorLines = useMemo(() => {
@@ -634,6 +637,18 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
               <span>Line Configuration</span>
             </button>
 
+            {onSwitchToDragReallocate && (
+              <button
+                id="switch-drag-reallocate-toolbar-btn"
+                onClick={onSwitchToDragReallocate}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-[#176f78] border border-teal-300 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                title="Open Drag & Drop Line Reallocation workspace"
+              >
+                <Move className="w-3.5 h-3.5" />
+                <span>Drag Lines Between Floors</span>
+              </button>
+            )}
+
             {/* IE Physical Layout Rearrangement Mode Toggle & Reset */}
             <button
               id="toggle-reorder-mode-btn"
@@ -739,6 +754,7 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
                   const count = matchLines.length > 0 ? matchLines.length : (cfg ? cfg.linesCount : 0);
                   const isSelected = selectedFloor === floorName;
                   const formattedCount = String(count).padStart(2, '0');
+                  const isDropTarget = dragOverFloorTab === floorName;
 
                   return (
                     <button
@@ -748,8 +764,44 @@ export const VisualFloorPlan: React.FC<VisualFloorPlanProps> = ({
                         setSelectedFloor(floorName);
                         if (cfg) setSelectedWingFilter(cfg.wing as 'Blue Wing' | 'Green Wing');
                       }}
+                      onDragOver={e => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        if (dragOverFloorTab !== floorName) {
+                          setDragOverFloorTab(floorName);
+                        }
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverFloorTab === floorName) {
+                          setDragOverFloorTab(null);
+                        }
+                      }}
+                      onDrop={e => {
+                        e.preventDefault();
+                        setDragOverFloorTab(null);
+                        const rawData = e.dataTransfer.getData('text/plain');
+                        let lineToMove: LineEntry | undefined;
+                        if (rawData) {
+                          lineToMove = lines.find(l => String(l.id) === rawData || l.lineNo === rawData);
+                        }
+                        if (!lineToMove && draggedLineId) {
+                          lineToMove = lines.find(l => l.id === draggedLineId);
+                        }
+                        if (!lineToMove) return;
+                        if (normalizeFloorName(lineToMove.floor) === floorName) return;
+
+                        const updatedLine: LineEntry = {
+                          ...lineToMove,
+                          floor: floorName
+                        };
+                        onSaveLine(updatedLine);
+                        showToast(`Line ${lineToMove.lineNo} moved to ${floorName}!`, 'success');
+                      }}
+                      title={`View ${floorName} or drop line here to reassign floor`}
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 border ${
-                        isSelected
+                        isDropTarget
+                          ? 'bg-teal-600 text-white border-teal-700 ring-2 ring-teal-400 scale-105 shadow-md animate-pulse'
+                          : isSelected
                           ? 'bg-[#176f78] text-white border-[#176f78] shadow-sm'
                           : 'bg-[#fbfaf6] text-[#17343a] border-[#d9d2c2] hover:bg-[#f1eee6]'
                       }`}
