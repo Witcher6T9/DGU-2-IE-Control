@@ -1061,15 +1061,6 @@ export const DailyChecklist: React.FC<DailyChecklistProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleMarkAllDone}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#176f78] text-white hover:bg-[#12555c] font-bold transition-all shadow-xs cursor-pointer active:scale-95"
-                >
-                  <CheckCheck className="w-3.5 h-3.5" />
-                  <span>Mark All 13 Tasks Done</span>
-                </button>
-
-                <button
-                  type="button"
                   onClick={handleResetAll}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#d9d2c2] text-[#527078] hover:bg-[#f1eee6] font-bold transition-all cursor-pointer"
                 >

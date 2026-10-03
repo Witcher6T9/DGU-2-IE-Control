@@ -60,7 +60,7 @@ import {
   setStoredSavedFactories,
   DEFAULT_FACTORY_PROFILE
 } from './data/factoryProfiles';
-import type { SettingsTab } from './components/SettingsModal';
+import type { SettingsCategory } from './components/SettingsControlCenterPage';
 import {
   ALL_IMPORTED_DEBONAIR_LINES,
   DEBONAIR_SEPTEMBER_24_DATE,
@@ -147,7 +147,6 @@ import type { ZeroTrustAuthMode } from './components/AuthPage';
 
 // Code-split modals loaded strictly on-demand
 const AuthPage = lazyWithRetry(() => import('./components/AuthPage').then(m => ({ default: m.AuthPage })));
-const SettingsModal = lazyWithRetry(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const UserModal = lazyWithRetry(() => import('./components/UserModal').then(m => ({ default: m.UserModal })));
 const NotificationsModal = lazyWithRetry(() => import('./components/NotificationsModal').then(m => ({ default: m.NotificationsModal })));
 const DatabaseModal = lazyWithRetry(() => import('./components/DatabaseModal').then(m => ({ default: m.DatabaseModal })));
@@ -515,9 +514,8 @@ export default function App() {
     lastSyncTime: new Date().toISOString()
   });
 
-  // Modals
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('all');
+  // Modals & Settings Navigation
+  const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>('all');
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [userModalTab, setUserModalTab] = useState<'profile' | 'roles'>('profile');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -557,7 +555,6 @@ export default function App() {
     try {
       await googleSignOut();
     } catch {}
-    setIsSettingsOpen(false);
     setIsUserModalOpen(false);
     handleOpenAuth('sign_in');
   };
@@ -581,7 +578,6 @@ export default function App() {
     } catch (e) {
       console.error('Account deletion error:', e);
     }
-    setIsSettingsOpen(false);
     handleOpenAuth('sign_up');
   };
   const [topBarConfig, setTopBarConfig] = useState<TopBarConfig>(() => getStoredTopBarConfig());
@@ -2355,8 +2351,10 @@ export default function App() {
       tab === 'operational-tiers'
     ) {
       setSettingsSection(tab === 'preferences' ? 'preferences' : 'control-center');
+      if (tab === 'preferences') setSettingsCategory('display');
+      else if (tab === 'roles' || tab === 'tiers' || tab === 'operational-tiers') setSettingsCategory('security');
+      else setSettingsCategory('all');
       setCurrentTab('settings');
-      setIsSettingsOpen(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -2447,9 +2445,9 @@ export default function App() {
         onOpenFactorySettings={handleOpenFactorySettings}
         onOpenAndroidPackage={() => setIsAndroidPackageModalOpen(true)}
         onOpenSettings={() => {
+          setSettingsCategory('all');
           setSettingsSection('control-center');
           setCurrentTab('settings');
-          setIsSettingsOpen(true);
         }}
         syncState={syncState}
         onToggleOnlineStatus={() => setSystemOffline(syncState.status === 'connected')}
@@ -2549,6 +2547,8 @@ export default function App() {
               onNavigate={handleNavigate}
               activeSection={settingsSection}
               onSelectSection={setSettingsSection}
+              initialCategory={settingsCategory}
+              onSelectCategory={setSettingsCategory}
               // Line Data Operations Hub Props
               checklists={checklists}
               selectedLineNo={selectedLineNo}
@@ -2669,55 +2669,6 @@ export default function App() {
           />
         )}
 
-        {isSettingsOpen && (
-          <SettingsModal
-            isOpen={isSettingsOpen}
-            onClose={() => setIsSettingsOpen(false)}
-            initialTab={settingsInitialTab}
-            currentTab={currentTab}
-            currentTheme={theme}
-            onSelectTheme={setTheme}
-            layout={layout}
-            onUpdateLayout={setLayout}
-            auditoryAlertsEnabled={auditoryAlertsEnabled}
-            onToggleAuditoryAlerts={setAuditoryAlertsEnabled}
-            onOpenPrivacySecurity={() => setIsPrivacySecurityOpen(true)}
-            factoryProfile={factoryProfile}
-            onUpdateFactoryProfile={handleUpdateFactoryProfile}
-            savedFactories={savedFactories}
-            onSaveFactoryList={handleSaveFactoryList}
-            onNavigate={handleNavigate}
-            dailyBackupSettings={dailyBackupSettings}
-            onUpdateDailyBackupSettings={setDailyBackupSettings}
-            onTriggerManualBackup={() => handleTriggerDailyBackup('manual')}
-            onOpenDatabaseModal={(tab) => {
-              setIsSettingsOpen(false);
-              setDatabaseInitialTab(tab || 'backup');
-              setIsDatabaseOpen(true);
-            }}
-            checklistProgress={checklistCompletionPct}
-            pendingTodosCount={pendingTodosCount}
-            unreadNotificationsCount={unreadNotificationsCount}
-            scorecardScore={scorecardResult.overallScore}
-            linesCount={currentDayLines.length}
-            profile={profile}
-            onOpenNotifications={() => setIsNotificationsOpen(true)}
-            onOpenChat={() => setIsChatOpen(true)}
-            onOpenScorecard={() => setIsScorecardOpen(true)}
-            onOpenUserModal={handleOpenUserModal}
-            onOpenAuth={() => setIsAuthPageOpen(true)}
-            onLockTerminal={handleLockTerminal}
-            onOpenAndroidPackage={() => setIsAndroidPackageModalOpen(true)}
-            onOpenDatabase={handleOpenDatabase}
-            onOpenFactorySettings={handleOpenFactorySettings}
-            lines={lines}
-            roleTiers={roleTiers}
-            onLogout={handleLogout}
-            onDeleteAccount={handleDeleteAccount}
-            onOpenEnterpriseWorkspaceManager={handleOpenEnterpriseWorkspaceManager}
-          />
-        )}
-
         {isUserModalOpen && (
           <UserModal
             isOpen={isUserModalOpen}
@@ -2768,8 +2719,9 @@ export default function App() {
             onUpdateDailyBackupSettings={setDailyBackupSettings}
             onOpenSettingsBackup={() => {
               setIsDatabaseOpen(false);
-              setSettingsInitialTab('backup');
-              setIsSettingsOpen(true);
+              setSettingsCategory('backup');
+              setSettingsSection('control-center');
+              setCurrentTab('settings');
             }}
             onTriggerManualBackup={() => handleTriggerDailyBackup('manual')}
             onOpenLineBookingModal={handleOpenLineBookingModal}
@@ -3165,6 +3117,7 @@ export default function App() {
           <AndroidPackageModal
             isOpen={isAndroidPackageModalOpen}
             onClose={() => setIsAndroidPackageModalOpen(false)}
+            profile={profile}
           />
         )}
 

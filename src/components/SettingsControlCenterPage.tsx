@@ -199,6 +199,10 @@ interface SettingsControlCenterPageProps {
   lines?: LineEntry[];
   onNavigate?: (tab: string, lineNo?: string) => void;
 
+  // Category & Navigation control
+  initialCategory?: SettingsCategory;
+  onSelectCategory?: (category: SettingsCategory) => void;
+
   // Controlled Section from App
   activeSection?: SettingsPageSection;
   onSelectSection?: (section: SettingsPageSection) => void;
@@ -312,6 +316,10 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
   lines = [],
   onNavigate,
 
+  // Category & Navigation control
+  initialCategory,
+  onSelectCategory,
+
   // Section handling
   activeSection: controlledSection,
   onSelectSection,
@@ -402,15 +410,30 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
 
   // Unified internal settings category - defaults to 'all' (Control Center & Overview)
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(() => {
+    if (initialCategory) return initialCategory;
     if (activeSection === 'preferences') return 'display';
     return 'all';
   });
+
+  useEffect(() => {
+    if (initialCategory) {
+      setActiveCategory(initialCategory);
+    }
+  }, [initialCategory]);
 
   useEffect(() => {
     if (!isCoreAdminUser && (activeCategory === 'android' || activeCategory === 'cicd')) {
       setActiveCategory('all');
     }
   }, [activeCategory, isCoreAdminUser]);
+
+  const handleSelectCategory = (cat: SettingsCategory) => {
+    setActiveCategory(cat);
+    if (onSelectCategory) {
+      onSelectCategory(cat);
+    }
+    triggerHaptic('selection');
+  };
 
   // Global Compact Density & Small Area Mode state
   const [currentDensity, setCurrentDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
@@ -1264,7 +1287,48 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
         </div>
       </header>
 
-      {/* 2. Main Settings Workspace (Full-Width Card-Style System without blank workspace voids) */}
+      {/* 2. Responsive Category Navigation Tabs Bar */}
+      <div className="w-full max-w-[1500px] mx-auto">
+        <nav aria-label="Settings Categories" className="bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl p-2 sm:p-2.5 shadow-2xs">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0">
+            {categories.map((cat) => {
+              const Icon = cat.icon;
+              const isActive = activeCategory === cat.id && !searchQuery;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    handleSelectCategory(cat.id);
+                    setSearchQuery('');
+                  }}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                    isActive
+                      ? 'bg-[#176f78] text-white shadow-xs font-bold'
+                      : 'text-[#527078] dark:text-slate-300 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] hover:text-[#17343a] dark:hover:text-white'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-[#176f78] dark:text-teal-400'}`} />
+                  <span>{cat.label}</span>
+                  {cat.badge && (
+                    <span
+                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
+                        isActive
+                          ? 'bg-white/20 text-white'
+                          : 'bg-black/5 dark:bg-white/10 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      {cat.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      </div>
+
+      {/* 3. Main Settings Workspace (Full-Width Card-Style System without blank workspace voids) */}
       <div className="w-full max-w-[1500px] mx-auto">
         {/* Settings Content Area */}
         <main className="w-full bg-white dark:bg-[#1c222b] border border-[#d9d2c2] dark:border-[#2e3846] rounded-2xl sm:rounded-3xl p-4 sm:p-5.5 shadow-2xs">
@@ -1460,8 +1524,24 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors shrink-0">
-                  <ChevronRight className="w-5 h-5" />
+                <div className="flex items-center gap-2.5 shrink-0">
+                  {onOpenChat && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenChat();
+                      }}
+                      className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#1f2630] text-xs font-semibold text-[#1a73e8] hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all cursor-pointer shadow-2xs"
+                      title="Open Google Chat"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Chat</span>
+                    </button>
+                  )}
+                  <div className="flex items-center text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                    <ChevronRight className="w-5 h-5" />
+                  </div>
                 </div>
               </div>
 
@@ -1557,126 +1637,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                 </div>
               )}
 
-              {/* 3. Tactile Quick Controls Grid (iOS Control Center / Android Quick Settings style) */}
-              <div>
-                <div className="mb-2.5 flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider">
-                    Control Center Quick Actions
-                  </span>
-                  <span className="text-[11px] text-[#176f78] dark:text-teal-400 font-medium">
-                    Tactile Floor Controls
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                  {/* Sound Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => onToggleAuditoryAlerts(!auditoryAlertsEnabled)}
-                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${
-                      auditoryAlertsEnabled
-                        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
-                        : 'bg-white dark:bg-[#181d24] border-[#d9d2c2] dark:border-[#2e3846] text-[#527078] dark:text-slate-400'
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1.5 ${
-                      auditoryAlertsEnabled ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                    }`}>
-                      {auditoryAlertsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                    </div>
-                    <span className="text-xs font-bold text-center leading-tight">
-                      {auditoryAlertsEnabled ? 'Sound On' : 'Muted'}
-                    </span>
-                    <span className="text-[9px] text-slate-400 mt-0.5">Floor Alerts</span>
-                  </button>
-
-                  {/* Theme Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => onSelectTheme(currentTheme === 'dark' ? 'light' : 'dark')}
-                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all cursor-pointer ${
-                      currentTheme === 'dark'
-                        ? 'bg-amber-400/15 border-amber-400/30 text-amber-600 dark:text-amber-400'
-                        : 'bg-white dark:bg-[#181d24] border-[#d9d2c2] dark:border-[#2e3846] text-[#17343a] dark:text-slate-200'
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1.5 ${
-                      currentTheme === 'dark' ? 'bg-amber-400 text-amber-950' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                    }`}>
-                      {currentTheme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                    </div>
-                    <span className="text-xs font-bold text-center leading-tight">
-                      {currentTheme === 'dark' ? 'Night Shift' : 'Warm Cream'}
-                    </span>
-                    <span className="text-[9px] text-slate-400 mt-0.5">Visual Mode</span>
-                  </button>
-
-                  {/* Lock Screen (Admin) */}
-                  {isMasterAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => onLockTerminal && onLockTerminal()}
-                      className="flex flex-col items-center justify-center p-3 rounded-2xl border bg-white dark:bg-[#181d24] border-[#d9d2c2] dark:border-[#2e3846] text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all cursor-pointer"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-1.5">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-bold text-center leading-tight">Lock Screen</span>
-                      <span className="text-[9px] text-slate-400 mt-0.5">PIN Security</span>
-                    </button>
-                  )}
-
-                  {/* Manual Snapshot */}
-                  {isMasterAdmin && (
-                    <button
-                      type="button"
-                      onClick={handleManualBackupClick}
-                      disabled={isBackingUp}
-                      className="flex flex-col items-center justify-center p-3 rounded-2xl border bg-white dark:bg-[#181d24] border-[#d9d2c2] dark:border-[#2e3846] text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-all cursor-pointer disabled:opacity-60"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-1.5">
-                        {isBackingUp ? (
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <HardDrive className="w-4 h-4" />
-                        )}
-                      </div>
-                      <span className="text-xs font-bold text-center leading-tight">
-                        {isBackingUp ? 'Backing Up' : 'Snapshot'}
-                      </span>
-                      <span className="text-[9px] text-slate-400 mt-0.5">IndexedDB</span>
-                    </button>
-                  )}
-
-                  {/* Google Chat */}
-                  <button
-                    type="button"
-                    onClick={() => onOpenChat && onOpenChat()}
-                    className="flex flex-col items-center justify-center p-3 rounded-2xl border bg-white dark:bg-[#181d24] border-[#d9d2c2] dark:border-[#2e3846] text-[#1a73e8] hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all cursor-pointer"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 text-[#1a73e8] flex items-center justify-center mb-1.5">
-                      <MessageSquare className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-bold text-center leading-tight">Google Chat</span>
-                    <span className="text-[9px] text-slate-400 mt-0.5">Spaces &bull; IE</span>
-                  </button>
-
-                  {/* Mobile App & Updates */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategory('android')}
-                    className="flex flex-col items-center justify-center p-3 rounded-2xl border bg-white dark:bg-[#181d24] border-[#d9d2c2] dark:border-[#2e3846] text-[#ff9500] hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-all cursor-pointer"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/40 text-[#ff9500] flex items-center justify-center mb-1.5">
-                      <Smartphone className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-bold text-center leading-tight">PWA &amp; APK</span>
-                    <span className="text-[9px] text-slate-400 mt-0.5">Offline Ready</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 4. GROUPED CARD SECTIONS (Flutter / Jetpack Compose / React Native Card System) */}
+              {/* 3. GROUPED CARD SECTIONS (Settings Categories Directory) */}
               <div className="space-y-5">
                 
                 {/* Section 1: Display & Ergonomics */}
@@ -1715,15 +1676,15 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                   </div>
                 </div>
 
-                {/* Section 2: Factory Operations & Analytics */}
+                {/* Section 2: Plant Identity & Operating Floors */}
                 <div>
                   <div className="px-1 mb-2 flex items-center justify-between">
                     <span className="text-xs font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider font-mono">
-                      Factory Operations &amp; Production Flow
+                      Plant Identity &amp; Operating Floors
                     </span>
                   </div>
                   <div className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
-                    {/* Row 1: Plant Identity */}
+                    {/* Plant Identity & Floors */}
                     <div
                       onClick={() => setActiveCategory('factory')}
                       className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
@@ -1744,58 +1705,6 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                       <div className="flex items-center gap-2.5 shrink-0">
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-[#176f78]/10 text-[#176f78] dark:text-teal-300 border border-[#176f78]/20">
                           {totalActiveLines} Lines Active
-                        </span>
-                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
-                      </div>
-                    </div>
-
-                    {/* Row 2: Pitch Calculator */}
-                    <div
-                      onClick={() => handleSetSection('capacity')}
-                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <SquircleIcon bgColor="bg-[#10b981]">
-                          <Calculator className="w-4 h-4 text-white" />
-                        </SquircleIcon>
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
-                            Line Capacity &amp; Pitch Calculator
-                          </div>
-                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
-                            Pitch time analysis, takt balancing, and SAM allocation
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                          Pitch Engine
-                        </span>
-                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
-                      </div>
-                    </div>
-
-                    {/* Row 3: Reports & Shift End Summary */}
-                    <div
-                      onClick={() => handleSetSection('reports')}
-                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <SquircleIcon bgColor="bg-[#007aff]">
-                          <FileSpreadsheet className="w-4 h-4 text-white" />
-                        </SquircleIcon>
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
-                            Shift End Summary &amp; Analytics Reports
-                          </div>
-                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
-                            Compile final WIP status, total achieved output, and bottleneck stage names into PDF
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                          Shift End PDF
                         </span>
                         <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
                       </div>
@@ -1885,7 +1794,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                     </span>
                   </div>
                   <div className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
-                    {/* Row 1: Security & RBAC */}
+                    {/* Security & RBAC */}
                     <div
                       onClick={() => setActiveCategory('security')}
                       className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
@@ -1910,34 +1819,6 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                         <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
                       </div>
                     </div>
-
-                    {/* Row 2: Tier_0 Root Command (System Admin Only) */}
-                    {isSysAdmin && (
-                      <div
-                        onClick={() => handleSetSection('tier_0')}
-                        className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-teal-500/5 transition-colors cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <SquircleIcon bgColor="bg-[#09353b]">
-                            <ShieldCheck className="w-4 h-4 text-teal-400" />
-                          </SquircleIcon>
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold text-teal-900 dark:text-teal-300 truncate group-hover:text-teal-600 dark:group-hover:text-teal-200 transition-colors">
-                              Tier_0 Root Command Suite
-                            </div>
-                            <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
-                              Schema Forge, Access Matrix, Plant Security, &amp; Deep System Controls
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 shrink-0">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
-                            Root Active
-                          </span>
-                          <ChevronRight className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -2008,6 +1889,44 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                   </div>
                 )}
 
+                {/* Section 7: Operational Workspaces & Centralized Hubs */}
+                <div>
+                  <div className="px-1 mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider font-mono">
+                      Operational Workspaces &amp; Frontline Hubs
+                    </span>
+                    <span className="text-[10px] font-mono text-[#007aff] dark:text-sky-400 font-bold">
+                      7 WORKSPACES
+                    </span>
+                  </div>
+                  <div className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
+                    <div
+                      onClick={() => setActiveCategory('hubs')}
+                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <SquircleIcon bgColor="bg-[#007aff]">
+                          <Layers className="w-4 h-4 text-white" />
+                        </SquircleIcon>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                            Centralized Operational Hubs
+                          </div>
+                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                            Line Data, Check List, Lean Tools, Pitch Calculator, Reports, WCM, &amp; UI Visualizer
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                          7 Hubs
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
           )}
@@ -2050,195 +1969,22 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                 </p>
               </div>
 
-              {/* Plant Identity Form */}
-              <form onSubmit={handleSavePlantIdentity} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#17343a] dark:text-slate-200 mb-1">
-                      Company / Group Name
-                    </label>
-                    <div className="relative">
-                      <Building className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                      <input
-                        type="text"
-                        value={factoryName}
-                        onChange={e => setFactoryName(e.target.value)}
-                        placeholder="e.g. Debonair LTD"
-                        className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-[#d9d2c2] dark:border-[#384454] bg-[#fbfaf6] dark:bg-[#151a21] text-[#17343a] dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-[#176f78]"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-[#17343a] dark:text-slate-200 mb-1">
-                      Active Unit Designation
-                    </label>
-                    <div className="relative">
-                      <Briefcase className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                      <input
-                        type="text"
-                        value={unitName}
-                        onChange={e => setUnitName(e.target.value)}
-                        placeholder="e.g. Unit-02 Manufacturing Complex"
-                        className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-[#d9d2c2] dark:border-[#384454] bg-[#fbfaf6] dark:bg-[#151a21] text-[#17343a] dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-[#176f78]"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-[#17343a] dark:text-slate-200 mb-1">
-                      Industry Sector
-                    </label>
-                    <input
-                      type="text"
-                      value={sector}
-                      onChange={e => setSector(e.target.value)}
-                      placeholder="e.g. Apparel & Garments (RMG)"
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-[#d9d2c2] dark:border-[#384454] bg-[#fbfaf6] dark:bg-[#151a21] text-[#17343a] dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-[#176f78]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-[#17343a] dark:text-slate-200 mb-1">
-                      Factory Facility Code
-                    </label>
-                    <input
-                      type="text"
-                      value={factoryCode}
-                      onChange={e => setFactoryCode(e.target.value)}
-                      placeholder="e.g. DBN-U02"
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-[#d9d2c2] dark:border-[#384454] bg-[#fbfaf6] dark:bg-[#151a21] text-[#17343a] dark:text-slate-100 font-mono focus:outline-hidden focus:ring-2 focus:ring-[#176f78]"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-[#17343a] dark:text-slate-200 mb-1">
-                      Facility Location / Address
-                    </label>
-                    <div className="relative">
-                      <MapPin className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                      <input
-                        type="text"
-                        value={location}
-                        onChange={e => setLocation(e.target.value)}
-                        placeholder="e.g. Gorai, Mirzapur, Tangail, Bangladesh"
-                        className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-[#d9d2c2] dark:border-[#384454] bg-[#fbfaf6] dark:bg-[#151a21] text-[#17343a] dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-[#176f78]"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <div className="text-xs text-[#527078] dark:text-slate-400">
-                    {isSavedPlant && (
-                      <span className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Changes saved successfully</span>
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 rounded-xl bg-[#176f78] text-white text-xs font-bold hover:bg-[#12555c] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>Save Plant Profile</span>
-                  </button>
-                </div>
-              </form>
-
-              {/* Operating Production Floors Section */}
-              <div className="pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846]">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h3 className="text-xs font-bold text-[#17343a] dark:text-slate-200 uppercase tracking-wider">
-                      Operating Production Floors ({totalActiveLines} Active Lines)
-                    </h3>
-                    <p className="text-[11px] text-[#527078] dark:text-slate-400">
-                      Standard unit divisions configured for floor supervision and balancing.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleSetSection('line-data')}
-                    className="text-xs font-bold text-[#176f78] dark:text-teal-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>View in Line Data</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {[
-                    { name: 'Padma', lines: 'Lines 01 - 06', count: 6, lineFilter: '1' },
-                    { name: 'Meghna', lines: 'Lines 07 - 12', count: 6, lineFilter: '7' },
-                    { name: 'Karnophuli', lines: 'Lines 13 - 17', count: 5, lineFilter: '13' },
-                    { name: 'Korotoya', lines: 'Lines 18 - 23', count: 6, lineFilter: '18' },
-                    { name: 'Shitalokshya', lines: 'Lines 24 - 29', count: 6, lineFilter: '24' },
-                    { name: 'Turag', lines: 'Lines 30 - 34', count: 5, lineFilter: '30' }
-                  ].map(f => (
-                    <div
-                      key={f.name}
-                      onClick={() => {
-                        handleSetSection('line-data');
-                        onSelectLineNo(f.lineFilter);
-                      }}
-                      className="p-3.5 rounded-xl border border-[#d9d2c2] dark:border-[#2e3846] bg-[#fbfaf6] dark:bg-[#181d24] hover:bg-white dark:hover:bg-[#202732] hover:border-[#176f78] transition-all cursor-pointer shadow-2xs group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-[#17343a] dark:text-slate-200 group-hover:text-[#176f78] transition-colors">
-                          {f.name}
-                        </span>
-                        <span className="text-[10px] font-mono text-[#527078] dark:text-slate-400">
-                          {f.count} Lines
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-[#527078] dark:text-slate-400 font-mono mt-1">
-                        {f.lines}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Working Hours & Shift Norms */}
-              <div className="pt-4 border-t border-[#e7e1d5] dark:border-[#2e3846] grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-3.5 rounded-xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846]">
-                  <div className="text-[11px] font-semibold text-[#527078] dark:text-slate-400">
-                    Standard Shift Hours
-                  </div>
-                  <div className="text-sm font-bold text-[#17343a] dark:text-slate-200 mt-1 font-mono">
-                    08:00 AM – 05:00 PM
-                  </div>
-                  <div className="text-[10px] text-[#527078] dark:text-slate-400 mt-0.5">
-                    9h duration · 1h lunch pause
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846]">
-                  <div className="text-[11px] font-semibold text-[#527078] dark:text-slate-400">
-                    Target Efficiency Baseline
-                  </div>
-                  <div className="text-sm font-bold text-[#17343a] dark:text-slate-200 mt-1 font-mono">
-                    68.0% Benchmark
-                  </div>
-                  <div className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5">
-                    IE standard for RMG jackets
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#fbfaf6] dark:bg-[#181d24] border border-[#d9d2c2] dark:border-[#2e3846]">
-                  <div className="text-[11px] font-semibold text-[#527078] dark:text-slate-400">
-                    Hourly Telemetry Slots
-                  </div>
-                  <div className="text-sm font-bold text-[#17343a] dark:text-slate-200 mt-1 font-mono">
-                    10 Production Hours
-                  </div>
-                  <div className="text-[10px] text-[#527078] dark:text-slate-400 mt-0.5">
-                    H1 (08-09) to H10 (18-19 OT)
-                  </div>
-                </div>
-              </div>
+              <PlantIdentityAndFloorsCustomizer
+                factoryProfile={factoryProfile}
+                onUpdateFactoryProfile={onUpdateFactoryProfile}
+                savedFactories={savedFactories}
+                onSaveFactoryList={onSaveFactoryList}
+                lines={lines}
+                onSaveLine={onSaveLine}
+                onSaveMultipleLines={onSaveMultipleLines}
+                onAddNewLine={onAddNewLine}
+                onDeleteLine={onDeleteLine}
+                onDeleteFloor={onDeleteFloor}
+                onSelectLineNo={onSelectLineNo}
+                onSelectFloor={onSelectFloor}
+                onNavigate={onNavigate}
+                profile={profile}
+              />
             </section>
           )}
 
@@ -2259,17 +2005,6 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                     </p>
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleSetSection('components');
-                        triggerHaptic('selection');
-                      }}
-                      className="px-3 py-1 rounded-xl bg-[#176f78] hover:bg-[#135a62] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-97 cursor-pointer"
-                    >
-                      <LayoutGrid className="w-3.5 h-3.5" />
-                      <span>Visualize All Components (48)</span>
-                    </button>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#176f78]/10 text-[#176f78] dark:text-teal-300 border border-[#176f78]/25">
                       {fontFamily.toUpperCase()} • {fontScale}% SCALE
                     </span>
@@ -3446,15 +3181,6 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={onOpenDataVault || (() => onOpenDatabase && onOpenDatabase('cloud-vault'))}
-                    className="px-4 py-2 rounded-xl bg-[#176f78] hover:bg-[#12555c] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Cloud className="w-3.5 h-3.5" />
-                    <span>Open Cloud Storage Hub</span>
-                  </button>
-
-                  <button
-                    type="button"
                     onClick={handleManualBackupClick}
                     disabled={isBackingUp}
                     className="px-3.5 py-2 rounded-xl border border-[#176f78] text-[#176f78] dark:text-teal-300 hover:bg-[#176f78]/10 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
@@ -3632,28 +3358,19 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                 </div>
               </div>
 
-              {/* Advanced Hub Links */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={onOpenDataVault || (() => onOpenDatabase && onOpenDatabase('cloud-vault'))}
-                  className="w-full py-3 rounded-xl bg-[#176f78] text-white hover:bg-[#12555c] text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Cloud className="w-4 h-4" />
-                  <span>Connect &amp; Sync Data Vaults (Dropbox, Terabox, Drive)</span>
-                </button>
-
-                {onOpenDatabase && (
+              {/* Advanced Hub Link */}
+              {onOpenDatabase && (
+                <div className="pt-2">
                   <button
                     type="button"
                     onClick={() => onOpenDatabase('backup')}
-                    className="w-full py-3 rounded-xl border border-[#176f78] text-[#176f78] dark:text-teal-400 hover:bg-[#176f78]/10 text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3 rounded-xl border border-[#176f78] text-[#176f78] dark:text-teal-400 hover:bg-[#176f78]/10 text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                   >
                     <HardDrive className="w-4 h-4" />
-                    <span>Open Advanced Data &amp; Telemetry Hub</span>
+                    <span>Open Advanced Data Vault &amp; Telemetry Hub</span>
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </section>
           )}
 

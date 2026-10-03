@@ -52,13 +52,17 @@ import {
   OtaInstallationProgressIndicator,
   OtaInstallStatus
 } from './OtaInstallationProgressIndicator';
+import { UserProfile } from '../types';
+import { isCoreAdmin } from '../utils/rbac';
 
 interface AndroidPackageModalProps {
   isOpen: boolean;
   onClose: () => void;
+  profile?: UserProfile;
 }
 
-export const AndroidPackageModal: React.FC<AndroidPackageModalProps> = ({ isOpen, onClose }) => {
+export const AndroidPackageModal: React.FC<AndroidPackageModalProps> = ({ isOpen, onClose, profile }) => {
+  const isCoreAdminUser = isCoreAdmin(profile);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // OTA In-App State
@@ -302,31 +306,38 @@ export const AndroidPackageModal: React.FC<AndroidPackageModalProps> = ({ isOpen
                 </div>
               </div>
 
-              {/* Channel Switcher */}
-              <div className="flex items-center bg-black/25 p-1 rounded-xl border border-white/10 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setSelectedChannel('production')}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                    selectedChannel === 'production'
-                      ? 'bg-white text-[#176f78] shadow-xs'
-                      : 'text-teal-200 hover:text-white'
-                  }`}
-                >
-                  Production (Stable)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedChannel('fast-track')}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                    selectedChannel === 'fast-track'
-                      ? 'bg-amber-400 text-amber-950 shadow-xs'
-                      : 'text-teal-200 hover:text-white'
-                  }`}
-                >
-                  Fast-Track (Nightly)
-                </button>
-              </div>
+              {/* Channel Switcher - Admin Only */}
+              {isCoreAdminUser ? (
+                <div className="flex items-center bg-black/25 p-1 rounded-xl border border-white/10 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedChannel('production')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      selectedChannel === 'production'
+                        ? 'bg-white text-[#176f78] shadow-xs'
+                        : 'text-teal-200 hover:text-white'
+                    }`}
+                  >
+                    Production (Stable)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedChannel('fast-track')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      selectedChannel === 'fast-track'
+                        ? 'bg-amber-400 text-amber-950 shadow-xs'
+                        : 'text-teal-200 hover:text-white'
+                    }`}
+                  >
+                    Fast-Track (Nightly)
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/20 border border-white/10 text-[11px] font-bold text-teal-200 shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Production Channel</span>
+                </div>
+              )}
             </div>
 
             {/* Telemetry Grid: Installed vs Available */}
@@ -496,107 +507,111 @@ export const AndroidPackageModal: React.FC<AndroidPackageModalProps> = ({ isOpen
             </div>
           </div>
 
-          {/* 2. AUTOMATIC 30-DAY CACHED ZIP INSTALLER PRUNER SECTION */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#e7e1d5] space-y-3.5 shadow-2xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e7e1d5] pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center shrink-0">
-                  <Archive className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-[#14363d] flex items-center gap-2">
-                    <span>Cached ZIP Installers &amp; 30-Day Auto-Pruner</span>
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      Auto-Prune Active
-                    </span>
-                  </h4>
-                  <p className="text-[11px] text-[#527078]">
-                    Automatically purges cached ZIP installers &amp; staging archives older than 30 days to free up system storage.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleManualPruneStorage}
-                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  title="Run 30-day cache pruning cycle immediately"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Run Auto-Pruner Now</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Pruning Feedback Banner if cleanup occurred */}
-            {autoPruneReport && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-950 font-medium">
+          {/* 2. AUTOMATIC 30-DAY CACHED ZIP INSTALLER PRUNER SECTION - Admin Only */}
+          {isCoreAdminUser && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#e7e1d5] space-y-3.5 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e7e1d5] pb-3">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>
-                    Auto-Prune Cycle complete: Cleared <strong>{autoPruneReport.prunedCount}</strong> archive(s) older than 30 days, freeing <strong>{autoPruneReport.freedMb}</strong>.
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center shrink-0">
+                    <Archive className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-[#14363d] flex items-center gap-2">
+                      <span>Cached ZIP Installers &amp; 30-Day Auto-Pruner</span>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        Auto-Prune Active
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-[#527078]">
+                      Automatically purges cached ZIP installers &amp; staging archives older than 30 days to free up system storage.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleManualPruneStorage}
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    title="Run 30-day cache pruning cycle immediately"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Run Auto-Pruner Now</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Pruning Feedback Banner if cleanup occurred */}
+              {autoPruneReport && (
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-950 font-medium">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      Auto-Prune Cycle complete: Cleared <strong>{autoPruneReport.prunedCount}</strong> archive(s) older than 30 days, freeing <strong>{autoPruneReport.freedMb}</strong>.
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-emerald-800">
+                    Ran at {autoPruneReport.lastPrunedAt}
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-emerald-800">
-                  Ran at {autoPruneReport.lastPrunedAt}
+              )}
+
+              {/* Cached ZIP Files Inventory */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-[#476369] uppercase font-mono block">
+                  Workstation Cached ZIP Archive Registry ({cachedInstallers.length} active files)
                 </span>
-              </div>
-            )}
 
-            {/* Cached ZIP Files Inventory */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-bold text-[#476369] uppercase font-mono block">
-                Workstation Cached ZIP Archive Registry ({cachedInstallers.length} active files)
-              </span>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {cachedInstallers.map((file, idx) => (
-                  <div
-                    key={file.id || idx}
-                    className="p-3 rounded-xl border border-[#e7e1d5] bg-[#faf8f4] flex items-center justify-between gap-2"
-                  >
-                    <div className="overflow-hidden">
-                      <div className="flex items-center gap-1.5">
-                        <FileCode className="w-3.5 h-3.5 text-[#176f78] shrink-0" />
-                        <span className="font-mono text-xs font-bold text-[#14363d] truncate" title={file.fileName}>
-                          {file.fileName}
-                        </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {cachedInstallers.map((file, idx) => (
+                    <div
+                      key={file.id || idx}
+                      className="p-3 rounded-xl border border-[#e7e1d5] bg-[#faf8f4] flex items-center justify-between gap-2"
+                    >
+                      <div className="overflow-hidden">
+                        <div className="flex items-center gap-1.5">
+                          <FileCode className="w-3.5 h-3.5 text-[#176f78] shrink-0" />
+                          <span className="font-mono text-xs font-bold text-[#14363d] truncate" title={file.fileName}>
+                            {file.fileName}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
+                          <span>{file.fileSizeMb}</span>
+                          <span>•</span>
+                          <span>Cached {file.ageDays} day(s) ago</span>
+                        </div>
                       </div>
-                      <div className="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
-                        <span>{file.fileSizeMb}</span>
-                        <span>•</span>
-                        <span>Cached {file.ageDays} day(s) ago</span>
+
+                      <div className="shrink-0 text-right">
+                        {file.ageDays > 30 ? (
+                          <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                            &gt;30d Prune Target
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            Retained (&lt;30d)
+                          </span>
+                        )}
                       </div>
                     </div>
-
-                    <div className="shrink-0 text-right">
-                      {file.ageDays > 30 ? (
-                        <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                          &gt;30d Prune Target
-                        </span>
-                      ) : (
-                        <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          Retained (&lt;30d)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Zip File Injector on System Updates Pusher Component */}
-          <ZipUpdateInjector
-            variant="card"
-            onUpdatePushed={pushed => {
-              setInjectedTick(t => t + 1);
-              setSelectedChannel(pushed.channel);
-              const updatedHistory = recordInstalledVersion(pushed, 'Zip File Injector');
-              setVersionHistory(updatedHistory);
-            }}
-          />
+          {/* Zip File Injector on System Updates Pusher Component - Core Admin Only */}
+          {isCoreAdminUser && (
+            <ZipUpdateInjector
+              variant="card"
+              onUpdatePushed={pushed => {
+                setInjectedTick(t => t + 1);
+                setSelectedChannel(pushed.channel);
+                const updatedHistory = recordInstalledVersion(pushed, 'Zip File Injector');
+                setVersionHistory(updatedHistory);
+              }}
+            />
+          )}
 
           {/* Release Notes for Current OTA Build */}
           <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] space-y-2.5">
@@ -668,142 +683,146 @@ export const AndroidPackageModal: React.FC<AndroidPackageModalProps> = ({ isOpen
             </div>
           </div>
 
-          {/* Native Android In-App OTA Architecture & Code Generator */}
-          <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e7e1d5] pb-2.5">
-              <div className="flex items-center gap-2">
-                <FileCode className="w-4 h-4 text-[#176f78]" />
-                <span className="text-xs font-black text-[#14363d]">Native Android OTA Update Engine Code</span>
-              </div>
-
-              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-                <button
-                  type="button"
-                  onClick={() => setActiveCodeSnippet('kotlin')}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
-                    activeCodeSnippet === 'kotlin' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  Kotlin Installer
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveCodeSnippet('firestore')}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
-                    activeCodeSnippet === 'firestore' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  Firestore Online Sync
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveCodeSnippet('session')}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
-                    activeCodeSnippet === 'session' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  Android 12+ Session
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveCodeSnippet('manifest')}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
-                    activeCodeSnippet === 'manifest' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  Manifest.xml
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveCodeSnippet('paths')}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
-                    activeCodeSnippet === 'paths' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  file_paths.xml
-                </button>
-              </div>
-            </div>
-
-            <div className="relative">
-              <button
-                onClick={() => {
-                  const code =
-                    activeCodeSnippet === 'kotlin'
-                      ? NATIVE_ANDROID_OTA_KOTLIN_CODE
-                      : activeCodeSnippet === 'firestore'
-                      ? NATIVE_ANDROID_FIRESTORE_SYNC_CODE
-                      : activeCodeSnippet === 'session'
-                      ? NATIVE_ANDROID_SESSION_INSTALLER_CODE
-                      : activeCodeSnippet === 'manifest'
-                      ? ANDROID_MANIFEST_OTA_SNIPPET
-                      : FILE_PATHS_XML_SNIPPET;
-                  copyToClipboard(code, 'ota_code');
-                }}
-                className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold font-mono flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                {copiedKey === 'ota_code' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                {copiedKey === 'ota_code' ? 'Copied' : 'Copy Code'}
-              </button>
-
-              <pre className="p-3 rounded-xl bg-[#0f282f] text-teal-200 font-mono text-[10px] overflow-x-auto max-h-48 leading-relaxed">
-                {activeCodeSnippet === 'kotlin' && NATIVE_ANDROID_OTA_KOTLIN_CODE}
-                {activeCodeSnippet === 'firestore' && NATIVE_ANDROID_FIRESTORE_SYNC_CODE}
-                {activeCodeSnippet === 'session' && NATIVE_ANDROID_SESSION_INSTALLER_CODE}
-                {activeCodeSnippet === 'manifest' && ANDROID_MANIFEST_OTA_SNIPPET}
-                {activeCodeSnippet === 'paths' && FILE_PATHS_XML_SNIPPET}
-              </pre>
-            </div>
-          </div>
-
-          {/* OTA Shift Policy & Automation Settings */}
-          <div className="p-4 rounded-2xl bg-[#f1eee6] border border-[#d9d2c2] space-y-3">
-            <h4 className="text-xs font-black uppercase tracking-wider text-[#14363d] flex items-center gap-1.5">
-              <Settings className="w-3.5 h-3.5 text-[#176f78]" />
-              Automated Shift OTA Policy
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl bg-white border border-[#d9d2c2] flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-bold text-[#14363d] block">Auto-Check on App Launch</span>
-                  <span className="text-[10px] text-[#527078]">Queries OTA server every time app boots</span>
+          {/* Native Android In-App OTA Architecture & Code Generator - Core Admin Only */}
+          {isCoreAdminUser && (
+            <div className="p-4 rounded-2xl bg-white border border-[#e7e1d5] space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e7e1d5] pb-2.5">
+                <div className="flex items-center gap-2">
+                  <FileCode className="w-4 h-4 text-[#176f78]" />
+                  <span className="text-xs font-black text-[#14363d]">Native Android OTA Update Engine Code</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleToggleAutoCheck}
-                  className={`w-10 h-6 rounded-full transition-colors p-0.5 cursor-pointer ${
-                    otaConfig.autoCheckEnabled ? 'bg-[#176f78]' : 'bg-slate-300'
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                      otaConfig.autoCheckEnabled ? 'translate-x-4' : 'translate-x-0'
+
+                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                  <button
+                    type="button"
+                    onClick={() => setActiveCodeSnippet('kotlin')}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
+                      activeCodeSnippet === 'kotlin' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
-                  />
-                </button>
+                  >
+                    Kotlin Installer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveCodeSnippet('firestore')}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
+                      activeCodeSnippet === 'firestore' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Firestore Online Sync
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveCodeSnippet('session')}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
+                      activeCodeSnippet === 'session' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Android 12+ Session
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveCodeSnippet('manifest')}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
+                      activeCodeSnippet === 'manifest' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Manifest.xml
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveCodeSnippet('paths')}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold cursor-pointer transition-colors ${
+                      activeCodeSnippet === 'paths' ? 'bg-[#176f78] text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    file_paths.xml
+                  </button>
+                </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-white border border-[#d9d2c2] flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-bold text-[#14363d] block">Shift Notification Alerts</span>
-                  <span className="text-[10px] text-[#527078]">Alerts supervisor if line update is released</span>
-                </div>
+              <div className="relative">
                 <button
-                  type="button"
-                  onClick={handleToggleShiftNotify}
-                  className={`w-10 h-6 rounded-full transition-colors p-0.5 cursor-pointer ${
-                    otaConfig.notifyOnShiftStart ? 'bg-[#176f78]' : 'bg-slate-300'
-                  }`}
+                  onClick={() => {
+                    const code =
+                      activeCodeSnippet === 'kotlin'
+                        ? NATIVE_ANDROID_OTA_KOTLIN_CODE
+                        : activeCodeSnippet === 'firestore'
+                        ? NATIVE_ANDROID_FIRESTORE_SYNC_CODE
+                        : activeCodeSnippet === 'session'
+                        ? NATIVE_ANDROID_SESSION_INSTALLER_CODE
+                        : activeCodeSnippet === 'manifest'
+                        ? ANDROID_MANIFEST_OTA_SNIPPET
+                        : FILE_PATHS_XML_SNIPPET;
+                    copyToClipboard(code, 'ota_code');
+                  }}
+                  className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold font-mono flex items-center gap-1 cursor-pointer transition-colors"
                 >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                      otaConfig.notifyOnShiftStart ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
+                  {copiedKey === 'ota_code' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  {copiedKey === 'ota_code' ? 'Copied' : 'Copy Code'}
                 </button>
+
+                <pre className="p-3 rounded-xl bg-[#0f282f] text-teal-200 font-mono text-[10px] overflow-x-auto max-h-48 leading-relaxed">
+                  {activeCodeSnippet === 'kotlin' && NATIVE_ANDROID_OTA_KOTLIN_CODE}
+                  {activeCodeSnippet === 'firestore' && NATIVE_ANDROID_FIRESTORE_SYNC_CODE}
+                  {activeCodeSnippet === 'session' && NATIVE_ANDROID_SESSION_INSTALLER_CODE}
+                  {activeCodeSnippet === 'manifest' && ANDROID_MANIFEST_OTA_SNIPPET}
+                  {activeCodeSnippet === 'paths' && FILE_PATHS_XML_SNIPPET}
+                </pre>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* OTA Shift Policy & Automation Settings - Core Admin Only */}
+          {isCoreAdminUser && (
+            <div className="p-4 rounded-2xl bg-[#f1eee6] border border-[#d9d2c2] space-y-3">
+              <h4 className="text-xs font-black uppercase tracking-wider text-[#14363d] flex items-center gap-1.5">
+                <Settings className="w-3.5 h-3.5 text-[#176f78]" />
+                Automated Shift OTA Policy
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-white border border-[#d9d2c2] flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-[#14363d] block">Auto-Check on App Launch</span>
+                    <span className="text-[10px] text-[#527078]">Queries OTA server every time app boots</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleAutoCheck}
+                    className={`w-10 h-6 rounded-full transition-colors p-0.5 cursor-pointer ${
+                      otaConfig.autoCheckEnabled ? 'bg-[#176f78]' : 'bg-slate-300'
+                    }`}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                        otaConfig.autoCheckEnabled ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-xl bg-white border border-[#d9d2c2] flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-[#14363d] block">Shift Notification Alerts</span>
+                    <span className="text-[10px] text-[#527078]">Alerts supervisor if line update is released</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleToggleShiftNotify}
+                    className={`w-10 h-6 rounded-full transition-colors p-0.5 cursor-pointer ${
+                      otaConfig.notifyOnShiftStart ? 'bg-[#176f78]' : 'bg-slate-300'
+                    }`}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                        otaConfig.notifyOnShiftStart ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
