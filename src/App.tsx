@@ -9,7 +9,7 @@ import { Dashboard } from './components/Dashboard';
 import { BottomNav } from './components/BottomNav';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { FloorWipSparkline } from './components/FloorWipSparkline';
-import { initAuth } from './lib/firebaseAuth';
+import { initAuth, googleSignOut } from './lib/firebaseAuth';
 import { Sparkles, Bot, MessageSquare, Activity, AlertTriangle, Flame, X, Video, Copy, Check, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { motion } from 'motion/react';
 import {
@@ -57,7 +57,8 @@ import {
   getStoredActiveFactory,
   setStoredActiveFactory,
   getStoredSavedFactories,
-  setStoredSavedFactories
+  setStoredSavedFactories,
+  DEFAULT_FACTORY_PROFILE
 } from './data/factoryProfiles';
 import type { SettingsTab } from './components/SettingsModal';
 import {
@@ -156,6 +157,7 @@ const PrivacySecurityModal = lazyWithRetry(() => import('./components/PrivacySec
 const TerminalLockScreen = lazyWithRetry(() => import('./components/TerminalLockScreen').then(m => ({ default: m.TerminalLockScreen })));
 const AndroidPackageModal = lazyWithRetry(() => import('./components/AndroidPackageModal').then(m => ({ default: m.AndroidPackageModal })));
 const LineBookingAndBudgetModal = lazyWithRetry(() => import('./components/LineBookingAndBudgetModal').then(m => ({ default: m.LineBookingAndBudgetModal })));
+const EnterpriseWorkspaceModal = lazyWithRetry(() => import('./components/enterprise/EnterpriseWorkspaceModal').then(m => ({ default: m.EnterpriseWorkspaceModal })));
 
 function TabLoadingSkeleton() {
   return (
@@ -541,6 +543,46 @@ export default function App() {
   const handleOpenAuth = (mode: ZeroTrustAuthMode = 'sign_in') => {
     setAuthPageInitialMode(mode);
     setIsAuthPageOpen(true);
+  };
+
+  const [isEnterpriseWorkspaceOpen, setIsEnterpriseWorkspaceOpen] = useState(false);
+  const [enterpriseWorkspaceInitialTab, setEnterpriseWorkspaceInitialTab] = useState<'registry' | 'ownership' | 'members' | 'create'>('registry');
+
+  const handleOpenEnterpriseWorkspaceManager = (initialTab: 'registry' | 'ownership' | 'members' | 'create' = 'registry') => {
+    setEnterpriseWorkspaceInitialTab(initialTab);
+    setIsEnterpriseWorkspaceOpen(true);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await googleSignOut();
+    } catch {}
+    setIsSettingsOpen(false);
+    setIsUserModalOpen(false);
+    handleOpenAuth('sign_in');
+  };
+
+  const handleDeleteAccount = () => {
+    try {
+      localStorage.removeItem('ie_user_profile');
+      localStorage.removeItem('local_user');
+      localStorage.removeItem('ie_active_factory_profile');
+      setFactoryProfile(DEFAULT_FACTORY_PROFILE);
+      setProfile({
+        userId: 'unconfigured-operator',
+        name: 'Unconfigured Operator',
+        email: 'guest@factory.local',
+        role: 'line_ie',
+        tierId: 'tier_4',
+        jobTitle: 'Line IE',
+        assignedUnit: 'Unit-02',
+        assignedWing: 'Blue Wing'
+      });
+    } catch (e) {
+      console.error('Account deletion error:', e);
+    }
+    setIsSettingsOpen(false);
+    handleOpenAuth('sign_up');
   };
   const [topBarConfig, setTopBarConfig] = useState<TopBarConfig>(() => getStoredTopBarConfig());
   const [isTopBarCustomizerOpen, setIsTopBarCustomizerOpen] = useState(false);
@@ -2314,6 +2356,7 @@ export default function App() {
     ) {
       setSettingsSection(tab === 'preferences' ? 'preferences' : 'control-center');
       setCurrentTab('settings');
+      setIsSettingsOpen(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -2406,6 +2449,7 @@ export default function App() {
         onOpenSettings={() => {
           setSettingsSection('control-center');
           setCurrentTab('settings');
+          setIsSettingsOpen(true);
         }}
         syncState={syncState}
         onToggleOnlineStatus={() => setSystemOffline(syncState.status === 'connected')}
@@ -2668,6 +2712,9 @@ export default function App() {
             onOpenFactorySettings={handleOpenFactorySettings}
             lines={lines}
             roleTiers={roleTiers}
+            onLogout={handleLogout}
+            onDeleteAccount={handleDeleteAccount}
+            onOpenEnterpriseWorkspaceManager={handleOpenEnterpriseWorkspaceManager}
           />
         )}
 
@@ -3142,6 +3189,19 @@ export default function App() {
             lines={lines}
             onSyncLinesWithBookings={handleSyncLinesWithBookings}
             profile={profile}
+          />
+        )}
+
+        {/* Enterprise Multi-Tenant Workspace & Sovereign Ownership Modal */}
+        {isEnterpriseWorkspaceOpen && (
+          <EnterpriseWorkspaceModal
+            isOpen={isEnterpriseWorkspaceOpen}
+            onClose={() => setIsEnterpriseWorkspaceOpen(false)}
+            profile={profile}
+            initialTab={enterpriseWorkspaceInitialTab}
+            onWorkspaceChanged={() => {
+              notifySave();
+            }}
           />
         )}
       </Suspense>

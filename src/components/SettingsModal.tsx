@@ -60,7 +60,11 @@ import {
   RotateCcw,
   Type,
   Vibrate,
-  Hash
+  Hash,
+  LogOut,
+  Trash2,
+  AlertTriangle,
+  Building2
 } from 'lucide-react';
 import { AndroidLogoIcon } from './AndroidLogoIcon';
 import {
@@ -79,7 +83,7 @@ import { triggerHaptic, setHapticsEnabled } from '../utils/haptics';
 import { DEFAULT_DAILY_BACKUP_SETTINGS } from '../utils/indexedDbBackup';
 import { DEFAULT_DASHBOARD_LAYOUT, SYSTEM_ADMIN_PROFILE } from '../mockData';
 import { playWipAlertSound, playBottleneckAlertSound } from '../utils/audioAlert';
-import { isMasterAdminOrAdmin, isSystemAdmin, SYSTEM_ADMIN_EMAIL } from '../utils/rbac';
+import { isMasterAdminOrAdmin, isSystemAdmin, isCoreAdmin, SYSTEM_ADMIN_EMAIL } from '../utils/rbac';
 import { Tier0CommandHub, TIER_0_MODULES, Tier0ModuleId } from './tier0/Tier0CommandHub';
 
 export type SettingsTab =
@@ -132,6 +136,9 @@ interface SettingsModalProps {
   onOpenFactorySettings?: () => void;
   lines?: LineEntry[];
   roleTiers?: RoleTier[];
+  onLogout?: () => void;
+  onDeleteAccount?: () => void;
+  onOpenEnterpriseWorkspaceManager?: (initialTab?: 'registry' | 'ownership' | 'members' | 'create') => void;
 }
 
 /**
@@ -225,16 +232,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenDatabase,
   onOpenFactorySettings,
   lines = [],
-  roleTiers = []
+  roleTiers = [],
+  onLogout,
+  onDeleteAccount,
+  onOpenEnterpriseWorkspaceManager
 }) => {
   const isMasterAdmin = isMasterAdminOrAdmin(profile);
   const isSysAdmin = isSystemAdmin(profile);
+  const isCoreAdminUser = isCoreAdmin(profile);
   const [selectedTier0Module, setSelectedTier0Module] = useState<Tier0ModuleId>('schema-forge');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Navigation stack state: 'root' (all settings list) or a sub-page id
   const [activeSubPage, setActiveSubPage] = useState<SettingsTab>(() => {
     const target = initialTab === 'modules' ? 'modules' : (initialTab || 'all');
-    if ((target === 'backup' || target === 'updates') && !isMasterAdmin) {
+    if ((target === 'backup' || target === 'updates') && !isCoreAdminUser && !isMasterAdmin) {
       return 'all';
     }
     if (target === 'tier_0' && !isSysAdmin) {
@@ -259,6 +273,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setUpdateStatusMsg('DGU-2 IE Control is up to date (Version 2.4.0).');
       setTimeout(() => setUpdateStatusMsg(null), 4500);
     }, 1200);
+  };
+
+  const handleConfirmDeleteAccount = () => {
+    if (deleteConfirmText.trim().toUpperCase() !== 'DELETE') return;
+    setIsDeletingAccount(true);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('ie_user_profile');
+        localStorage.removeItem('local_user');
+        localStorage.removeItem('ie_active_factory_profile');
+      }
+      if (onDeleteAccount) {
+        onDeleteAccount();
+      } else if (onLogout) {
+        onLogout();
+      }
+      setIsDeleteModalOpen(false);
+      onClose();
+    } catch (e) {
+      console.error('Failed to reset account', e);
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   const [modalFontFamily, setModalFontFamily] = useState<FontFamilyStyle>(() => {
@@ -906,13 +943,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center bg-black/65 backdrop-blur-xs animate-fadeIn overflow-hidden">
-      {/* 
-        Native Mobile Settings Container:
-        - Full-screen on mobile (< 640px) with safe area insets (edge-to-edge iOS Settings feel)
-        - Inset modal window on tablet/desktop (>= 640px) with rounded corners & shadow
-      */}
-      <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl bg-[#f2f2f7] dark:bg-[#000000] sm:rounded-3xl sm:border border-[#d1d1d6] dark:border-[#38383a] shadow-2xl flex flex-col overflow-hidden text-[#1c1c1e] dark:text-[#f2f2f7] transition-all">
+    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-xs animate-fadeIn overflow-hidden">
+      {/* Backdrop overlay dismiss */}
+      <div className="absolute inset-0" onClick={onClose} aria-label="Close Settings Drawer" />
+
+      {/* Slide-Up Bottom Drawer Sheet */}
+      <div className="relative w-full max-h-[92vh] sm:max-w-3xl md:max-w-4xl mx-auto bg-[#f2f2f7] dark:bg-[#121417] rounded-t-[28px] sm:rounded-t-[32px] border-t border-x border-[#d1d1d6] dark:border-[#2a2f38] shadow-2xl flex flex-col overflow-hidden text-[#1c1c1e] dark:text-[#f2f2f7] transition-all animate-in slide-in-from-bottom duration-300">
+        {/* Grab Handle */}
+        <div className="pt-2.5 pb-1 flex justify-center shrink-0 cursor-grab active:cursor-grabbing">
+          <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 transition-colors" />
+        </div>
         
         {/* iOS / Material Settings Navigation Bar (Top Sticky App Bar - Settings Default Header) */}
         <header className="sticky top-0 z-30 px-4 sm:px-6 py-3.5 bg-[#fbfbfd]/95 dark:bg-[#1c1c1e]/95 backdrop-blur-xl border-b border-[#c6c6c8]/60 dark:border-[#38383a]/60 flex items-center justify-between shrink-0 select-none pt-safe transition-colors">
@@ -1116,169 +1156,151 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {!searchQuery && activeSubPage === 'all' && (
             <div className="space-y-5">
               
-              {/* 1. APPLE ID / USER ACCOUNT HERO CARD */}
-              <div
-                onClick={() => {
-                  onClose();
-                  if (onOpenUserModal) onOpenUserModal('profile');
-                }}
-                className="bg-white dark:bg-[#1c1c1e] rounded-2xl sm:rounded-3xl border border-[#e5e5ea] dark:border-[#2c2c2e] p-3.5 sm:p-4 shadow-xs flex items-center justify-between gap-3 cursor-pointer hover:bg-[#fbfbfd] dark:hover:bg-[#252528] active:bg-[#e5e5ea] dark:active:bg-[#2c2c2e] transition-colors touch-manipulation"
-              >
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="relative">
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-[#176f78] via-[#007aff] to-[#5856d6] text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
-                      {profile?.name
-                        ? profile.name
-                            .split(' ')
-                            .map(n => n[0])
-                            .slice(0, 2)
-                            .join('')
-                            .toUpperCase()
-                        : 'IE'}
-                    </div>
-                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#1c1c1e]" />
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-[17px] font-bold text-[#000000] dark:text-white leading-tight truncate">
-                        {profile?.name || 'Debonair IE Admin'}
-                      </h3>
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#176f78]/15 text-[#176f78] dark:text-teal-300 font-mono shrink-0">
-                        {profile?.tierId ? profile.tierId.replace('_', ' ').toUpperCase() : (profile?.role ? profile.role.toUpperCase() : 'IE STAFF')}
-                      </span>
-                    </div>
-                    <p className="text-[13px] text-[#8e8e93] truncate mt-0.5">
-                      {profile?.jobTitle || 'Industrial Engineering Incharge'} • {profile?.email || 'applicationhub69@gmail.com'}
-                    </p>
-                    <div className="flex items-center gap-2 text-[11px] text-[#176f78] dark:text-teal-400 mt-1 font-medium">
-                      <span>{factoryProfile?.name || 'Debonair LTD'} ({factoryProfile?.unitName || 'Unit-02'})</span>
-                      <span>•</span>
-                      <span>{linesCount} Active Lines</span>
-                    </div>
+              {/* 1. USER ACCOUNT SECTION */}
+              <div className="space-y-3">
+                <div className="px-3 flex items-center justify-between">
+                  <span className="text-[12px] font-bold text-[#6e6e73] dark:text-[#8e8e93] uppercase tracking-wider">
+                    User Account &amp; Operator Profile
+                  </span>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>TLS 1.3 AUTHENTICATED</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 text-[#c7c7cc] shrink-0">
-                  <ChevronRight className="w-5 h-5" />
+                {/* Operator Profile Card */}
+                <div
+                  onClick={() => {
+                    onClose();
+                    if (onOpenUserModal) onOpenUserModal('profile');
+                  }}
+                  className="bg-white dark:bg-[#1a1f26] rounded-2xl sm:rounded-3xl border border-[#e5e5ea] dark:border-[#2a3240] p-4 shadow-xs flex items-center justify-between gap-3 cursor-pointer hover:bg-[#fbfbfd] dark:hover:bg-[#202732] active:bg-[#e5e5ea] dark:active:bg-[#28313e] transition-colors touch-manipulation"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="relative">
+                      {profile?.photoURL ? (
+                        <img
+                          src={profile.photoURL}
+                          alt={profile.name || 'User'}
+                          className="w-13 h-13 sm:w-14 sm:h-14 rounded-full object-cover shadow-sm ring-2 ring-teal-500/30"
+                        />
+                      ) : (
+                        <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-[#176f78] via-[#007aff] to-[#5856d6] text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
+                          {profile?.name
+                            ? profile.name
+                                .split(' ')
+                                .map(n => n[0])
+                                .slice(0, 2)
+                                .join('')
+                                .toUpperCase()
+                            : 'IE'}
+                        </div>
+                      )}
+                      <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#1c1c1e]" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-[17px] font-bold text-[#000000] dark:text-white leading-tight truncate">
+                          {profile?.name || 'Debonair IE Operator'}
+                        </h3>
+                        {/* Tier Badge Tier 0 to Tier 4 */}
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase shrink-0 border ${
+                          profile?.tierId === 'tier_0' || isCoreAdminUser
+                            ? 'bg-teal-500/20 text-teal-700 dark:text-teal-300 border-teal-500/40'
+                            : profile?.tierId === 'tier_1'
+                            ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30'
+                            : profile?.tierId === 'tier_2'
+                            ? 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30'
+                            : profile?.tierId === 'tier_3'
+                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                            : 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30'
+                        }`}>
+                          {profile?.tierId ? profile.tierId.replace('_', ' ').toUpperCase() : (isCoreAdminUser ? 'TIER 0' : 'TIER 4')}
+                        </span>
+                      </div>
+                      <p className="text-[13px] text-[#8e8e93] truncate mt-0.5">
+                        {profile?.jobTitle || (profile?.role ? profile.role.toUpperCase() : 'Industrial Engineer')} • {profile?.email || 'operator@factory.local'}
+                      </p>
+                      <div className="flex items-center gap-2 text-[11px] text-[#176f78] dark:text-teal-400 mt-1 font-medium">
+                        <span>{profile?.assignedWing || 'Blue Wing'}</span>
+                        <span>•</span>
+                        <span>{profile?.shift || 'General Shift (8:00 AM - 5:00 PM)'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-[#c7c7cc] shrink-0">
+                    <ChevronRight className="w-5 h-5" />
+                  </div>
+                </div>
+
+                {/* Assigned Production Facility summary & Instant Switch/Create Plant Identity */}
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#1a1f26] border border-[#e5e5ea] dark:border-[#2a3240] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-teal-500/15 dark:bg-teal-500/20 text-[#176f78] dark:text-teal-300 flex items-center justify-center shrink-0">
+                      <Factory className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        Assigned Production Facility
+                      </div>
+                      <div className="text-sm font-bold text-[#1c1c1e] dark:text-white flex items-center gap-2">
+                        <span>{factoryProfile?.name || 'Debonair LTD'}</span>
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 font-mono">
+                          ({factoryProfile?.unitName || 'DGU-2'})
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5">
+                        <span>{factoryProfile?.industrySector || 'Apparel & Garments'}</span>
+                        <span>•</span>
+                        <span>{linesCount} Active Lines</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      if (onOpenFactorySettings) onOpenFactorySettings();
+                    }}
+                    className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#176f78]/10 hover:bg-[#176f78]/20 dark:bg-teal-900/30 dark:hover:bg-teal-900/50 text-[#176f78] dark:text-teal-300 border border-[#176f78]/20 dark:border-teal-700/40 cursor-pointer transition-all active:scale-95 shrink-0"
+                  >
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>Switch / Create Plant Identity</span>
+                  </button>
+                </div>
+
+                {/* Delete Account Danger Zone */}
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                      <Trash2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-rose-900 dark:text-rose-300">
+                        Danger Zone • Delete Operator Account
+                      </div>
+                      <div className="text-[11px] text-rose-700/80 dark:text-rose-400/80">
+                        Clear local operator credentials and reset plant state to unconfigured factory defaults.
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteConfirmText('');
+                      setIsDeleteModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer transition-all active:scale-95 shrink-0 self-start sm:self-auto flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Account</span>
+                  </button>
                 </div>
               </div>
-
-              {/* TIER_0 ONLY EXCLUSIVE ENTRY - STRICTLY VISIBLE ONLY WHEN isSystemAdmin(profile) === true */}
-              {isSysAdmin && (
-                <div className="space-y-2">
-                  <div className="px-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-                      <span className="text-[12px] font-bold text-teal-800 dark:text-teal-400 uppercase tracking-wider font-mono">
-                        Tier_0 Only (entry from Settings)
-                      </span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
-                      ROOT CLEARANCE
-                    </span>
-                  </div>
-
-                  <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-linear-to-r from-slate-950 via-[#0e272c] to-[#09353b] text-white p-4 sm:p-5 border border-teal-500/30 shadow-lg">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3.5">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0" />
-                          <h3 className="text-base font-bold text-white font-display">
-                            0_Tier Master Console
-                          </h3>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40">
-                            ROOT CLEARANCE
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-300 mt-1 font-medium">
-                          Consolidated Development Systems • Maintaining Infrastructure • Core IE Frontline Tools
-                        </p>
-                        <p className="text-[11px] text-teal-300/80 font-mono mt-0.5">
-                          19 Engines Consolidated • System Administrator Clearance
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedTier0Module('schema-forge');
-                          setActiveSubPage('tier_0');
-                        }}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-teal-500 text-slate-950 hover:bg-teal-400 cursor-pointer shadow-md transition-all active:scale-95 shrink-0 self-start sm:self-auto"
-                      >
-                        <span>Open 0_Tier Console</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Fast Jump Action Buttons */}
-                    <div className="flex items-center gap-1.5 flex-wrap mt-3 pt-3 border-t border-white/10">
-                      <span className="text-[11px] font-mono text-teal-300 font-bold mr-1">SUITES:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedTier0Module('uiux-visualizer');
-                          setActiveSubPage('tier_0');
-                        }}
-                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-sky-500/20 hover:bg-sky-500 text-sky-200 hover:text-slate-950 border border-sky-500/30 transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <span>🛠️ Dev Tools</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedTier0Module('maintenance-hub');
-                          setActiveSubPage('tier_0');
-                        }}
-                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-500/20 hover:bg-indigo-500 text-indigo-200 hover:text-white border border-indigo-500/30 transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <span>🛡️ Maintaining</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedTier0Module('lean-toolkit');
-                          setActiveSubPage('tier_0');
-                        }}
-                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500/20 hover:bg-amber-400 text-amber-200 hover:text-slate-950 border border-amber-500/30 transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <span>⚙️ Core Tools</span>
-                      </button>
-                    </div>
-
-                    {/* Quick Engines Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
-                      {TIER_0_MODULES.slice(0, 8).map(mod => {
-                        const Icon = mod.icon;
-                        return (
-                          <button
-                            key={mod.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedTier0Module(mod.id);
-                              setActiveSubPage('tier_0');
-                            }}
-                            className="flex items-center gap-2 p-2 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 transition-all text-left cursor-pointer group"
-                          >
-                            <div className="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                              <Icon className="w-3.5 h-3.5" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-[11px] font-bold text-white truncate">
-                                {mod.name}
-                              </div>
-                              <div className="text-[8px] text-slate-400 font-mono truncate uppercase">
-                                {mod.badge}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* 2. CONTROL CENTER QUICK TILES GRID (iOS Control Center / Android Quick Settings) */}
               <div>
@@ -1391,8 +1413,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span className="text-[9px] text-[#8e8e93] leading-none mt-0.5">Spaces &bull; AI</span>
                   </button>
 
-                  {/* Tile 6: System Updates & Install - ONLY for Master Administration/Admin Role */}
-                  {isMasterAdmin && (
+                  {/* Tile 6: System Updates (Core Admin only) OR Performance Scorecard (Public/Regular Users) */}
+                  {isCoreAdminUser ? (
                     <button
                       type="button"
                       onClick={() => setActiveSubPage('updates')}
@@ -1405,17 +1427,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <span className="text-[11px] font-bold text-center leading-tight truncate w-full px-0.5">
                         System Update
                       </span>
-                      <span className="text-[9px] text-[#8e8e93] leading-none mt-0.5">Install &amp; APK</span>
+                      <span className="text-[9px] text-[#8e8e93] leading-none mt-0.5">Core Admin</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        if (onOpenScorecard) onOpenScorecard();
+                      }}
+                      className="flex flex-col items-center justify-center p-2.5 rounded-2xl border bg-white dark:bg-[#1c1c1e] border-[#e5e5ea] dark:border-[#2c2c2e] text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/30 transition-all cursor-pointer touch-manipulation active:scale-95"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-teal-100 dark:bg-teal-900/40 text-[#176f78] dark:text-teal-300 flex items-center justify-center mb-1">
+                        <Award className="w-4 h-4" />
+                      </div>
+                      <span className="text-[11px] font-bold text-center leading-tight truncate w-full px-0.5">
+                        Scorecard
+                      </span>
+                      <span className="text-[9px] text-[#8e8e93] leading-none mt-0.5">Performance</span>
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* 3. SECTION: PREFERENCES & DISPLAY */}
+              {/* 3. SECTION: DISPLAY & ERGONOMICS */}
               <div>
                 <div className="px-3 mb-1.5 flex items-center justify-between">
                   <span className="text-[12px] font-bold text-[#6e6e73] dark:text-[#8e8e93] uppercase tracking-wider">
-                    Preferences &amp; Display
+                    Display &amp; Ergonomics
                   </span>
                 </div>
 
@@ -1481,7 +1520,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     <div className="flex items-center gap-3">
                       <SquircleIcon bgColor="bg-[#5856d6]">
-                        <Layout className="w-4 h-4" />
+                        <Layout className="w-4 h-4 text-white" />
                       </SquircleIcon>
                       <div>
                         <div className="text-[16px] text-[#1c1c1e] dark:text-white font-normal leading-tight">
@@ -1495,25 +1534,71 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                     <ChevronRight className="w-4 h-4 text-[#c7c7cc]" />
                   </div>
+
+                  {/* Tabular Numerals Switch */}
+                  <div className="px-4 py-3 flex items-center justify-between min-h-[50px]">
+                    <div className="flex items-center gap-3">
+                      <SquircleIcon bgColor="bg-[#007aff]">
+                        <Hash className="w-4 h-4 text-white" />
+                      </SquircleIcon>
+                      <div>
+                        <div className="text-[16px] text-[#1c1c1e] dark:text-white font-normal leading-tight">
+                          Tabular Numerals
+                        </div>
+                        <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                          Align table digits vertically with uniform column spacing
+                        </div>
+                      </div>
+                    </div>
+
+                    <CupertinoSwitch
+                      checked={modalTabularNums}
+                      onChange={handleModalToggleTabularNums}
+                      ariaLabel="Toggle Tabular Numerals"
+                    />
+                  </div>
+
+                  {/* Haptic Feedback Switch */}
+                  <div className="px-4 py-3 flex items-center justify-between min-h-[50px]">
+                    <div className="flex items-center gap-3">
+                      <SquircleIcon bgColor="bg-[#34c759]">
+                        <Vibrate className="w-4 h-4 text-white" />
+                      </SquircleIcon>
+                      <div>
+                        <div className="text-[16px] text-[#1c1c1e] dark:text-white font-normal leading-tight">
+                          Tactile Haptic Feedback
+                        </div>
+                        <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                          Physical vibration on touch actions and status toggles
+                        </div>
+                      </div>
+                    </div>
+
+                    <CupertinoSwitch
+                      checked={modalHaptics}
+                      onChange={handleModalToggleHaptics}
+                      ariaLabel="Toggle Haptic Feedback"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* 4. SECTION: PRODUCTION CONTROL WORKSPACES (Primary 5 + View All) */}
+              {/* 4. SECTION: FACTORY OPERATIONS & PRODUCTION FLOW */}
               <div>
                 <div className="px-3 mb-1.5 flex items-center justify-between">
                   <span className="text-[12px] font-bold text-[#6e6e73] dark:text-[#8e8e93] uppercase tracking-wider">
-                    IE Workspaces &amp; Workstations ({ieNavigationModules.length})
+                    Factory Operations &amp; Production Flow ({ieNavigationModules.length})
                   </span>
                   <button
                     type="button"
                     onClick={() => setActiveSubPage('modules')}
                     className="text-[12px] text-[#007aff] font-semibold hover:underline cursor-pointer"
                   >
-                    See All
+                    View All
                   </button>
                 </div>
 
-                <div className="bg-white dark:bg-[#1c1c1e] rounded-2xl sm:rounded-3xl border border-[#e5e5ea] dark:border-[#2c2c2e] shadow-2xs overflow-hidden divide-y divide-[#e5e5ea] dark:divide-[#2c2c2e]">
+                <div className="bg-white dark:bg-[#1a1f26] rounded-2xl sm:rounded-3xl border border-[#e5e5ea] dark:border-[#2a3240] shadow-2xs overflow-hidden divide-y divide-[#e5e5ea] dark:divide-[#2a3240]">
                   {ieNavigationModules.slice(0, 5).map(m => {
                     const Icon = m.icon;
                     const isCurrent = currentTab === m.id;
@@ -1521,7 +1606,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div
                         key={m.id}
                         onClick={() => handleModuleLaunch(m.id)}
-                        className={`px-4 py-3 flex items-center justify-between gap-3 hover:bg-[#fbfbfd] dark:hover:bg-[#252528] active:bg-[#e5e5ea] dark:active:bg-[#2c2c2e] transition-colors cursor-pointer touch-manipulation min-h-[52px] ${
+                        className={`px-4 py-3 flex items-center justify-between gap-3 hover:bg-[#fbfbfd] dark:hover:bg-[#202732] active:bg-[#e5e5ea] dark:active:bg-[#28313e] transition-colors cursor-pointer touch-manipulation min-h-[52px] ${
                           isCurrent ? 'bg-[#007aff]/5 dark:bg-[#007aff]/10' : ''
                         }`}
                       >
@@ -1559,14 +1644,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {/* View All Workspaces Row */}
                   <div
                     onClick={() => setActiveSubPage('modules')}
-                    className="px-4 py-3 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#252528] active:bg-[#e5e5ea] dark:active:bg-[#2c2c2e] transition-colors cursor-pointer touch-manipulation text-[#007aff]"
+                    className="px-4 py-3 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#202732] active:bg-[#e5e5ea] dark:active:bg-[#28313e] transition-colors cursor-pointer touch-manipulation text-[#007aff]"
                   >
                     <div className="flex items-center gap-3">
                       <SquircleIcon bgColor="bg-[#007aff]">
                         <LayoutGrid className="w-4 h-4 text-white" />
                       </SquircleIcon>
                       <span className="text-[15px] font-semibold">
-                        View All 11 IE Workspaces &amp; Setup
+                        View All 11 IE Workspaces &amp; Floor Workbenches
                       </span>
                     </div>
                     <ChevronRight className="w-4 h-4 text-[#007aff]" />
@@ -1574,122 +1659,225 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* 5. SECTION: DATA & LOCAL SNAPSHOT BACKUP - ONLY for Master Administration/Admin Role */}
-              {isMasterAdmin && (
-                <div>
-                  <div className="px-3 mb-1.5 flex items-center justify-between">
-                    <span className="text-[12px] font-bold text-[#6e6e73] dark:text-[#8e8e93] uppercase tracking-wider">
-                      Data Persistence &amp; Storage
-                    </span>
-                    <span className="text-[11px] font-mono text-[#007aff] font-medium">IndexedDB</span>
-                  </div>
-
-                  <div className="bg-white dark:bg-[#1c1c1e] rounded-2xl sm:rounded-3xl border border-[#e5e5ea] dark:border-[#2c2c2e] shadow-2xs overflow-hidden divide-y divide-[#e5e5ea] dark:divide-[#2c2c2e]">
-                    {/* Master Backup Switch */}
-                    <div className="px-4 py-3 flex items-center justify-between min-h-[50px]">
-                      <div className="flex items-center gap-3">
-                        <SquircleIcon bgColor="bg-[#ff9500]">
-                          <HardDrive className="w-4 h-4" />
-                        </SquircleIcon>
-                        <div>
-                          <div className="text-[16px] text-[#1c1c1e] dark:text-white font-normal leading-tight">
-                            Automated Daily Backup
-                          </div>
-                          <div className="text-[12px] text-[#8e8e93] mt-0.5">
-                            Local IndexedDB snapshot at {dailyBackupSettings.dailyBackupTime || '18:00'}
-                          </div>
-                        </div>
-                      </div>
-
-                      <CupertinoSwitch
-                        checked={dailyBackupSettings.autoDailyBackupEnabled}
-                        onChange={val => handleUpdateBackup({ autoDailyBackupEnabled: val })}
-                        ariaLabel="Toggle Automated Daily Backup"
-                      />
-                    </div>
-
-                    {/* Backup Details Page Link */}
-                    <div
-                      onClick={() => setActiveSubPage('backup')}
-                      className="px-4 py-3 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#252528] active:bg-[#e5e5ea] dark:active:bg-[#2c2c2e] transition-colors cursor-pointer touch-manipulation min-h-[50px]"
-                    >
-                      <div className="flex items-center gap-3">
-                        <SquircleIcon bgColor="bg-[#34c759]">
-                          <Clock className="w-4 h-4" />
-                        </SquircleIcon>
-                        <div>
-                          <div className="text-[16px] text-[#1c1c1e] dark:text-white font-normal leading-tight">
-                            Backup Schedule &amp; Repository
-                          </div>
-                          <div className="text-[12px] text-[#8e8e93] mt-0.5">
-                            Configure retention, run snapshot, or restore
-                          </div>
-                        </div>
-                      </div>
-
-                      <ChevronRight className="w-4 h-4 text-[#c7c7cc]" />
-                    </div>
-
-                    {/* CSV Line Data Import Link */}
-                    <div
-                      onClick={() => {
-                        onClose();
-                        if (onOpenDatabase) onOpenDatabase('csv-import');
-                        else if (onOpenDatabaseModal) onOpenDatabaseModal('csv-import');
-                      }}
-                      className="px-4 py-3 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#252528] active:bg-[#e5e5ea] dark:active:bg-[#2c2c2e] transition-colors cursor-pointer touch-manipulation min-h-[50px]"
-                    >
-                      <div className="flex items-center gap-3">
-                        <SquircleIcon bgColor="bg-[#107c41]">
-                          <Upload className="w-4 h-4" />
-                        </SquircleIcon>
-                        <div>
-                          <div className="text-[16px] text-[#1c1c1e] dark:text-white font-normal leading-tight">
-                            Import Line Data (CSV / Excel)
-                          </div>
-                          <div className="text-[12px] text-[#8e8e93] mt-0.5">
-                            Bulk load SMVs, styles &amp; workstation targets
-                          </div>
-                        </div>
-                      </div>
-
-                      <ChevronRight className="w-4 h-4 text-[#c7c7cc]" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 6. SECTION: ABOUT & DEVICE SPECS */}
+              {/* 5. SECTION: FLOOR ALARMS & SOUND ALERTS */}
               <div>
                 <div className="px-3 mb-1.5 flex items-center justify-between">
                   <span className="text-[12px] font-bold text-[#6e6e73] dark:text-[#8e8e93] uppercase tracking-wider">
-                    About &amp; Platform Information
+                    Floor Alarms &amp; Sound Alerts
+                  </span>
+                  <span className="text-[11px] font-mono text-[#007aff] font-medium">
+                    {auditoryAlertsEnabled ? 'Acoustic Active' : 'Muted'}
                   </span>
                 </div>
 
-                <div className="bg-white dark:bg-[#1c1c1e] rounded-2xl sm:rounded-3xl border border-[#e5e5ea] dark:border-[#2c2c2e] shadow-2xs overflow-hidden divide-y divide-[#e5e5ea] dark:divide-[#2c2c2e]">
-                  <div className="px-4 py-3 flex items-center justify-between min-h-[48px]">
-                    <span className="text-[15px] text-[#1c1c1e] dark:text-white">Platform System</span>
-                    <span className="text-[14px] text-[#8e8e93] font-medium">DGU-2 IE Daily Control</span>
+                <div className="bg-white dark:bg-[#1a1f26] rounded-2xl sm:rounded-3xl border border-[#e5e5ea] dark:border-[#2a3240] shadow-2xs overflow-hidden divide-y divide-[#e5e5ea] dark:divide-[#2a3240]">
+                  {/* Master Alert Switch */}
+                  <div className="px-4 py-3 flex items-center justify-between min-h-[50px]">
+                    <div className="flex items-center gap-3">
+                      <SquircleIcon bgColor="bg-[#ff2d55]">
+                        <BellRing className="w-4 h-4 text-white" />
+                      </SquircleIcon>
+                      <div>
+                        <div className="text-[16px] text-[#1c1c1e] dark:text-white font-normal leading-tight">
+                          Floor Auditory Alarms
+                        </div>
+                        <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                          Real-time bottleneck warnings, WIP pacing chimes, and floor sirens
+                        </div>
+                      </div>
+                    </div>
+                    <CupertinoSwitch
+                      checked={auditoryAlertsEnabled}
+                      onChange={handleToggleAudio}
+                      ariaLabel="Toggle Floor Auditory Alerts"
+                    />
                   </div>
 
-                  <div className="px-4 py-3 flex items-center justify-between min-h-[48px]">
-                    <span className="text-[15px] text-[#1c1c1e] dark:text-white">Build Version</span>
-                    <span className="text-[14px] text-[#8e8e93] font-mono">v2.4.0 (PWA + TWA)</span>
+                  {/* Sound Testing & Profiles */}
+                  <div
+                    onClick={() => setActiveSubPage('alerts')}
+                    className="px-4 py-3 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#202732] active:bg-[#e5e5ea] dark:active:bg-[#28313e] transition-colors cursor-pointer touch-manipulation min-h-[50px]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <SquircleIcon bgColor="bg-[#34c759]">
+                        <Volume2 className="w-4 h-4 text-white" />
+                      </SquircleIcon>
+                      <div>
+                        <div className="text-[16px] text-[#1c1c1e] dark:text-white font-normal leading-tight">
+                          Acoustic Tone Profiles &amp; Test Chimes
+                        </div>
+                        <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                          High WIP warning tone (880Hz) &amp; Bottleneck alert chime (520Hz)
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-[#c7c7cc]" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 6. SECTION: DATA VAULT & STORAGE SYSTEMS */}
+              <div>
+                <div className="px-3 mb-1.5 flex items-center justify-between">
+                  <span className="text-[12px] font-bold text-[#6e6e73] dark:text-[#8e8e93] uppercase tracking-wider">
+                    Data Vault &amp; Storage Systems
+                  </span>
+                  <span className="text-[11px] font-mono text-[#007aff] font-medium">IndexedDB Local-First</span>
+                </div>
+
+                <div className="bg-white dark:bg-[#1a1f26] rounded-2xl sm:rounded-3xl border border-[#e5e5ea] dark:border-[#2a3240] shadow-2xs overflow-hidden divide-y divide-[#e5e5ea] dark:divide-[#2a3240]">
+                  {/* Master Backup Switch */}
+                  <div className="px-4 py-3 flex items-center justify-between min-h-[50px]">
+                    <div className="flex items-center gap-3">
+                      <SquircleIcon bgColor="bg-[#ff9500]">
+                        <HardDrive className="w-4 h-4 text-white" />
+                      </SquircleIcon>
+                      <div>
+                        <div className="text-[16px] text-[#1c1c1e] dark:text-white font-normal leading-tight">
+                          Automated Daily Backup
+                        </div>
+                        <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                          Local IndexedDB snapshot at {dailyBackupSettings.dailyBackupTime || '18:00'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <CupertinoSwitch
+                      checked={dailyBackupSettings.autoDailyBackupEnabled}
+                      onChange={val => handleUpdateBackup({ autoDailyBackupEnabled: val })}
+                      ariaLabel="Toggle Automated Daily Backup"
+                    />
                   </div>
 
-                  <div className="px-4 py-3 flex items-center justify-between min-h-[48px]">
-                    <span className="text-[15px] text-[#1c1c1e] dark:text-white">Active Plant</span>
-                    <span className="text-[14px] text-[#8e8e93] font-medium">
-                      {factoryProfile?.name || 'Debonair'} ({factoryProfile?.unitName || 'Unit-02'})
+                  {/* Backup Details Page Link */}
+                  <div
+                    onClick={() => setActiveSubPage('backup')}
+                    className="px-4 py-3 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#202732] active:bg-[#e5e5ea] dark:active:bg-[#28313e] transition-colors cursor-pointer touch-manipulation min-h-[50px]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <SquircleIcon bgColor="bg-[#34c759]">
+                        <Clock className="w-4 h-4 text-white" />
+                      </SquircleIcon>
+                      <div>
+                        <div className="text-[16px] text-[#1c1c1e] dark:text-white font-normal leading-tight">
+                          Backup Schedule &amp; Repository
+                        </div>
+                        <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                          Configure retention, run snapshot, or restore local state
+                        </div>
+                      </div>
+                    </div>
+
+                    <ChevronRight className="w-4 h-4 text-[#c7c7cc]" />
+                  </div>
+
+                  {/* CSV Line Data Import Link */}
+                  <div
+                    onClick={() => {
+                      onClose();
+                      if (onOpenDatabase) onOpenDatabase('csv-import');
+                      else if (onOpenDatabaseModal) onOpenDatabaseModal('csv-import');
+                    }}
+                    className="px-4 py-3 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#202732] active:bg-[#e5e5ea] dark:active:bg-[#28313e] transition-colors cursor-pointer touch-manipulation min-h-[50px]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <SquircleIcon bgColor="bg-[#107c41]">
+                        <Upload className="w-4 h-4 text-white" />
+                      </SquircleIcon>
+                      <div>
+                        <div className="text-[16px] text-[#1c1c1e] dark:text-white font-normal leading-tight">
+                          Import Line Data (CSV / Excel)
+                        </div>
+                        <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                          Bulk load SMVs, styles &amp; workstation targets
+                        </div>
+                      </div>
+                    </div>
+
+                    <ChevronRight className="w-4 h-4 text-[#c7c7cc]" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 7. SECTION: SECURITY & GOVERNANCE */}
+              <div>
+                <div className="px-3 mb-1.5 flex items-center justify-between">
+                  <span className="text-[12px] font-bold text-[#6e6e73] dark:text-[#8e8e93] uppercase tracking-wider">
+                    Security &amp; Governance
+                  </span>
+                  <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                    Zero-Trust Active
+                  </span>
+                </div>
+
+                <div className="bg-white dark:bg-[#1a1f26] rounded-2xl sm:rounded-3xl border border-[#e5e5ea] dark:border-[#2a3240] shadow-2xs overflow-hidden divide-y divide-[#e5e5ea] dark:divide-[#2a3240]">
+                  <div
+                    onClick={() => {
+                      onClose();
+                      if (onOpenPrivacySecurity) onOpenPrivacySecurity();
+                    }}
+                    className="px-4 py-3 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#202732] active:bg-[#e5e5ea] dark:active:bg-[#28313e] transition-colors cursor-pointer touch-manipulation min-h-[50px]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <SquircleIcon bgColor="bg-emerald-600">
+                        <ShieldCheck className="w-4 h-4 text-white" />
+                      </SquircleIcon>
+                      <div>
+                        <div className="text-[16px] text-[#1c1c1e] dark:text-white font-normal leading-tight">
+                          Zero-Trust RBAC &amp; Audit Logs
+                        </div>
+                        <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                          Cryptographic hash-chained audit trails &amp; strict floor boundaries
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-[#c7c7cc]" />
+                  </div>
+
+                  {onLockTerminal && (
+                    <div
+                      onClick={() => {
+                        onClose();
+                        onLockTerminal();
+                      }}
+                      className="px-4 py-3 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#202732] active:bg-[#e5e5ea] dark:active:bg-[#28313e] transition-colors cursor-pointer touch-manipulation min-h-[50px]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <SquircleIcon bgColor="bg-rose-500">
+                          <Lock className="w-4 h-4 text-white" />
+                        </SquircleIcon>
+                        <div>
+                          <div className="text-[16px] text-[#1c1c1e] dark:text-white font-normal leading-tight">
+                            Lock Terminal Workstation
+                          </div>
+                          <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                            Arm PIN tripwire and prevent unauthorized floor entries
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#c7c7cc]" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 8. SECTION: SYSTEM UPDATES & WORKSPACES (Strictly Core Admin Only) */}
+              {isCoreAdminUser && (
+                <div>
+                  <div className="px-3 mb-1.5 flex items-center justify-between">
+                    <span className="text-[12px] font-bold text-teal-800 dark:text-teal-400 uppercase tracking-wider font-mono">
+                      System Updates &amp; Workspaces (Core Admin Only)
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
+                      ROOT CLEARANCE
                     </span>
                   </div>
 
-                  {/* System Updates & Install - ONLY for Master Administration/Admin Role */}
-                  {isMasterAdmin && (
+                  <div className="bg-white dark:bg-[#1a1f26] rounded-2xl sm:rounded-3xl border border-teal-500/30 shadow-2xs overflow-hidden divide-y divide-[#e5e5ea] dark:divide-[#2a3240]">
+                    {/* System Updates & CI/CD Pipeline Row */}
                     <div
                       onClick={() => setActiveSubPage('updates')}
-                      className="px-4 py-3 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#252528] active:bg-[#e5e5ea] dark:active:bg-[#2c2c2e] transition-colors cursor-pointer touch-manipulation min-h-[50px] text-[#007aff]"
+                      className="px-4 py-3 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#202732] active:bg-[#e5e5ea] dark:active:bg-[#28313e] transition-colors cursor-pointer touch-manipulation min-h-[50px] text-[#007aff]"
                     >
                       <div className="flex items-center gap-3">
                         <SquircleIcon bgColor="bg-[#007aff]">
@@ -1697,10 +1885,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </SquircleIcon>
                         <div>
                           <div className="text-[16px] text-[#1c1c1e] dark:text-white font-medium leading-tight">
-                            System Updates &amp; Install
+                            System Updates &amp; CI/CD Pipelines
                           </div>
                           <div className="text-[12px] text-[#8e8e93] mt-0.5">
-                            v2.4.0 • Android APK package &amp; PWA install
+                            v2.4.0 • Android APK package &amp; PWA build channel
                           </div>
                         </div>
                       </div>
@@ -1713,37 +1901,89 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <ChevronRight className="w-4 h-4 text-[#c7c7cc]" />
                       </div>
                     </div>
-                  )}
 
-                  {/* Reset Settings to Factory Defaults - ONLY for Master Administration/Admin Role */}
-                  {isMasterAdmin && (
+                    {/* Multi-Tenant Enterprise Workspaces Row */}
                     <div
                       onClick={() => {
-                        if (onSelectTheme) onSelectTheme('light');
-                        if (onToggleAuditoryAlerts) onToggleAuditoryAlerts(true);
-                        if (onUpdateLayout) onUpdateLayout(DEFAULT_DASHBOARD_LAYOUT);
-                        setBackupToast('Settings restored to factory defaults (Theme, Layout, Alerts)');
-                        setTimeout(() => setBackupToast(null), 3500);
+                        onClose();
+                        if (onOpenEnterpriseWorkspaceManager) {
+                          onOpenEnterpriseWorkspaceManager('registry');
+                        }
                       }}
-                      className="px-4 py-3 flex items-center justify-between hover:bg-rose-500/5 active:bg-rose-500/10 transition-colors cursor-pointer touch-manipulation min-h-[50px] text-rose-600 dark:text-rose-400"
+                      className="px-4 py-3 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#202732] active:bg-[#e5e5ea] dark:active:bg-[#28313e] transition-colors cursor-pointer touch-manipulation min-h-[50px]"
                     >
                       <div className="flex items-center gap-3">
-                        <SquircleIcon bgColor="bg-rose-500">
-                          <RotateCcw className="w-4 h-4 text-white" />
+                        <SquircleIcon bgColor="bg-[#176f78]">
+                          <Building2 className="w-4 h-4 text-white" />
                         </SquircleIcon>
                         <div>
-                          <div className="text-[16px] font-medium leading-tight text-rose-600 dark:text-rose-400">
-                            Reset Settings to Defaults
+                          <div className="text-[16px] text-[#1c1c1e] dark:text-white font-medium leading-tight">
+                            Enterprise Workspaces Registry &amp; Ownership Hub
                           </div>
                           <div className="text-[12px] text-[#8e8e93] mt-0.5">
-                            Restores default theme, widget layout &amp; alert tones
+                            Manage multi-tenant workspaces, isolation namespaces, &amp; sovereignty
                           </div>
                         </div>
                       </div>
                       <ChevronRight className="w-4 h-4 text-[#c7c7cc]" />
                     </div>
-                  )}
+
+                    {/* 0_Tier Master Console */}
+                    <div
+                      onClick={() => {
+                        setSelectedTier0Module('schema-forge');
+                        setActiveSubPage('tier_0');
+                      }}
+                      className="px-4 py-3 flex items-center justify-between hover:bg-[#fbfbfd] dark:hover:bg-[#202732] active:bg-[#e5e5ea] dark:active:bg-[#28313e] transition-colors cursor-pointer touch-manipulation min-h-[50px]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <SquircleIcon bgColor="bg-slate-900">
+                          <ShieldCheck className="w-4 h-4 text-teal-400" />
+                        </SquircleIcon>
+                        <div>
+                          <div className="text-[16px] text-[#1c1c1e] dark:text-white font-medium leading-tight">
+                            0_Tier Master Console (19 Engines)
+                          </div>
+                          <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                            Dev tools, maintenance hub, &amp; lean industrial engineering core
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#c7c7cc]" />
+                    </div>
+                  </div>
                 </div>
+              )}
+
+              {/* 9. SECTION: LOGOUT */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    if (onLogout) {
+                      onLogout();
+                    } else if (onOpenAuth) {
+                      onOpenAuth();
+                    }
+                  }}
+                  className="w-full p-4 rounded-2xl bg-white dark:bg-[#1a1f26] hover:bg-rose-50/60 dark:hover:bg-rose-950/20 active:bg-rose-100/60 border border-[#e5e5ea] dark:border-[#2a3240] hover:border-rose-300 dark:hover:border-rose-900/50 shadow-xs flex items-center justify-between text-rose-600 dark:text-rose-400 cursor-pointer transition-all touch-manipulation group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <LogOut className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-[15px] font-bold leading-tight">
+                        Logout &amp; Terminate Session
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        Securely end authenticated TLS session and lock terminal
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-rose-600 transition-colors" />
+                </button>
               </div>
 
             </div>
@@ -2651,6 +2891,91 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </footer>
 
       </div>
+
+      {/* Delete Account Safety Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+          <div
+            className="absolute inset-0"
+            onClick={() => {
+              if (!isDeletingAccount) setIsDeleteModalOpen(false);
+            }}
+          />
+          <div className="relative w-full max-w-md bg-white dark:bg-[#1a1f26] rounded-2xl border border-rose-200 dark:border-rose-900/50 shadow-2xl p-5 space-y-4 z-10 animate-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
+                  Danger Zone: Delete Account &amp; Reset Plant
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  This action is permanent and irreversible. Your operator profile, authentication keys, and assigned facility customization will be wiped from this device.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                disabled={isDeletingAccount}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-800 dark:text-rose-300 space-y-1.5 font-mono">
+              <div className="flex items-center gap-1.5 font-bold">
+                <span>Account:</span>
+                <span className="text-slate-800 dark:text-white truncate">{profile?.email || 'operator@factory.local'}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span>Plant state:</span>
+                <span>Reset to unconfigured factory defaults</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                To confirm, type <span className="text-rose-600 dark:text-rose-400 font-mono font-bold tracking-wider">DELETE</span> below:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type DELETE to confirm"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#12161c] text-sm font-mono font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-rose-500"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                disabled={isDeletingAccount}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteAccount}
+                disabled={deleteConfirmText.trim().toUpperCase() !== 'DELETE' || isDeletingAccount}
+                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${
+                  deleteConfirmText.trim().toUpperCase() === 'DELETE' && !isDeletingAccount
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white active:scale-95'
+                    : 'bg-rose-200 dark:bg-rose-950/40 text-rose-400 dark:text-rose-700 cursor-not-allowed opacity-60'
+                }`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDeletingAccount ? 'Deleting...' : 'Delete Account & Reset'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -1049,18 +1049,22 @@ export interface WorkspaceMember {
   designation?: string;
   phone?: string;
   avatarColor?: string;
-  addedAt: string;
+  addedAt?: string;
+  joinedAt?: string;
+  status?: 'active' | 'pending' | 'suspended';
+  invitedBy?: string;
 }
 
 export interface EnterpriseWorkspace {
   id: string;
   name: string;
   code: string;
+  slug?: string;
   description?: string;
   ownerId: string;
   ownerEmail: string;
   ownerName: string;
-  tier: 'enterprise_free' | 'enterprise_pro' | 'enterprise_sovereign';
+  tier?: 'enterprise_free' | 'enterprise_pro' | 'enterprise_sovereign';
   status: 'active' | 'archived';
   members: WorkspaceMember[];
   plants: EnterprisePlant[];
@@ -1068,6 +1072,27 @@ export interface EnterpriseWorkspace {
   storageNamespace: string;
   createdAt: string;
   updatedAt: string;
+  brandColor?: string;
+  logoIcon?: string;
+  industrySector?: string;
+  headquarters?: string;
+  country?: string;
+  contactEmail?: string;
+  establishedYear?: string;
+  subscriptionTier?: string;
+  isCustom?: boolean;
+  ownershipTransferredAt?: string;
+  previousOwners?: {
+    ownerEmail: string;
+    ownerName: string;
+    transferredAt: string;
+    actionTaken: string;
+    userId?: string;
+    name?: string;
+    email?: string;
+  }[];
+  accessPolicy?: 'domain_matched' | 'domain_restricted' | 'invite_only' | 'open' | 'open_organization';
+  allowedDomains?: string[];
 }
 
 export interface ManagementMember {

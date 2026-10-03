@@ -113,7 +113,7 @@ import {
   AuditCheckItem,
   CenterlineAuditItem
 } from '../types/dcs';
-import { isMasterAdminOrAdmin, isSystemAdmin } from '../utils/rbac';
+import { isMasterAdminOrAdmin, isSystemAdmin, isCoreAdmin } from '../utils/rbac';
 import { playBottleneckAlertSound, playWipAlertSound } from '../utils/audioAlert';
 import { ActiveOperationalTiers } from './ActiveOperationalTiers';
 import { Tier0CommandHub } from './tier0/Tier0CommandHub';
@@ -370,6 +370,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
 }) => {
   const isSysAdmin = isSystemAdmin(profile);
   const isMasterAdmin = isMasterAdminOrAdmin(profile);
+  const isCoreAdminUser = isCoreAdmin(profile);
 
   const [internalSection, setInternalSection] = useState<SettingsPageSection>('control-center');
   const activeSection = controlledSection || internalSection;
@@ -404,6 +405,12 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
     if (activeSection === 'preferences') return 'display';
     return 'all';
   });
+
+  useEffect(() => {
+    if (!isCoreAdminUser && (activeCategory === 'android' || activeCategory === 'cicd')) {
+      setActiveCategory('all');
+    }
+  }, [activeCategory, isCoreAdminUser]);
 
   // Global Compact Density & Small Area Mode state
   const [currentDensity, setCurrentDensity] = useState<'compact' | 'comfortable' | 'spacious'>(() => {
@@ -898,14 +905,26 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
       color: 'bg-[#ff3b30]',
       badge: profile.tierId ? profile.tierId.replace('_', ' ').toUpperCase() : 'RBAC'
     },
-    {
-      id: 'android' as SettingsCategory,
-      label: 'System Updates',
-      description: 'Platform version, OTA hotfixes, & PWA offline cache',
-      icon: DownloadCloud,
-      color: 'bg-[#ff9500]',
-      badge: 'Up to Date'
-    },
+    ...(isCoreAdminUser
+      ? [
+          {
+            id: 'android' as SettingsCategory,
+            label: 'System Updates',
+            description: 'Platform version, OTA hotfixes, & PWA offline cache',
+            icon: DownloadCloud,
+            color: 'bg-[#ff9500]',
+            badge: 'Up to Date'
+          },
+          {
+            id: 'cicd' as SettingsCategory,
+            label: 'CI/CD & DevOps Pipeline',
+            description: 'Witcher6T9/DGU-2-IE-Control GitHub Actions: automated build, test & deploy',
+            icon: GitBranch,
+            color: 'bg-[#176f78]',
+            badge: 'Automated'
+          }
+        ]
+      : []),
     {
       id: 'hubs' as SettingsCategory,
       label: 'Operational Hubs',
@@ -913,14 +932,6 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
       icon: Layers,
       color: 'bg-[#007aff]',
       badge: '6 Hubs'
-    },
-    {
-      id: 'cicd' as SettingsCategory,
-      label: 'CI/CD & DevOps Pipeline',
-      description: 'Witcher6T9/DGU-2-IE-Control GitHub Actions: automated build, test & deploy',
-      icon: GitBranch,
-      color: 'bg-[#176f78]',
-      badge: 'Automated'
     }
   ];
 
@@ -1289,7 +1300,7 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                   { id: 'capacity-calc', title: 'Line Capacity & Pitch Calculator', subtitle: 'Takt time balancing, pitch time, and SAM allocation', icon: Calculator, color: 'bg-[#10b981]', action: () => handleSetSection('capacity'), badge: 'IE Engine' },
                   { id: 'reports-hub', title: 'Shift End Summary & Analytics Reports', subtitle: 'Compile final WIP status, total achieved output, and bottleneck stage names', icon: FileSpreadsheet, color: 'bg-[#007aff]', action: () => handleSetSection('reports'), badge: 'PDF Ready' },
                   { id: 'db-backup', title: 'IndexedDB Vault Snapshot', subtitle: 'Local indexed storage backup and data restore', icon: Database, color: 'bg-[#34c759]', action: handleManualBackupClick, badge: 'IndexedDB' },
-                  { id: 'pwa-android', title: 'System Updates & PWA Offline', subtitle: 'OTA hotfixes, service worker precache, and installation package', icon: DownloadCloud, color: 'bg-[#ff9500]', action: () => setActiveCategory('android'), badge: 'Up to Date' }
+                  ...(isCoreAdminUser ? [{ id: 'pwa-android', title: 'System Updates & PWA Offline', subtitle: 'OTA hotfixes, service worker precache, and installation package', icon: DownloadCloud, color: 'bg-[#ff9500]', action: () => setActiveCategory('android'), badge: 'Up to Date' }] : [])
                 ].filter(a => a.title.toLowerCase().includes(query) || a.subtitle.toLowerCase().includes(query));
 
                 const totalMatches = matchedCategories.length + quickActions.length;
@@ -1930,93 +1941,72 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
                   </div>
                 </div>
 
-                {/* Section 6: System Updates & Workspaces */}
-                <div>
-                  <div className="px-1 mb-2 flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#527078] dark:text-slate-400 uppercase tracking-wider font-mono">
-                      System Updates &amp; Workspaces
-                    </span>
-                  </div>
-                  <div className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-[#d9d2c2] dark:border-[#2e3846] shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
-                    {/* Row 1: System Updates */}
-                    <div
-                      onClick={() => setActiveCategory('android')}
-                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <SquircleIcon bgColor="bg-[#ff9500]">
-                          <DownloadCloud className="w-4 h-4 text-white" />
-                        </SquircleIcon>
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
-                            System Updates
-                          </div>
-                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
-                            Offline service worker cache, OTA updates, &amp; APK package
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                          Up to Date
-                        </span>
-                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
-                      </div>
+                {/* Section 6: System Updates & Workspaces (Exclusively Core Admin Only) */}
+                {isCoreAdminUser && (
+                  <div>
+                    <div className="px-1 mb-2 flex items-center justify-between">
+                      <span className="text-xs font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider font-mono">
+                        System Updates &amp; Workspaces (Core Admin Only)
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
+                        DEVOPS &bull; CI/CD
+                      </span>
                     </div>
-
-                    {/* Row 2: Operational Hubs */}
-                    <div
-                      onClick={() => setActiveCategory('hubs')}
-                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <SquircleIcon bgColor="bg-[#007aff]">
-                          <Layers className="w-4 h-4 text-white" />
-                        </SquircleIcon>
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
-                            IE Operational Workspaces &amp; Launchpad
-                          </div>
-                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
-                            Direct jump into Line Data, Check List, Lean Tools, WCM, Reports, &amp; Capacity
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                          6 Hubs
-                        </span>
-                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
-                      </div>
-                    </div>
-
-                    {/* Row 3: CI/CD & DevOps Pipeline */}
-                    <div
-                      onClick={() => setActiveCategory('cicd')}
-                      className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <SquircleIcon bgColor="bg-[#176f78]">
-                          <GitBranch className="w-4 h-4 text-white" />
-                        </SquircleIcon>
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
-                            CI/CD &amp; DevOps Pipeline
-                          </div>
-                          <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
-                            Witcher6T9/DGU-2-IE-Control GitHub Actions: automated build, test &amp; deploy
+                    <div className="bg-white dark:bg-[#181d24] rounded-2xl sm:rounded-3xl border border-teal-500/30 shadow-2xs overflow-hidden divide-y divide-[#e7e1d5] dark:divide-[#2e3846]">
+                      {/* Row 1: System Updates */}
+                      <div
+                        onClick={() => setActiveCategory('android')}
+                        className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <SquircleIcon bgColor="bg-[#ff9500]">
+                            <DownloadCloud className="w-4 h-4 text-white" />
+                          </SquircleIcon>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                              System Updates
+                            </div>
+                            <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                              Offline service worker cache, OTA updates, &amp; APK package
+                            </div>
                           </div>
                         </div>
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                            Up to Date
+                          </span>
+                          <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-teal-500/10 text-[#176f78] dark:text-teal-300 border border-[#176f78]/20">
-                          Automated
-                        </span>
-                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+
+                      {/* Row 2: CI/CD & DevOps Pipeline */}
+                      <div
+                        onClick={() => setActiveCategory('cicd')}
+                        className="px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-[#fbfaf6] dark:hover:bg-[#232a34] transition-colors cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <SquircleIcon bgColor="bg-[#176f78]">
+                            <GitBranch className="w-4 h-4 text-white" />
+                          </SquircleIcon>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-[#17343a] dark:text-slate-100 truncate group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors">
+                              CI/CD &amp; DevOps Pipeline
+                            </div>
+                            <div className="text-xs text-[#527078] dark:text-slate-400 truncate">
+                              Witcher6T9/DGU-2-IE-Control GitHub Actions: automated build, test &amp; deploy
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-teal-500/10 text-[#176f78] dark:text-teal-300 border border-[#176f78]/20">
+                            Automated
+                          </span>
+                          <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#176f78] dark:group-hover:text-teal-400 transition-colors" />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
               </div>
             </div>
@@ -3754,9 +3744,9 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
           )}
 
           {/* ========================================================
-              CATEGORY 6: SYSTEM UPDATES
+              CATEGORY 6: SYSTEM UPDATES (Core Admin Only)
           ======================================================== */}
-          {activeCategory === 'android' && (
+          {activeCategory === 'android' && isCoreAdminUser && (
             <section className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4">
                 <div>
@@ -3925,9 +3915,9 @@ export const SettingsControlCenterPage: React.FC<SettingsControlCenterPageProps>
           )}
 
           {/* ========================================================
-              CATEGORY 8: CI/CD & DEVOPS PIPELINE (Witcher6T9/DGU-2-IE-Control)
+              CATEGORY 8: CI/CD & DEVOPS PIPELINE (Core Admin Only)
           ======================================================== */}
-          {activeCategory === 'cicd' && (
+          {activeCategory === 'cicd' && isCoreAdminUser && (
             <section className="space-y-6">
               <div className="border-b border-[#e7e1d5] dark:border-[#2e3846] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>

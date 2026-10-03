@@ -214,8 +214,8 @@ export const UserModal: React.FC<UserModalProps> = ({
     const isTargetAdminEmail = cleanEmail === SYSTEM_ADMIN_EMAIL.toLowerCase();
 
     // Prevent non-admin emails from selecting tier_0
-    if (selectedTierId === 'tier_0' && !isTargetAdminEmail) {
-      alert(`Master System Administrator (Tier 0) is restricted exclusively to ${SYSTEM_ADMIN_EMAIL}. Please select Tier 1, 2, 3 or 4.`);
+    if (selectedTierId === 'tier_0' && !isTargetAdminEmail && !isSystemAdmin(profile)) {
+      setGoogleAuthError('Master System Administrator (Tier 0) requires verified Core Admin clearance. Please select Tier 1, 2, 3 or 4.');
       setSelectedTierId('tier_1');
       return;
     }
@@ -625,12 +625,8 @@ export const UserModal: React.FC<UserModalProps> = ({
                     value={selectedTierId}
                     onChange={e => {
                       if (e.target.value === 'tier_0') {
-                        if (email.trim().toLowerCase() !== SYSTEM_ADMIN_EMAIL.toLowerCase() && !isSystemAdmin(profile)) {
-                          alert(`Access Denied: Master System Administrator role is strictly restricted to ${SYSTEM_ADMIN_EMAIL}.`);
-                          return;
-                        }
-                        if (!isSystemAdmin(profile)) {
-                          setShowAdminPassModal(true);
+                        if (!isSystemAdmin({ ...profile, email: email.trim() })) {
+                          setGoogleAuthError('Master System Administrator (Tier 0) requires verified Core Admin clearance.');
                           return;
                         }
                       }

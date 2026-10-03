@@ -599,7 +599,7 @@ export const Tier0CommandHub: React.FC<Tier0CommandHubProps> = ({
                 0_TIER MASTER CONSOLE
               </span>
               <span className="text-[11px] text-teal-200/80 font-mono">
-                {profile.email || SYSTEM_ADMIN_EMAIL}
+                {profile.email || 'Core Admin'}
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/10 text-slate-300 border border-white/15">
                 ROOT AUTHORITY • 19 TOOLS CONSOLIDATED
@@ -1438,7 +1438,7 @@ const SecurityLoopModule: React.FC<{
     { name: 'Lockout Tripwire Engine', status: armedTripwire ? 'ARMED' : 'STANDBY', detail: '3 failed PIN attempts triggers instant floor lockdown' },
     { name: 'IndexedDB State Integrity', status: 'VERIFIED', detail: 'Local storage hash matches in-memory mirror' },
     { name: 'Offline Data Isolation', status: 'ENFORCED', detail: 'No external telemetry leaking beyond authorized sandbox' },
-    { name: 'Root Administrative Authenticator', status: 'AUTHENTICATED', detail: `Active email: ${profile.email || SYSTEM_ADMIN_EMAIL}` }
+    { name: 'Root Administrative Authenticator', status: 'AUTHENTICATED', detail: `Active session: ${profile.email || 'Core Admin'}` }
   ];
 
   return (
@@ -1827,7 +1827,7 @@ const BackupForgeModule: React.FC<{
       version: '2.4.0',
       system: 'DGU2 IE Control Hub',
       synthesizedAt: new Date().toISOString(),
-      creator: profile.email || SYSTEM_ADMIN_EMAIL,
+      creator: profile.email || 'core-admin@factory.local',
       factory: factoryProfile?.name || 'Debonair LTD',
       linesCount: lines.length,
       linesData: lines
@@ -1941,7 +1941,7 @@ const AuditForensicsModule: React.FC<{
       id: 'aud-001',
       timestamp: '14:22:10',
       action: 'Tier_0 Command Hub Accessed',
-      details: `Root operations session initialized by ${profile.email || SYSTEM_ADMIN_EMAIL}`,
+      details: `Root operations session initialized by ${profile.email || 'Core Admin'}`,
       severity: 'security',
       user: profile.name || 'Ashikur Rahman'
     },

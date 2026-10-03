@@ -40,7 +40,8 @@ import {
   verifySystemAdminPasscode,
   generateSessionFingerprint,
   FACTORY_BLOCKS,
-  isSystemAdmin
+  isSystemAdmin,
+  ALL_FACTORY_LINES
 } from '../utils/rbac';
 import { SYSTEM_ADMIN_PROFILE, ROLE_TIERS } from '../mockData';
 import { googleSignIn } from '../lib/firebaseAuth';
@@ -147,7 +148,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       }
     } catch {}
 
-    if (currentProfile?.email && currentProfile.email.toLowerCase() === cleanEmail) {
+    const isCoreAdminUser = SYSTEM_ADMIN_EMAILS.some(e => e.toLowerCase() === cleanEmail);
+    if (isCoreAdminUser) {
+      tierId = 'tier_0';
+      role = 'admin';
+      assignedUnit = 'Debonair LTD (Unit-02) — Master Administration';
+      assignedWing = 'All';
+      assignedBlock = 'All Blocks & Wings';
+      assignedLines = ALL_FACTORY_LINES;
+    } else if (currentProfile?.email && currentProfile.email.toLowerCase() === cleanEmail) {
       assignedUnit = currentProfile.assignedUnit || assignedUnit;
       assignedWing = currentProfile.assignedWing || assignedWing;
       assignedBlock = currentProfile.assignedBlock || assignedBlock;
@@ -161,15 +170,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       ...(currentProfile || {}),
       name: fullName.trim() || cleanEmail.split('@')[0],
       email: cleanEmail,
-      employeeId: employeeId.trim() || 'IE-9042',
+      employeeId: employeeId.trim() || (isCoreAdminUser ? 'SYS-ADMIN-01' : 'IE-9042'),
       tierId,
       role,
-      jobTitle: matchedTier.roleTitle || matchedTier.name,
+      jobTitle: isCoreAdminUser ? 'System Administrator (Root Operations)' : (matchedTier.roleTitle || matchedTier.name),
       assignedUnit,
       assignedWing,
       assignedBlock,
       assignedLines,
-      shift: 'General Shift (8:00 AM - 5:00 PM)',
+      shift: isCoreAdminUser ? '24/7 Root Operations & System Control' : 'General Shift (8:00 AM - 5:00 PM)',
       photoURL: currentProfile?.photoURL || `data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="50" fill="%23176f78"/%3E%3Ctext x="50%25" y="55%25" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-size="36" font-weight="700"%3EIE%3C/text%3E%3C/svg%3E`
     };
 
@@ -200,26 +209,30 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       return;
     }
 
-    // Zero Trust Principle: New user accounts strictly default to Tier 4 (Line IE / Data Entry)
-    // Factory boundary (wings, floors, lines) is allocated by administration via the central organogram
+    const isCoreAdminRegister = SYSTEM_ADMIN_EMAILS.some(e => e.toLowerCase() === cleanEmail);
     const tier4 = roleTiers.find(t => t.id === 'tier_4') || roleTiers[0];
+
     const registeredProfile: UserProfile = {
       ...(currentProfile || {}),
       name: fullName.trim(),
       email: cleanEmail,
-      employeeId: employeeId.trim() || `IE-${Math.floor(1000 + Math.random() * 9000)}`,
-      tierId: 'tier_4',
-      role: 'line_ie',
-      jobTitle: tier4.roleTitle || 'Line Industrial Engineer',
-      assignedUnit: 'Debonair LTD (Unit 02)',
-      assignedWing: 'Blue Wing',
-      assignedBlock: FACTORY_BLOCKS[0]?.label,
-      assignedLines: ['Line 01'],
-      shift: 'General Shift (8:00 AM - 5:00 PM)',
+      employeeId: employeeId.trim() || (isCoreAdminRegister ? 'SYS-ADMIN-01' : `IE-${Math.floor(1000 + Math.random() * 9000)}`),
+      tierId: isCoreAdminRegister ? 'tier_0' : 'tier_4',
+      role: isCoreAdminRegister ? 'admin' : 'line_ie',
+      jobTitle: isCoreAdminRegister ? 'System Administrator (Root Operations)' : (tier4.roleTitle || 'Line Industrial Engineer'),
+      assignedUnit: isCoreAdminRegister ? 'Debonair LTD (Unit-02) — Master Administration' : 'Debonair LTD (Unit 02)',
+      assignedWing: isCoreAdminRegister ? 'All' : 'Blue Wing',
+      assignedBlock: isCoreAdminRegister ? 'All Blocks & Wings' : FACTORY_BLOCKS[0]?.label,
+      assignedLines: isCoreAdminRegister ? ALL_FACTORY_LINES : ['Line 01'],
+      shift: isCoreAdminRegister ? '24/7 Root Operations & System Control' : 'General Shift (8:00 AM - 5:00 PM)',
       photoURL: `data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="50" fill="%23176f78"/%3E%3Ctext x="50%25" y="55%25" dominant-baseline="middle" text-anchor="middle" fill="%23ffffff" font-family="sans-serif" font-size="36" font-weight="700"%3EIE%3C/text%3E%3C/svg%3E`
     };
 
-    setSuccessMsg('Zero Trust registration complete: Enrolled with Tier 4 (Line IE Least-Privilege). Operational boundaries will be provisioned by Department Administration.');
+    setSuccessMsg(
+      isCoreAdminRegister
+        ? 'Core Admin authorization provisioned across all factory plant spaces.'
+        : 'Zero Trust registration complete: Enrolled with Tier 4 (Line IE Least-Privilege). Operational boundaries will be provisioned by Department Administration.'
+    );
     setTimeout(() => {
       saveAndComplete(registeredProfile);
     }, 800);

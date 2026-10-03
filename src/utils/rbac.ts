@@ -183,6 +183,19 @@ export function isSystemAdmin(profile?: Partial<UserProfile> | UserProfile | nul
 }
 
 /**
+ * Core Admin Governance:
+ * Quiet role recognition that grants Core Admin / Tier 0 Master Operations authorization
+ * across all plant spaces without exposing hardcoded identifiers in the user interface.
+ */
+export function isCoreAdmin(profile?: Partial<UserProfile> | UserProfile | null): boolean {
+  if (!profile) return false;
+  if (isSystemAdmin(profile)) return true;
+  if (profile.tierId === 'tier_0' && profile.role === 'admin') return true;
+  const email = (profile.email || '').toLowerCase().trim();
+  return SYSTEM_ADMIN_EMAILS.some(e => e.toLowerCase() === email);
+}
+
+/**
  * Check if the active profile has Master Administration or Admin Role.
  * Root operations and administrative system controls components are visible
  * ONLY to users who pass this check.

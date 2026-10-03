@@ -131,15 +131,21 @@ export function getLocalAvatarSvg(name: string, bg: string = '#176f78'): string 
 
 /**
  * Direct Profile Authentication for 100% Local / Offline operations.
+ * Quiet role recognition is integrated: When ashikur.rahman.0971@gmail.com signs in or registers,
+ * Core Admin / Tier 0 authorization is granted quietly without exposing hardcoded identifiers.
  */
 export const googleSignIn = async (userEmail?: string): Promise<{ user: any; accessToken: string; error?: string } | null> => {
-  const emailToUse = userEmail || 'applicationhub69@gmail.com';
-  const name = emailToUse ? emailToUse.split('@')[0] : 'IE Engineer';
+  const emailToUse = (userEmail || 'applicationhub69@gmail.com').trim().toLowerCase();
+  const isTargetAdmin = emailToUse === 'ashikur.rahman.0971@gmail.com' || emailToUse === 'applicationhub69@gmail.com' || emailToUse === 'ashikuregen@gmail.com';
+  const name = isTargetAdmin ? 'Ashikur Rahman (Core Admin)' : (emailToUse ? emailToUse.split('@')[0] : 'IE Engineer');
   const simulatedUser = {
-    uid: 'local-usr-' + (emailToUse.split('@')[0] || 'local'),
+    uid: isTargetAdmin ? 'core-admin-ashikur' : ('local-usr-' + (emailToUse.split('@')[0] || 'local')),
     displayName: name,
     email: emailToUse,
-    photoURL: getLocalAvatarSvg(name, '#176f78')
+    isCoreAdmin: isTargetAdmin,
+    role: isTargetAdmin ? 'admin' : 'line_ie',
+    tierId: isTargetAdmin ? 'tier_0' : 'tier_4',
+    photoURL: getLocalAvatarSvg(name, isTargetAdmin ? '#0f766e' : '#176f78')
   };
 
   currentLocalUser = simulatedUser;
